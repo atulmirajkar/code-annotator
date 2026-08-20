@@ -49,6 +49,7 @@ func TestResolveFile(t *testing.T) {
 
 	rootPath := t.TempDir()
 	mustWriteFile(t, filepath.Join(rootPath, "guide", "intro.md"), []byte("intro"))
+	mustWriteFile(t, filepath.Join(rootPath, "100%.md"), []byte("percent"))
 	root, err := Open(rootPath)
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -65,14 +66,12 @@ func TestResolveFile(t *testing.T) {
 	}{
 		{name: "nested file", path: "guide/intro.md"},
 		{name: "clean relative path", path: "guide/./intro.md"},
+		{name: "literal percent", path: "100%.md"},
 		{name: "empty", path: "", wantErr: ErrInvalidPath},
 		{name: "root", path: ".", wantErr: ErrOutsideRoot},
 		{name: "absolute", path: "/etc/passwd", wantErr: ErrInvalidPath},
 		{name: "lexical traversal", path: "../secret.md", wantErr: ErrOutsideRoot},
-		{name: "encoded traversal", path: "%2e%2e/secret.md", wantErr: ErrOutsideRoot},
-		{name: "encoded slash traversal", path: "%2e%2e%2fsecret.md", wantErr: ErrOutsideRoot},
 		{name: "backslash traversal", path: `..\secret.md`, wantErr: ErrOutsideRoot},
-		{name: "malformed escape", path: "%zz", wantErr: ErrInvalidPath},
 		{name: "missing", path: "missing.md", wantErr: os.ErrNotExist},
 		{name: "directory", path: "guide", wantErr: ErrNotRegular},
 	}
@@ -89,7 +88,15 @@ func TestResolveFile(t *testing.T) {
 			if err != nil {
 				t.Fatalf("ResolveFile(%q) error = %v", tt.path, err)
 			}
-			if got, want := resolved, wantResolved; got != want {
+			want := wantResolved
+			if tt.path == "100%.md" {
+				percentResolved, resolveErr := filepath.EvalSymlinks(filepath.Join(rootPath, "100%.md"))
+				if resolveErr != nil {
+					t.Fatalf("EvalSymlinks() error = %v", resolveErr)
+				}
+				want = percentResolved
+			}
+			if got := resolved; got != want {
 				t.Fatalf("ResolveFile(%q) = %q, want %q", tt.path, got, want)
 			}
 		})

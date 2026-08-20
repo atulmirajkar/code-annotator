@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -62,7 +61,7 @@ func (r *Root) Path() string {
 	return r.path
 }
 
-// ResolveFile resolves a URL-style relative path to an existing regular file
+// ResolveFile resolves a slash-separated relative path to an existing regular file
 // inside the root. It rejects lexical traversal and symlinks escaping the root.
 func (r *Root) ResolveFile(requestPath string) (string, error) {
 	relative, err := cleanRequestPath(requestPath)
@@ -136,19 +135,14 @@ func cleanRequestPath(requestPath string) (string, error) {
 		return "", ErrInvalidPath
 	}
 
-	decoded, err := url.PathUnescape(requestPath)
-	if err != nil || strings.ContainsRune(decoded, '\x00') {
-		return "", ErrInvalidPath
-	}
-
 	// Treat backslashes as separators on every platform so a path accepted on
 	// Unix cannot become traversal when the same binary is built for Windows.
-	decoded = strings.ReplaceAll(decoded, `\`, "/")
-	if strings.HasPrefix(decoded, "/") {
+	normalized := strings.ReplaceAll(requestPath, `\`, "/")
+	if strings.HasPrefix(normalized, "/") {
 		return "", ErrInvalidPath
 	}
 
-	cleaned := path.Clean(decoded)
+	cleaned := path.Clean(normalized)
 	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return "", ErrOutsideRoot
 	}

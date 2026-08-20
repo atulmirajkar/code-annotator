@@ -8,8 +8,10 @@ import (
 	"io/fs"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"atulm/md-viewer/internal/content"
 	mdrender "atulm/md-viewer/internal/render"
@@ -17,6 +19,13 @@ import (
 )
 
 const maxDocumentBytes int64 = 4 << 20
+
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 15 * time.Second
+	writeTimeout      = 30 * time.Second
+	idleTimeout       = 60 * time.Second
+)
 
 // Server serves an index and rendered Markdown documents from a content root.
 type Server struct {
@@ -74,8 +83,9 @@ func New(root *content.Root, renderer *mdrender.Renderer) (*Server, error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", server.handleIndex)
 	mux.HandleFunc("GET /view/{path...}", server.handleDocument)
+	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
-	server.handler = mux
+	server.handler = securityHeaders(mux)
 
 	return server, nil
 }
@@ -83,6 +93,19 @@ func New(root *content.Root, renderer *mdrender.Renderer) (*Server, error) {
 // Handler returns the complete HTTP handler for the viewer.
 func (s *Server) Handler() http.Handler {
 	return s.handler
+}
+
+// HTTPServer creates a configured net/http server for address. The caller owns
+// the listener and graceful shutdown lifecycle.
+func (s *Server) HTTPServer(address string) *http.Server {
+	return &http.Server{
+		Addr:              address,
+		Handler:           s.Handler(),
+		ReadHeaderTimeout: readHeaderTimeout,
+		ReadTimeout:       readTimeout,
+		WriteTimeout:      writeTimeout,
+		IdleTimeout:       idleTimeout,
+	}
 }
 
 func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request) {
@@ -100,7 +123,12 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 }
 
 func (s *Server) handleDocument(response http.ResponseWriter, request *http.Request) {
-	documentPath := request.PathValue("path")
+	requestPath := escapedRoutePath(request, "/view/")
+	documentPath, err := url.PathUnescape(requestPath)
+	if err != nil {
+		http.NotFound(response, request)
+		return
+	}
 	if !strings.EqualFold(filepath.Ext(documentPath), ".md") {
 		http.NotFound(response, request)
 		return
@@ -112,6 +140,34 @@ func (s *Server) handleDocument(response http.ResponseWriter, request *http.Requ
 		return
 	}
 	s.renderDocument(response, index, documentPath)
+}
+
+func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request) {
+	assetPath := escapedRoutePath(request, "/asset/")
+	assetPath, err := url.PathUnescape(assetPath)
+	if err != nil {
+		http.NotFound(response, request)
+		return
+	}
+	resolved, err := s.root.ResolveFile(assetPath)
+	if err != nil {
+		s.writeAssetError(response, request, err)
+		return
+	}
+
+	file, err := os.Open(resolved)
+	if err != nil {
+		s.writeAssetError(response, request, err)
+		return
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		http.Error(response, "could not read document asset", http.StatusInternalServerError)
+		return
+	}
+	http.ServeContent(response, request, filepath.Base(resolved), info.ModTime(), file)
 }
 
 func (s *Server) renderDocument(response http.ResponseWriter, index content.Index, documentPath string) {
@@ -167,6 +223,14 @@ func (s *Server) writeContentError(response http.ResponseWriter, err error) {
 	}
 }
 
+func (s *Server) writeAssetError(response http.ResponseWriter, request *http.Request, err error) {
+	if content.IsNotExist(err) || errors.Is(err, content.ErrInvalidPath) || errors.Is(err, content.ErrOutsideRoot) || errors.Is(err, content.ErrNotRegular) {
+		http.NotFound(response, request)
+		return
+	}
+	http.Error(response, "could not read document asset", http.StatusInternalServerError)
+}
+
 func (s *Server) handleHealth(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	response.WriteHeader(http.StatusOK)
@@ -175,4 +239,19 @@ func (s *Server) handleHealth(response http.ResponseWriter, _ *http.Request) {
 
 func routeURL(prefix, relative string) string {
 	return (&url.URL{Path: prefix + relative}).String()
+}
+
+func escapedRoutePath(request *http.Request, prefix string) string {
+	return strings.TrimPrefix(request.URL.EscapedPath(), prefix)
+}
+
+func securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		response.Header().Set("Cache-Control", "no-store")
+		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'unsafe-inline'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		response.Header().Set("Referrer-Policy", "no-referrer")
+		response.Header().Set("X-Content-Type-Options", "nosniff")
+		response.Header().Set("X-Frame-Options", "DENY")
+		next.ServeHTTP(response, request)
+	})
 }
