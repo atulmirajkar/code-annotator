@@ -31,7 +31,7 @@ a { color: var(--accent); }
 .brand { color: var(--text); font-weight: 750; text-decoration: none; letter-spacing: -.02em; }
 .root { min-width: 0; overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
 .layout { display: grid; grid-template-columns: minmax(14rem, 19rem) minmax(0, 1fr); min-height: calc(100vh - 3.5rem); }
-.sidebar { padding: 1.5rem 1rem; border-right: 1px solid var(--border); background: var(--surface); }
+.sidebar { position: sticky; top: 3.5rem; align-self: start; height: calc(100vh - 3.5rem); overflow-y: auto; padding: 1.5rem 1rem; border-right: 1px solid var(--border); background: var(--surface); }
 .sidebar h2 { margin: 0 .5rem .75rem; font-size: .75rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
 .documents { margin: 0; padding: 0; list-style: none; }
 .documents a { display: block; padding: .55rem .65rem; border-radius: .45rem; color: var(--text); font-size: .9rem; text-decoration: none; overflow-wrap: anywhere; }
@@ -56,7 +56,7 @@ a { color: var(--accent); }
 
 @media (max-width: 720px) {
   .layout { grid-template-columns: 1fr; }
-  .sidebar { border-right: 0; border-bottom: 1px solid var(--border); }
+  .sidebar { position: static; height: auto; overflow: visible; border-right: 0; border-bottom: 1px solid var(--border); }
   .documents { display: flex; gap: .25rem; overflow-x: auto; padding-bottom: .25rem; }
   .documents li { flex: 0 0 auto; }
   .documents a { max-width: 18rem; }
