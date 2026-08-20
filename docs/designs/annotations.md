@@ -25,6 +25,8 @@ AI agent without modifying the source document.
 - Export unresolved annotations in deterministic JSON or agent-friendly
   Markdown.
 - Track an annotation from creation through acknowledgement and resolution.
+- Keep inline reviewer and agent replies as a durable thread across repeated
+  implementation attempts.
 - Keep the existing viewer read-only unless review mode is explicitly enabled.
 
 ## Non-goals
@@ -69,7 +71,10 @@ not expose mutation endpoints.
 5. Selecting a highlight focuses its card; selecting a card scrolls to its
    passage.
 6. The reviewer can filter by status or intent and add document-level comments.
-7. After an agent responds, the reviewer can close or reopen the annotation.
+7. After an agent reports an applied change, the reviewer can accept it or reply
+   inline with `Needs changes`.
+8. `Needs changes` keeps the same annotation and anchor active and returns it to
+   the agent queue with the complete discussion and attempt history.
 
 On desktop, the layout becomes document navigation, document content, and review
 panel. On narrow screens, the review panel becomes a drawer. Annotation creation
@@ -91,14 +96,23 @@ must remain usable with keyboard selection and focus navigation.
 ```text
 open -> acknowledged -> applied -> closed
   |          |            |
-  +----------+------------+-> rejected
+  |          |            +-> needs_changes -> acknowledged -> applied
+  |          |
+  +----------+----------------> rejected
 
 closed or rejected -> open
 ```
 
 `applied` means an agent or author reports that work was performed. `closed`
 means the reviewer accepted the outcome. Keeping those states distinct prevents
-an agent from closing its own review request implicitly.
+an agent from closing its own review request implicitly. `needs_changes` means
+an attempted resolution was not satisfactory and remains actionable. It is not
+the same as `rejected`, which records a decision not to perform the request.
+
+Only a reviewer can transition `applied` to `closed`. When a reviewer selects
+`Needs changes`, a reply is required and the annotation transitions from
+`applied` to `needs_changes`. The next agent attempt reuses the same annotation
+ID rather than creating a replacement annotation.
 
 ## Storage model
 
@@ -140,7 +154,7 @@ and avoids one highly contended repository-wide database file.
           "endLine": 104
         }
       },
-      "resolution": null
+      "thread": []
     }
   ]
 }
@@ -151,21 +165,46 @@ Timestamps use UTC RFC 3339. Relative document paths always use `/` separators.
 Unknown fields must be preserved when rewriting a supported schema version so
 future agent metadata is not silently discarded.
 
-### Resolution metadata
+### Threaded activity and resolution attempts
 
-When an agent acknowledges, applies, or rejects a request, it may attach:
+The original `comment` remains immutable review context. Follow-up discussion
+and resolution attempts are appended to `thread` in chronological order. An
+agent reporting an applied change may append:
 
 ```json
 {
+  "id": "msg_01J7Z0A8Q2K4P7M6N5R3T1V9W8",
+  "kind": "resolution",
   "summary": "Added --listen while retaining 127.0.0.1 as the default.",
   "commit": "abc1234",
-  "actor": "codex",
-  "resolvedAt": "2026-08-20T20:15:00Z"
+  "author": "codex",
+  "createdAt": "2026-08-20T20:15:00Z"
 }
 ```
 
-The viewer treats these fields as a report, not proof. A human still controls
-the transition to `closed`.
+If the result is unsatisfactory, the reviewer chooses `Needs changes` and
+appends a reply:
+
+```json
+{
+  "id": "msg_01J7Z0N4S8B6H3Q2C9D5F7K1M0",
+  "kind": "review",
+  "message": "The implementation replaced the loopback default. Keep 127.0.0.1 unless the flag is supplied.",
+  "author": "atul",
+  "createdAt": "2026-08-20T20:30:00Z"
+}
+```
+
+Allowed thread kinds are `reply`, `acknowledgement`, `resolution`, `review`, and
+`status_change`. Resolution entries may carry a commit reference and summary;
+ordinary replies carry a message. Existing thread entries are append-only.
+Corrections are represented by another entry so the review history is not
+silently rewritten.
+
+The viewer treats an agent resolution as a report, not proof. A human either
+transitions it to `closed` or responds with `needs_changes`. Every subsequent
+agent export includes the original request, all resolution attempts, and all
+reviewer replies.
 
 ## Anchoring and stale detection
 
@@ -217,7 +256,8 @@ Mutation routes exist only in review mode.
 | --- | --- |
 | `GET /api/annotations?document={path}` | List annotations and derived anchor state. |
 | `POST /api/annotations` | Create a text or document annotation. |
-| `PATCH /api/annotations/{id}` | Edit comment, transition status, or add resolution metadata. |
+| `PATCH /api/annotations/{id}` | Transition status or update allowed mutable fields. |
+| `POST /api/annotations/{id}/replies` | Append an agent or reviewer thread entry. |
 | `POST /api/annotations/{id}/reattach` | Attach a stale comment to a new selection. |
 
 The first milestone should not permanently delete annotations. A mistaken
@@ -247,8 +287,8 @@ Sidecars are the canonical machine-readable interface. Add a CLI surface that
 does not require the server to be running:
 
 ```sh
-md-viewer annotations list --root ./docs --status open --format json
-md-viewer annotations export --root ./docs --status open --format markdown
+md-viewer annotations list --root ./docs --status open,needs_changes --format json
+md-viewer annotations export --root ./docs --status open,needs_changes --format markdown
 md-viewer annotations resolve --root ./docs --id ann_... \
   --status applied --actor codex --commit abc1234 --summary "Implemented request"
 ```
@@ -264,9 +304,11 @@ An agent workflow is:
 1. List unresolved `question`, `suggestion`, and `change_request` annotations.
 2. Read each current document plus its quoted context.
 3. Make in-scope changes and verify them.
-4. Mark handled annotations `applied` or `rejected` with a summary and optional
-   commit.
-5. Leave final closure to the reviewer.
+4. Mark handled annotations `applied` with a summary and optional commit, or
+   `rejected` with a reason when the request cannot or should not be performed.
+5. If the reviewer responds with `needs_changes`, read the complete thread and
+   make another attempt against the same annotation ID.
+6. Leave final closure to the reviewer.
 
 An MCP adapter or automatic watcher can be designed later over the same sidecar
 and CLI contracts. The viewer must not execute arbitrary agent commands.
@@ -288,7 +330,7 @@ web/                       selection, highlights, review panel, filters
 2. Root-safe atomic sidecar store with optimistic concurrency.
 3. Read-only annotation API and review-panel display.
 4. Secure review mode and annotation creation from verified selections.
-5. Status updates, stale-anchor display, and reattachment.
+5. Threaded replies, `needs_changes`, stale-anchor display, and reattachment.
 6. Offline CLI list and Markdown/JSON export.
 7. Agent resolution command, integration tests, and documentation.
 
@@ -307,6 +349,10 @@ Each slice should be a separately reviewable commit with unit tests and a green
 - Requests without the correct origin and session token cannot mutate data.
 - An agent can list and export open actions without starting the web server.
 - An agent can report an applied change with a summary and commit reference.
+- A reviewer can respond inline to an applied attempt, set `needs_changes`, and
+  return the same annotation to the agent queue without losing prior attempts.
+- Agent exports include the original request, every resolution attempt, and the
+  latest reviewer reply.
 - A reviewer, not the agent, controls final closure.
 - Storage, API, UI, security, and CLI behavior have automated coverage.
 
