@@ -1,0 +1,110 @@
+// Package app owns command-line configuration and the server process lifecycle.
+package app
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"strconv"
+	"time"
+
+	"atulm/md-viewer/internal/content"
+	mdrender "atulm/md-viewer/internal/render"
+	"atulm/md-viewer/internal/server"
+)
+
+const shutdownTimeout = 5 * time.Second
+
+type config struct {
+	rootPath string
+	port     int
+	noOpen   bool
+}
+
+// Run parses args, starts the local viewer, and blocks until ctx is canceled or
+// the HTTP server fails. stdout receives the usable viewer URL.
+func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	configuration, err := parseConfig(args, stderr)
+	if err != nil {
+		return err
+	}
+
+	root, err := content.Open(configuration.rootPath)
+	if err != nil {
+		return fmt.Errorf("open Markdown directory: %w", err)
+	}
+	viewer, err := server.New(root, mdrender.New())
+	if err != nil {
+		return fmt.Errorf("create Markdown viewer: %w", err)
+	}
+
+	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(configuration.port))
+	listener, err := net.Listen("tcp4", address)
+	if err != nil {
+		return fmt.Errorf("listen on %s: %w", address, err)
+	}
+	defer listener.Close()
+
+	httpServer := viewer.HTTPServer(listener.Addr().String())
+	viewerURL := "http://" + listener.Addr().String() + "/"
+	fmt.Fprintf(stdout, "Serving %s at %s\n", root.Path(), viewerURL)
+	fmt.Fprintln(stdout, "Press Ctrl-C to stop")
+
+	serveResult := make(chan error, 1)
+	go func() {
+		serveResult <- httpServer.Serve(listener)
+	}()
+
+	select {
+	case serveErr := <-serveResult:
+		if errors.Is(serveErr, http.ErrServerClosed) {
+			return nil
+		}
+		return fmt.Errorf("serve Markdown viewer: %w", serveErr)
+	case <-ctx.Done():
+		shutdownContext, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+		defer cancel()
+		if err := httpServer.Shutdown(shutdownContext); err != nil {
+			return fmt.Errorf("shut down Markdown viewer: %w", err)
+		}
+		serveErr := <-serveResult
+		if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
+			return fmt.Errorf("serve Markdown viewer: %w", serveErr)
+		}
+		return nil
+	}
+}
+
+func parseConfig(args []string, stderr io.Writer) (config, error) {
+	flags := flag.NewFlagSet("md-viewer", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	port := flags.Int("port", 0, "loopback port; 0 selects an available port")
+	noOpen := flags.Bool("no-open", false, "do not open the default browser")
+	flags.Usage = func() {
+		fmt.Fprintln(stderr, "Usage: md-viewer [options] <directory>")
+		fmt.Fprintln(stderr)
+		fmt.Fprintln(stderr, "Options:")
+		flags.PrintDefaults()
+	}
+
+	if err := flags.Parse(args); err != nil {
+		return config{}, err
+	}
+	if flags.NArg() != 1 {
+		flags.Usage()
+		return config{}, errors.New("exactly one Markdown directory is required")
+	}
+	if *port < 0 || *port > 65535 {
+		return config{}, fmt.Errorf("port must be between 0 and 65535: %d", *port)
+	}
+
+	return config{
+		rootPath: flags.Arg(0),
+		port:     *port,
+		noOpen:   *noOpen,
+	}, nil
+}
