@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{if .Selected}}{{.Selected}} · {{end}}md-viewer</title>
+  <style>{{.Styles}}</style>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">md-viewer</a>
+    <span class="root" title="{{.Root}}">{{.Root}}</span>
+  </header>
+  <div class="layout">
+    <nav class="sidebar" aria-label="Markdown documents">
+      <h2>Documents</h2>
+      {{if .Documents}}
+      <ul class="documents">
+        {{range .Documents}}
+        <li>
+          <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
+            {{if .Directory}}<span class="directory">{{.Directory}}/</span>{{end}}{{.Name}}
+          </a>
+        </li>
+        {{end}}
+      </ul>
+      {{else}}
+      <p class="empty-nav">No Markdown files found.</p>
+      {{end}}
+    </nav>
+    <main class="document">
+      {{if .Empty}}
+      <section class="empty-state">
+        <h1>No Markdown files found</h1>
+        <p>Add a <code>.md</code> file below this directory, then refresh the page.</p>
+      </section>
+      {{else}}
+      <article class="markdown-body">{{.Content}}</article>
+      {{end}}
+    </main>
+  </div>
+</body>
+</html>
