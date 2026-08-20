@@ -113,7 +113,7 @@ func (s Sidecar) Validate() error {
 	if s.SchemaVersion != SchemaVersion {
 		return fmt.Errorf("unsupported annotation schema version %d", s.SchemaVersion)
 	}
-	if err := validateDocumentPath(s.Document); err != nil {
+	if err := ValidateDocumentPath(s.Document); err != nil {
 		return err
 	}
 
@@ -289,7 +289,9 @@ func ValidateTransition(from, to Status, actor ActorRole) error {
 	return nil
 }
 
-func validateDocumentPath(document string) error {
+// ValidateDocumentPath checks the canonical slash-separated Markdown path used
+// by sidecars and storage APIs.
+func ValidateDocumentPath(document string) error {
 	if document == "" || strings.ContainsRune(document, '\x00') || strings.Contains(document, `\`) || strings.HasPrefix(document, "/") {
 		return errors.New("document must be a non-empty slash-separated relative path")
 	}
