@@ -74,6 +74,7 @@ Available flags:
 ## Documentation
 
 - [MVP design](docs/designs/mvp.md)
+- [Annotation review design](docs/designs/annotations.md)
 - [Architecture](docs/architecture.md)
 - [Build and run](docs/build.md)
 - [Project status](project_status.md)

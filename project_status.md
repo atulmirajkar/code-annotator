@@ -8,7 +8,8 @@ Last updated: 2026-08-20
 
 The MVP scope is implemented with automated unit, handler, lifecycle, race, and
 cross-platform build verification. Markdown and asset updates are read from disk
-on browser refresh. Live reload remains a post-MVP milestone.
+on browser refresh. Annotation review is the next product milestone, followed by
+live reload.
 
 ## Milestones
 
@@ -52,7 +53,20 @@ on browser refresh. Live reload remains a post-MVP milestone.
 - [x] Verify native, Windows amd64, and Linux amd64 builds.
 - [ ] Prepare the first tagged MVP release.
 
-### 6. Live reload
+### 6. Annotation review and AI handoff
+
+- [x] Define the annotation product goals and trust boundary.
+- [x] Design the versioned sidecar JSON schema and source anchoring model.
+- [x] Design the selection, comment panel, and annotation status workflow.
+- [x] Define CLI export commands for AI-agent consumption.
+- [ ] Add an explicit writable review mode and annotation directory handling.
+- [ ] Implement atomic sidecar persistence and stale-anchor detection.
+- [ ] Implement annotation HTTP APIs with origin and session-token protection.
+- [ ] Add rendered-text selection, highlights, and the review panel.
+- [ ] Add annotation list, export, and resolve CLI commands.
+- [ ] Add storage, API, UI, security, and agent-handoff tests.
+
+### 7. Live reload
 
 - [ ] Watch the selected content directory for Markdown and asset changes.
 - [ ] Notify connected browser sessions using Server-Sent Events.
@@ -71,7 +85,9 @@ on browser refresh. Live reload remains a post-MVP milestone.
 | `github.com/yuin/goldmark` with GFM and raw HTML disabled | Approved |
 | `github.com/pkg/browser` for default-browser launch | Approved |
 | Browser-launch failure is non-fatal | Approved |
-| Live reload deferred to post-MVP milestone 6 | Approved |
+| Annotations stored separately from Markdown in versioned JSON sidecars | Proposed |
+| Annotation review scheduled before live reload | Approved |
+| Live reload deferred to post-annotation milestone 7 | Approved |
 | Editing and network sharing deferred | Approved |
 
 ## Known risks
@@ -86,4 +102,5 @@ on browser refresh. Live reload remains a post-MVP milestone.
 
 ## Next milestone
 
-Complete a manual UI smoke test, then prepare the first tagged MVP release.
+Review and approve the annotation design, then break milestone 6 into small
+implementation commits.

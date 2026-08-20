@@ -133,6 +133,7 @@ external.
 
 ## Deferred capabilities
 
-Live reload, syntax highlighting, search, table-of-contents generation, raw HTML,
-and non-loopback listening are deferred. Any future network-sharing option must
+Annotation review and AI handoff are designed as the next milestone. Live
+reload, syntax highlighting, search, table-of-contents generation, raw HTML, and
+non-loopback listening remain deferred. Any future network-sharing option must
 be explicit and should include a separate security review.
