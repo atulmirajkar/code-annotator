@@ -272,6 +272,48 @@ func TestHTTPServerConfiguration(t *testing.T) {
 	}
 }
 
+func TestViewerRefreshReflectsDiskChanges(t *testing.T) {
+	t.Parallel()
+
+	rootPath := t.TempDir()
+	readmePath := filepath.Join(rootPath, "README.md")
+	assetPath := filepath.Join(rootPath, "images", "status.txt")
+	writeTestFile(t, readmePath, "# First version\n\n[Guide](guide/intro.md)\n")
+	writeTestFile(t, assetPath, "first asset")
+	handler := handlerForRoot(t, rootPath)
+
+	firstPage := getResponse(t, handler, "/")
+	if !strings.Contains(firstPage.Body.String(), "<h1>First version</h1>") {
+		t.Fatalf("first page does not contain original Markdown: %s", firstPage.Body.String())
+	}
+
+	writeTestFile(t, readmePath, "# Saved update\n\n[Guide](guide/intro.md)\n")
+	writeTestFile(t, filepath.Join(rootPath, "guide", "intro.md"), "# New guide")
+	writeTestFile(t, assetPath, "updated asset")
+
+	refreshedPage := getResponse(t, handler, "/")
+	for _, want := range []string{
+		"<h1>Saved update</h1>",
+		`href="/view/guide/intro.md"`,
+	} {
+		if !strings.Contains(refreshedPage.Body.String(), want) {
+			t.Errorf("refreshed page missing %q: %s", want, refreshedPage.Body.String())
+		}
+	}
+	if strings.Contains(refreshedPage.Body.String(), "First version") {
+		t.Errorf("refreshed page contains stale Markdown: %s", refreshedPage.Body.String())
+	}
+
+	guidePage := getResponse(t, handler, "/view/guide/intro.md")
+	if !strings.Contains(guidePage.Body.String(), "<h1>New guide</h1>") {
+		t.Fatalf("nested document was not discovered: %s", guidePage.Body.String())
+	}
+	asset := getResponse(t, handler, "/asset/images/status.txt")
+	if got, want := asset.Body.String(), "updated asset"; got != want {
+		t.Fatalf("refreshed asset = %q, want %q", got, want)
+	}
+}
+
 func newTestHandler(t *testing.T, files map[string]string) http.Handler {
 	t.Helper()
 	rootPath := t.TempDir()
@@ -286,6 +328,27 @@ func newTestHandler(t *testing.T, files map[string]string) http.Handler {
 	}
 
 	return handlerForRoot(t, rootPath)
+}
+
+func writeTestFile(t *testing.T, filePath, body string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(filePath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filePath, []byte(body), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+}
+
+func getResponse(t *testing.T, handler http.Handler, requestPath string) *httptest.ResponseRecorder {
+	t.Helper()
+	request := httptest.NewRequest(http.MethodGet, requestPath, nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if got, want := response.Code, http.StatusOK; got != want {
+		t.Fatalf("GET %q status = %d, want %d; body: %s", requestPath, got, want, response.Body.String())
+	}
+	return response
 }
 
 func handlerForRoot(t *testing.T, rootPath string) http.Handler {

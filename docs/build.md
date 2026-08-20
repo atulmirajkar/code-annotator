@@ -1,9 +1,5 @@
 # Build and run
 
-> The repository is currently in the design phase. These commands define the
-> intended MVP workflow and will become executable as implementation milestones
-> are completed.
-
 ## Requirements
 
 - Go `1.26.5` or a compatible newer Go release, matching `go.mod`.
@@ -47,7 +43,7 @@ go build -o bin/md-viewer.exe ./cmd/md-viewer
 ./bin/md-viewer.exe ./docs
 ```
 
-## Planned command-line options
+## Command-line options
 
 Use a fixed loopback port:
 
@@ -69,13 +65,13 @@ by the operating system.
 Format and test the code:
 
 ```sh
-gofmt -w ./cmd ./internal
+go fmt ./...
 go test ./...
 go vet ./...
 go test -race ./...
 ```
 
-Once implemented, a minimal manual check is:
+A minimal manual check is:
 
 1. Create a directory containing a Markdown file and a relative image.
 2. Start `md-viewer` with that directory.
@@ -85,7 +81,7 @@ Once implemented, a minimal manual check is:
 
 ## Install locally
 
-After the MVP command exists, install it into the active Go binary directory:
+Install it into the active Go binary directory:
 
 ```sh
 go install ./cmd/md-viewer

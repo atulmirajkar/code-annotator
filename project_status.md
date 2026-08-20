@@ -4,11 +4,11 @@ Last updated: 2026-08-20
 
 ## Current state
 
-**Phase:** MVP design complete; implementation not started.
+**Phase:** Manual-refresh MVP implemented; release tag pending.
 
-The MVP scope and architecture are documented. No application source or tests
-exist yet, so the build and run commands are a target contract rather than a
-verified workflow.
+The MVP scope is implemented with automated unit, handler, lifecycle, race, and
+cross-platform build verification. Markdown and asset updates are read from disk
+on browser refresh. Live reload remains a post-MVP milestone.
 
 ## Milestones
 
@@ -22,34 +22,34 @@ verified workflow.
 
 ### 2. CLI and process lifecycle
 
-- [ ] Add `cmd/md-viewer` entry point.
-- [ ] Parse the directory argument, `--port`, and `--no-open`.
-- [ ] Validate and resolve the content root.
-- [ ] Bind an OS-selected or explicit loopback port.
-- [ ] Add signal handling and graceful shutdown.
+- [x] Add `cmd/md-viewer` entry point.
+- [x] Parse the directory argument, `--port`, and `--no-open`.
+- [x] Validate and resolve the content root.
+- [x] Bind an OS-selected or explicit loopback port.
+- [x] Add signal handling and graceful shutdown.
 
 ### 3. Content and rendering
 
-- [ ] Implement recursive Markdown discovery and stable ordering.
-- [ ] Implement traversal- and symlink-safe content lookup.
-- [ ] Configure goldmark with GFM extensions and safe defaults.
-- [ ] Rewrite document-relative Markdown links and asset references.
-- [ ] Add embedded HTML templates and responsive styling.
+- [x] Implement recursive Markdown discovery and stable ordering.
+- [x] Implement traversal- and symlink-safe content lookup.
+- [x] Configure goldmark with GFM extensions and safe defaults.
+- [x] Rewrite document-relative Markdown links and asset references.
+- [x] Add embedded HTML templates and responsive styling.
 
 ### 4. HTTP server and browser integration
 
-- [ ] Implement index, view, asset, and health handlers.
-- [ ] Add security headers, timeouts, and useful error responses.
-- [ ] Integrate `github.com/pkg/browser` through a testable launch adapter.
-- [ ] Keep the server alive and print the URL when browser launch fails.
+- [x] Implement index, view, asset, and health handlers.
+- [x] Add security headers, timeouts, and useful error responses.
+- [x] Integrate `github.com/pkg/browser` through a testable launch adapter.
+- [x] Keep the server alive and print the URL when browser launch fails.
 
 ### 5. Verification and release readiness
 
-- [ ] Add unit tests for path containment, indexing, and rendering.
-- [ ] Add handler and lifecycle integration tests.
-- [ ] Verify relative links and assets on nested documents.
-- [ ] Run `go test ./...`, `go vet ./...`, and `go test -race ./...`.
-- [ ] Verify build and manual run instructions on supported platforms.
+- [x] Add unit tests for path containment, indexing, and rendering.
+- [x] Add handler and lifecycle integration tests.
+- [x] Verify relative links and assets on nested documents.
+- [x] Run `go test ./...`, `go vet ./...`, and `go test -race ./...`.
+- [x] Verify native, Windows amd64, and Linux amd64 builds.
 - [ ] Prepare the first tagged MVP release.
 
 ### 6. Live reload
@@ -86,5 +86,4 @@ verified workflow.
 
 ## Next milestone
 
-Implement milestone 2: the CLI, validated content root, loopback listener, and
-graceful process lifecycle.
+Complete a manual UI smoke test, then prepare the first tagged MVP release.

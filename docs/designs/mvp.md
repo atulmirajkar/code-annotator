@@ -2,8 +2,8 @@
 
 ## Status
 
-Approved for implementation. This document defines the first usable release of
-`md-viewer`. Milestone progress is tracked in
+Implemented. This document defines the first usable release of `md-viewer`.
+Milestone progress is tracked in
 [`../../project_status.md`](../../project_status.md).
 
 ## Problem

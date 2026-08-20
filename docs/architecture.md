@@ -111,8 +111,10 @@ not string-prefix comparison. Asset handlers must not expose directory listings.
 ## Rendering and navigation
 
 The index prefers `README.md` as the initial document when it exists. Other
-Markdown files are presented in a stable, case-insensitive sort order. The page
-template provides a navigation sidebar and a readable document pane.
+Markdown files are presented in a stable, case-insensitive sort order. Hidden
+files and directories are omitted. The page template provides a navigation
+sidebar and a readable document pane; on desktop, the sidebar remains visible
+and scrolls independently from the document.
 
 Relative Markdown links to other `.md` files should resolve to `/view/` routes.
 Relative image and asset references should resolve to `/asset/` routes relative

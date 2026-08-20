@@ -4,8 +4,7 @@
 files from a directory. It starts a server on the loopback interface, renders
 Markdown as HTML, and opens the viewer in the user's default browser.
 
-The project is currently in the design phase. The commands below describe the
-MVP interface that the implementation will provide.
+The MVP is implemented and ready to run from source or as a compiled binary.
 
 ## MVP goals
 
@@ -20,7 +19,7 @@ MVP interface that the implementation will provide.
 Editing, uploads, live reload, full-text search, and network sharing are not in
 the initial MVP.
 
-## Planned usage
+## Usage
 
 Run directly from the repository:
 
@@ -39,7 +38,7 @@ The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
 available in the terminal.
 
-Planned flags:
+Available flags:
 
 ```text
 --port <number>  Use a specific loopback port instead of an OS-selected port
@@ -55,6 +54,7 @@ Planned flags:
 
 ## Development status
 
-The MVP has been designed but not yet implemented. See
-[`project_status.md`](project_status.md) for the milestone checklist and current
-state.
+The manual-refresh MVP is implemented. Saving a Markdown file and refreshing the
+browser reads and renders the latest contents from disk. See
+[`project_status.md`](project_status.md) for release readiness and the planned
+live-reload milestone.
