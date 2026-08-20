@@ -52,8 +52,13 @@ chmod +x dist/darwin-arm64/md-viewer
 ./dist/darwin-arm64/md-viewer ./docs
 ```
 
-See [`dist/README.md`](dist/README.md) for the release layout and reproducible
-cross-build commands.
+Regenerate every platform binary after a source update with:
+
+```sh
+./scripts/build-dist.sh
+```
+
+See [`dist/README.md`](dist/README.md) for the release layout and build details.
 
 The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
