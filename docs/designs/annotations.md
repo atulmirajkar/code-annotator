@@ -114,6 +114,21 @@ Only a reviewer can transition `applied` to `closed`. When a reviewer selects
 `applied` to `needs_changes`. The next agent attempt reuses the same annotation
 ID rather than creating a replacement annotation.
 
+The domain model validates transitions against the actor role:
+
+| Actor | Allowed transitions |
+| --- | --- |
+| Agent | `open -> acknowledged`, `open -> rejected` |
+| Agent | `acknowledged -> applied`, `acknowledged -> rejected` |
+| Agent | `needs_changes -> acknowledged` |
+| Reviewer | `applied -> closed`, `applied -> needs_changes` |
+| Reviewer | `closed -> open`, `rejected -> open` |
+
+Skipping acknowledgement, repeating the current status, or having an agent close
+its own work is invalid. Status-change thread entries record the actor role and
+the previous and next statuses so the transition can be validated again when a
+sidecar is loaded.
+
 ## Storage model
 
 Store one versioned JSON sidecar per Markdown document and mirror its relative
@@ -201,6 +216,12 @@ ordinary replies carry a message. Existing thread entries are append-only.
 Corrections are represented by another entry so the review history is not
 silently rewritten.
 
+Each thread entry has its own `msg_` identifier, author, UTC timestamp, and kind.
+`status_change` entries additionally contain `actorRole`, `fromStatus`, and
+`toStatus`. Thread entries must be chronological, cannot predate the annotation,
+and cannot be newer than the annotation's `updatedAt`. Annotation and thread IDs
+must be unique within a sidecar.
+
 The viewer treats an agent resolution as a report, not proof. A human either
 transitions it to `closed` or responds with `needs_changes`. Every subsequent
 agent export includes the original request, all resolution attempts, and all
@@ -217,14 +238,30 @@ selectors:
 - Line numbers provide understandable diagnostics and agent context.
 - A SHA-256 document digest identifies the source revision used at creation.
 
+Selector creation accepts UTF-8 byte offsets with an exclusive end position. It
+rejects invalid UTF-8, empty or out-of-range selections, and offsets that split a
+multi-byte character. It derives the exact quote, one-based line range, SHA-256
+digest, and up to 64 adjacent bytes of prefix and suffix context on rune
+boundaries. Digests are emitted as lowercase hexadecimal; comparison accepts
+either hexadecimal case because both encodings represent the same digest.
+
 Anchor resolution proceeds in this order:
 
-1. If the digest matches, verify the text at the stored byte range.
-2. Otherwise, find an exact text match with matching prefix and suffix.
-3. If there is one exact match without full context, attach with a `moved`
-   warning.
-4. If matches are ambiguous or absent, mark the annotation `stale` and show it
-   only in the review panel until the reviewer reattaches it.
+1. Validate the stored source selector and current document UTF-8.
+2. If the digest matches and the stored byte range still contains the exact
+   quote, return `exact` with current byte and line positions.
+3. Otherwise, find every exact quote occurrence, including overlapping matches.
+4. If exactly one occurrence also matches the stored prefix and suffix, return
+   `moved`.
+5. If no contextual match exists but there is exactly one exact occurrence,
+   return `moved` with the weaker unique-quote match.
+6. If no occurrence exists, return `stale` with reason `not_found`.
+7. If multiple candidates remain, return `stale` with reason `ambiguous` and the
+   candidate count; never choose one silently.
+
+Stale resolution is expected data rather than an API error. Invalid selectors or
+invalid current UTF-8 are errors. A valid selector with incorrect old offsets can
+still be repaired through unique quote/context matching.
 
 Staleness is derived UI state, not an annotation lifecycle status. An open
 change request can therefore also be stale.
