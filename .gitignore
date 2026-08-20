@@ -6,6 +6,9 @@
 *.dylib
 bin/
 
+# Checked-in release artifacts
+!dist/**/*.exe
+
 # Test binaries and coverage artifacts
 *.test
 *.out

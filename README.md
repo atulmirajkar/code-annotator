@@ -34,6 +34,27 @@ go build -o bin/md-viewer ./cmd/md-viewer
 ./bin/md-viewer ./docs
 ```
 
+Prebuilt binaries are available under [`dist/`](dist/):
+
+| Platform | Architecture | Binary |
+| --- | --- | --- |
+| macOS | arm64 (Apple silicon) | [`dist/darwin-arm64/md-viewer`](dist/darwin-arm64/md-viewer) |
+| macOS | amd64 (Intel) | [`dist/darwin-amd64/md-viewer`](dist/darwin-amd64/md-viewer) |
+| Linux | arm64 | [`dist/linux-arm64/md-viewer`](dist/linux-arm64/md-viewer) |
+| Linux | amd64 | [`dist/linux-amd64/md-viewer`](dist/linux-amd64/md-viewer) |
+| Windows | arm64 | [`dist/windows-arm64/md-viewer.exe`](dist/windows-arm64/md-viewer.exe) |
+| Windows | amd64 | [`dist/windows-amd64/md-viewer.exe`](dist/windows-amd64/md-viewer.exe) |
+
+On macOS or Linux, make the selected binary executable if needed, then run it:
+
+```sh
+chmod +x dist/darwin-arm64/md-viewer
+./dist/darwin-arm64/md-viewer ./docs
+```
+
+See [`dist/README.md`](dist/README.md) for the release layout and reproducible
+cross-build commands.
+
 The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
 available in the terminal.
@@ -51,6 +72,7 @@ Available flags:
 - [Architecture](docs/architecture.md)
 - [Build and run](docs/build.md)
 - [Project status](project_status.md)
+- [Prebuilt binaries](dist/README.md)
 
 ## Development status
 
