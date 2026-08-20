@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -72,13 +73,20 @@ func TestRunServesOnLoopbackAndShutsDown(t *testing.T) {
 	defer cancel()
 	stdout := newSyncBuffer()
 	result := make(chan error, 1)
+	var launched atomic.Bool
 	go func() {
-		result <- Run(ctx, []string{"--no-open", rootPath}, stdout, io.Discard)
+		result <- run(ctx, []string{"--no-open", rootPath}, stdout, io.Discard, func(string) error {
+			launched.Store(true)
+			return nil
+		})
 	}()
 
 	viewerURL := waitForViewerURL(t, stdout)
 	if !strings.HasPrefix(viewerURL, "http://127.0.0.1:") {
 		t.Fatalf("viewer URL = %q, want loopback URL", viewerURL)
+	}
+	if launched.Load() {
+		t.Fatal("browser launcher was called with --no-open")
 	}
 
 	client := &http.Client{Timeout: 2 * time.Second}
@@ -99,6 +107,66 @@ func TestRunServesOnLoopbackAndShutsDown(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("Run() did not shut down after cancellation")
+	}
+}
+
+func TestRunLaunchesReadyServerAndToleratesFailure(t *testing.T) {
+	t.Parallel()
+
+	rootPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rootPath, "README.md"), []byte("# Running"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stdout := newSyncBuffer()
+	stderr := newSyncBuffer()
+	launchedURL := make(chan string, 1)
+	result := make(chan error, 1)
+	launchError := errors.New("no graphical browser")
+	go func() {
+		result <- run(ctx, []string{rootPath}, stdout, stderr, func(viewerURL string) error {
+			client := &http.Client{Timeout: 2 * time.Second}
+			response, err := client.Get(viewerURL + "healthz")
+			if err != nil {
+				return fmt.Errorf("server was not ready before launch: %w", err)
+			}
+			response.Body.Close()
+			if response.StatusCode != http.StatusOK {
+				return fmt.Errorf("health status before launch = %d", response.StatusCode)
+			}
+			launchedURL <- viewerURL
+			return launchError
+		})
+	}()
+
+	var viewerURL string
+	select {
+	case viewerURL = <-launchedURL:
+	case <-time.After(3 * time.Second):
+		t.Fatalf("browser launcher was not called; stderr: %s", stderr.String())
+	}
+	if !strings.HasPrefix(viewerURL, "http://127.0.0.1:") {
+		t.Fatalf("launched URL = %q, want loopback URL", viewerURL)
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for !strings.Contains(stderr.String(), launchError.Error()) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if warning := stderr.String(); !strings.Contains(warning, launchError.Error()) || !strings.Contains(warning, viewerURL) {
+		t.Fatalf("launch warning = %q, want error and manual URL", warning)
+	}
+
+	cancel()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run() did not shut down after browser launch failure")
 	}
 }
 

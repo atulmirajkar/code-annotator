@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"atulm/md-viewer/internal/content"
+	"atulm/md-viewer/internal/launch"
 	mdrender "atulm/md-viewer/internal/render"
 	"atulm/md-viewer/internal/server"
 )
@@ -28,6 +29,12 @@ type config struct {
 // Run parses args, starts the local viewer, and blocks until ctx is canceled or
 // the HTTP server fails. stdout receives the usable viewer URL.
 func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	return run(ctx, args, stdout, stderr, launch.OpenURL)
+}
+
+type urlLauncher func(string) error
+
+func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL urlLauncher) error {
 	configuration, err := parseConfig(args, stderr)
 	if err != nil {
 		return err
@@ -58,6 +65,14 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	go func() {
 		serveResult <- httpServer.Serve(listener)
 	}()
+	if !configuration.noOpen {
+		if err := openURL(viewerURL); err != nil {
+			fmt.Fprintf(stderr, "Could not open the default browser: %v\n", err)
+			fmt.Fprintf(stderr, "Open %s manually.\n", viewerURL)
+		} else {
+			fmt.Fprintln(stdout, "Opened in the default browser")
+		}
+	}
 
 	select {
 	case serveErr := <-serveResult:
