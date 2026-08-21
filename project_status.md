@@ -1,15 +1,15 @@
 # Project status
 
-Last updated: 2026-08-20
+Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Annotation review implementation; release tag pending.
+**Phase:** Annotation review verification; release tag pending.
 
-The manual-refresh MVP and secured annotation APIs are implemented. Review-mode
-pages include selection mapping, annotation display, and secured creation;
-highlights and remaining browser mutation controls remain. Embedded diagram
-rendering and live reload follow annotation review.
+The manual-refresh MVP and annotation review workflow are implemented, including
+selection mapping, highlights, secured browser mutations, live API agent handoff,
+and a repository-owned agent skill. Browser interaction coverage remains.
+Embedded diagram rendering and live reload follow annotation review.
 
 ## Milestones
 
@@ -70,7 +70,8 @@ rendering and live reload follow annotation review.
 - [x] Add ordinary inline discussion replies to annotation cards.
 - [x] Add browser controls for reattaching stale text anchors.
 - [x] Collapse annotation details and infrequent actions by default.
-- [ ] Add storage, API, UI, security, and agent-handoff tests.
+- [x] Add storage, API, security, and agent-handoff tests.
+- [ ] Add focused browser UI interaction tests.
 
 ### 7. Mermaid and sequence diagrams
 

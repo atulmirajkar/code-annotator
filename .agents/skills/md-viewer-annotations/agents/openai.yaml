@@ -1,0 +1,4 @@
+interface:
+  display_name: "md-viewer Annotations"
+  short_description: "Process live Markdown review annotations safely"
+  default_prompt: "Use the running md-viewer API to process actionable annotations in this repository."
