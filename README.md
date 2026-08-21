@@ -5,7 +5,9 @@ source code from a directory. It starts a server on the loopback interface,
 renders safe HTML, and opens the viewer in the user's default browser. Beyond
 plain Markdown viewing, it supports side-by-side Git diff comparison and a
 full annotation review workflow, with browser and offline CLI tooling for
-human and AI-agent handoff.
+human and AI-agent handoff, including a bundled `code-annotator` agent skill
+that teaches AI agents how to discover, interpret, and respond to
+annotations.
 
 The MVP is implemented and ready to run from source or as a compiled binary.
 
@@ -47,14 +49,14 @@ go build -o bin/code-annotator ./cmd/code-annotator
 
 Prebuilt binaries are available under [`dist/`](dist/):
 
-| Platform | Architecture | Binary |
-| --- | --- | --- |
-| macOS | arm64 (Apple silicon) | [`dist/darwin-arm64/code-annotator`](dist/darwin-arm64/code-annotator) |
-| macOS | amd64 (Intel) | [`dist/darwin-amd64/code-annotator`](dist/darwin-amd64/code-annotator) |
-| Linux | arm64 | [`dist/linux-arm64/code-annotator`](dist/linux-arm64/code-annotator) |
-| Linux | amd64 | [`dist/linux-amd64/code-annotator`](dist/linux-amd64/code-annotator) |
-| Windows | arm64 | [`dist/windows-arm64/code-annotator.exe`](dist/windows-arm64/code-annotator.exe) |
-| Windows | amd64 | [`dist/windows-amd64/code-annotator.exe`](dist/windows-amd64/code-annotator.exe) |
+| Platform | Architecture          | Binary                                                                           |
+| -------- | --------------------- | -------------------------------------------------------------------------------- |
+| macOS    | arm64 (Apple silicon) | [`dist/darwin-arm64/code-annotator`](dist/darwin-arm64/code-annotator)           |
+| macOS    | amd64 (Intel)         | [`dist/darwin-amd64/code-annotator`](dist/darwin-amd64/code-annotator)           |
+| Linux    | arm64                 | [`dist/linux-arm64/code-annotator`](dist/linux-arm64/code-annotator)             |
+| Linux    | amd64                 | [`dist/linux-amd64/code-annotator`](dist/linux-amd64/code-annotator)             |
+| Windows  | arm64                 | [`dist/windows-arm64/code-annotator.exe`](dist/windows-arm64/code-annotator.exe) |
+| Windows  | amd64                 | [`dist/windows-amd64/code-annotator.exe`](dist/windows-amd64/code-annotator.exe) |
 
 On macOS or Linux, make the selected binary executable if needed, then run it:
 
@@ -227,7 +229,7 @@ After the repository is published, the same convention supports installation
 without a checkout:
 
 ```sh
-npx skills add <owner>/<repository> --skill code-annotator -g -y
+npx skills add atulmirajkar/code-annotator --skill code-annotator -g -y
 ```
 
 The Skills CLI discovers the skill directly from `.agents/skills/`.
@@ -246,7 +248,6 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 The manual-refresh MVP, annotation review workflow, agent handoff, embedded
 Mermaid rendering, and code review with side-by-side Git diff comparison are
-implemented and browser-tested. Saving a Markdown file and refreshing the
-browser reads and renders the latest contents from disk. See
+implemented and browser-tested. See
 [`project_status.md`](project_status.md) for release readiness and the planned
 live-reload milestone.
