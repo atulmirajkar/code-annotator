@@ -57,20 +57,50 @@ func Open(ctx context.Context, contentRoot, requestedBase string) (Config, error
 	if err != nil {
 		return Config{}, err
 	}
-	commitOutput, err := runGit(ctx, repositoryRoot, "rev-parse", "--verify", "--end-of-options", requestedBase+"^{commit}")
+	commit, err := resolveCommit(ctx, repositoryRoot, requestedBase)
 	if err != nil {
-		return Config{}, fmt.Errorf("resolve Git base %q: revision is not a local commit", requestedBase)
-	}
-	commit := strings.TrimSpace(string(commitOutput))
-	if !validObjectID(commit) {
-		return Config{}, errors.New("Git returned an invalid commit identifier")
+		return Config{}, err
 	}
 	return Config{
 		RepositoryRoot: repositoryRoot,
 		ContentPrefix:  prefix,
 		RequestedBase:  requestedBase,
-		BaseCommit:     strings.ToLower(commit),
+		BaseCommit:     commit,
 	}, nil
+}
+
+// Reresolve re-resolves the configured revision against the same worktree and
+// returns a Config that differs only in BaseCommit. It lets a refresh adopt a
+// moving revision's new tip without contacting a remote or mutating the repo.
+// Identity fields (RepositoryRoot, ContentPrefix, RequestedBase) are preserved.
+func (c Config) Reresolve(ctx context.Context) (Config, error) {
+	if c.RepositoryRoot == "" {
+		return Config{}, errors.New("Git comparison is not configured")
+	}
+	commit, err := resolveCommit(ctx, c.RepositoryRoot, c.RequestedBase)
+	if err != nil {
+		return Config{}, err
+	}
+	updated := c
+	updated.BaseCommit = commit
+	return updated, nil
+}
+
+// resolveCommit validates a revision and resolves it to an immutable lowercase
+// full object ID using the shared no-shell, no-prompt Git boundary.
+func resolveCommit(ctx context.Context, repositoryRoot, revision string) (string, error) {
+	if err := validateRevision(revision); err != nil {
+		return "", err
+	}
+	output, err := runGit(ctx, repositoryRoot, "rev-parse", "--verify", "--end-of-options", revision+"^{commit}")
+	if err != nil {
+		return "", fmt.Errorf("resolve Git base %q: revision is not a local commit", revision)
+	}
+	commit := strings.TrimSpace(string(output))
+	if !validObjectID(commit) {
+		return "", errors.New("Git returned an invalid commit identifier")
+	}
+	return strings.ToLower(commit), nil
 }
 
 // validateRevision rejects values that Git could interpret as options or that

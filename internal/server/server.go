@@ -51,7 +51,7 @@ type Server struct {
 	renderer     *mdrender.Renderer
 	annotations  *annotationstore.Store
 	review       *reviewSession
-	comparison   *gitdiff.Config
+	comparison   *comparisonController
 	page         *template.Template
 	styles       []byte
 	reviewJS     []byte
@@ -145,12 +145,24 @@ func WithIndexOptions(options content.IndexOptions) Option {
 // patch generation is added separately and cannot replace this frozen base.
 func WithGitComparison(configuration gitdiff.Config) Option {
 	return func(server *Server) error {
-		if configuration.RepositoryRoot == "" || configuration.RequestedBase == "" || configuration.BaseCommit == "" {
-			return errors.New("configure Git comparison: incomplete configuration")
+		controller, err := newComparisonController(configuration, nil, "")
+		if err != nil {
+			return err
 		}
-		server.comparison = &configuration
+		server.comparison = controller
 		return nil
 	}
+}
+
+// comparisonSnapshot captures one immutable comparison state for the lifetime
+// of a single request, so changed-path and file-diff work share a base that a
+// concurrent refresh or selection cannot alter mid-request.
+func (s *Server) comparisonSnapshot() *comparisonSnapshot {
+	if s.comparison == nil {
+		return nil
+	}
+	snapshot := s.comparison.snapshot()
+	return &snapshot
 }
 
 // validateReviewOrigin accepts only an HTTP origin with a loopback IP host and
@@ -339,7 +351,7 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(request.Context(), response, index, "", nil, "", false)
+		s.renderPage(request.Context(), response, index, "", nil, "", false, s.comparisonSnapshot())
 		return
 	}
 
@@ -395,6 +407,7 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 }
 
 func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string, diffMode bool) {
+	snapshot := s.comparisonSnapshot()
 	document, ok := findDocument(index, documentPath)
 	if !ok {
 		http.Error(response, "document not found", http.StatusNotFound)
@@ -406,14 +419,14 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		return
 	}
 
-	if diffMode && (document.Kind != content.KindCode || s.comparison == nil) {
+	if diffMode && (document.Kind != content.KindCode || snapshot == nil) {
 		http.Error(response, "Changes view is unavailable", http.StatusNotFound)
 		return
 	}
 
 	var fragment []byte
 	if diffMode {
-		diff, diffErr := s.comparison.BuildFileDiff(ctx, documentPath, source)
+		diff, diffErr := snapshot.config.BuildFileDiff(ctx, documentPath, source)
 		if diffErr != nil {
 			// File view remains usable when a per-file Git operation fails. Avoid
 			// exposing command output or repository details in the browser.
@@ -440,15 +453,15 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 	if s.review != nil {
 		digest = annotation.DocumentSHA256(source)
 	}
-	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode)
+	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode, snapshot)
 }
 
-func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool, snapshot *comparisonSnapshot) {
 	changed := make(map[string]struct{})
 	changedReady := false
 	changedError := false
-	if s.comparison != nil {
-		paths, err := s.comparison.ChangedPaths(ctx)
+	if snapshot != nil {
+		paths, err := snapshot.config.ChangedPaths(ctx)
 		if err != nil {
 			changedError = true
 		} else {
@@ -494,14 +507,14 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		ChangedReady:   changedReady,
 		ChangedError:   changedError,
 		DiffMode:       diffMode,
-		DiffAvailable:  isCode && s.comparison != nil,
+		DiffAvailable:  isCode && snapshot != nil,
 		FileURL:        routeURL("/view/", selected),
 		ChangesURL:     routeURL("/view/", selected) + "?mode=diff",
 	}
-	if s.comparison != nil {
-		data.DiffBase = s.comparison.RequestedBase
-		data.DiffCommit = s.comparison.BaseCommit
-		data.DiffCommitShort = abbreviatedCommit(s.comparison.BaseCommit)
+	if snapshot != nil {
+		data.DiffBase = snapshot.config.RequestedBase
+		data.DiffCommit = snapshot.config.BaseCommit
+		data.DiffCommitShort = abbreviatedCommit(snapshot.config.BaseCommit)
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

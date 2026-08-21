@@ -43,3 +43,6 @@ go.work.sum
 
 # Local review artifacts
 .lavish/
+
+# Local annotation sidecars written by review mode
+.md-viewer/
