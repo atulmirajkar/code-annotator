@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -16,6 +17,9 @@ import (
 	"testing"
 	"time"
 
+	"atulm/md-viewer/internal/annotation"
+	annotationstore "atulm/md-viewer/internal/annotation/store"
+	"atulm/md-viewer/internal/commands"
 	"atulm/md-viewer/internal/content"
 )
 
@@ -250,6 +254,147 @@ func TestRunRejectsInvalidRoot(t *testing.T) {
 	err := Run(context.Background(), []string{"--no-open", filepath.Join(t.TempDir(), "missing")}, io.Discard, io.Discard)
 	if err == nil || !strings.Contains(err.Error(), "open Markdown directory") {
 		t.Fatalf("Run() error = %v, want invalid root error", err)
+	}
+}
+
+func TestLiveAgentClientAgainstReviewServer(t *testing.T) {
+	t.Parallel()
+
+	rootPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rootPath, "README.md"), []byte("# Review"), 0o644); err != nil {
+		t.Fatalf("os.WriteFile() error = %v", err)
+	}
+	annotationsDir := filepath.Join(t.TempDir(), "annotations")
+	seedLiveAgentAnnotation(t, annotationsDir)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stdout := newSyncBuffer()
+	result := make(chan error, 1)
+	go func() {
+		result <- run(ctx, []string{"--review", "--no-open", "--annotations-dir", annotationsDir, rootPath}, stdout, io.Discard, func(string) error { return nil })
+	}()
+	viewerURL := waitForViewerURL(t, stdout)
+
+	type queueResponse struct {
+		Documents []struct {
+			Document    string `json:"document"`
+			Revision    string `json:"revision"`
+			Annotations []struct {
+				ID     string            `json:"id"`
+				Status annotation.Status `json:"status"`
+			} `json:"annotations"`
+		} `json:"documents"`
+	}
+	type mutationResponse struct {
+		Revision   string `json:"revision"`
+		Annotation struct {
+			ID     string            `json:"id"`
+			Status annotation.Status `json:"status"`
+		} `json:"annotation"`
+	}
+
+	var initialRevision string
+	steps := []struct {
+		name    string
+		args    func() []string
+		wantErr string
+		check   func(*testing.T, []byte)
+	}{
+		{
+			name: "discover queue and revision",
+			args: func() []string { return []string{"queue", "--url", viewerURL} },
+			check: func(t *testing.T, output []byte) {
+				var queue queueResponse
+				if err := json.Unmarshal(output, &queue); err != nil {
+					t.Fatalf("json.Unmarshal(queue) error = %v; output: %s", err, output)
+				}
+				if len(queue.Documents) != 1 || queue.Documents[0].Document != "README.md" || len(queue.Documents[0].Annotations) != 1 || queue.Documents[0].Annotations[0].ID != "ann_live_agent" {
+					t.Fatalf("queue = %#v", queue)
+				}
+				initialRevision = queue.Documents[0].Revision
+				if initialRevision == "" {
+					t.Fatal("queue revision is empty")
+				}
+			},
+		},
+		{
+			name: "acknowledge through authenticated API",
+			args: func() []string {
+				return []string{"resolve", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--status", "acknowledged", "--role", "agent", "--author", "codex"}
+			},
+			check: func(t *testing.T, output []byte) {
+				var mutation mutationResponse
+				if err := json.Unmarshal(output, &mutation); err != nil {
+					t.Fatalf("json.Unmarshal(mutation) error = %v; output: %s", err, output)
+				}
+				if mutation.Annotation.ID != "ann_live_agent" || mutation.Annotation.Status != annotation.StatusAcknowledged || mutation.Revision == initialRevision {
+					t.Fatalf("mutation = %#v", mutation)
+				}
+			},
+		},
+		{
+			name: "reject stale revision",
+			args: func() []string {
+				return []string{"reply", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--author", "codex", "--message", "Stale reply"}
+			},
+			wantErr: "reload the queue",
+		},
+	}
+
+	for _, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			var output bytes.Buffer
+			err := commands.RunAgent(step.args(), &output, io.Discard)
+			if step.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), step.wantErr) {
+					t.Fatalf("RunAgent() error = %v, want containing %q", err, step.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RunAgent() error = %v", err)
+			}
+			step.check(t, output.Bytes())
+		})
+	}
+
+	cancel()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("run() error = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("review server did not stop")
+	}
+}
+
+// seedLiveAgentAnnotation creates one document-level action for the end-to-end
+// client test without depending on browser annotation creation.
+func seedLiveAgentAnnotation(t *testing.T, directory string) {
+	t.Helper()
+	store, err := annotationstore.Open(directory)
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	now := time.Now().UTC().Add(-time.Hour)
+	sidecar := annotation.Sidecar{
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      "README.md",
+		Annotations: []annotation.Annotation{{
+			ID:        "ann_live_agent",
+			Intent:    annotation.IntentChangeRequest,
+			Status:    annotation.StatusOpen,
+			Comment:   "Update this document.",
+			Author:    "reviewer",
+			CreatedAt: now,
+			UpdatedAt: now,
+			Thread:    []annotation.ThreadEntry{},
+		}},
+	}
+	if _, err := store.Save(sidecar, ""); err != nil {
+		t.Fatalf("Store.Save() error = %v", err)
 	}
 }
 

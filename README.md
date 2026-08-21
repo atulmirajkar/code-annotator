@@ -128,6 +128,21 @@ The client accepts only a loopback viewer URL, obtains the temporary review
 token from that viewer, sends the required `If-Match` revision, and never opens
 annotation sidecars.
 
+### Agent skill
+
+The repository includes the `md-viewer-annotations` skill under
+`.agents/skills/`. Agents working from this repository can discover it without
+installation. To make the skill available to personal Codex sessions outside
+this checkout, copy it into the personal skills directory:
+
+```sh
+mkdir -p ~/.codex/skills
+cp -R .agents/skills/md-viewer-annotations ~/.codex/skills/
+```
+
+The installed skill expects an `md-viewer` binary on `PATH`; the repository
+version instead uses `go run ./cmd/md-viewer` so it exercises current source.
+
 ## Documentation
 
 - [MVP design](docs/designs/mvp.md)
