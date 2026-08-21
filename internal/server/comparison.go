@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync"
 
-	"atulm/md-viewer/internal/gitdiff"
+	"atulm/code-annotator/internal/gitdiff"
 )
 
 // errUnknownCommit reports a selection whose commit is absent from the current

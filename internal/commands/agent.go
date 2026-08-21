@@ -17,7 +17,7 @@ import (
 
 const maxAgentResponseBytes int64 = 8 << 20
 
-var reviewTokenPattern = regexp.MustCompile(`<meta name="md-viewer-review-token" content="([A-Za-z0-9_-]+)">`)
+var reviewTokenPattern = regexp.MustCompile(`<meta name="code-annotator-review-token" content="([A-Za-z0-9_-]+)">`)
 
 type agentConfig struct {
 	command  string
@@ -78,9 +78,9 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	if configuration.command != "queue" && configuration.command != "reply" && configuration.command != "resolve" {
 		return agentConfig{}, fmt.Errorf("unknown agent subcommand %q", configuration.command)
 	}
-	flags := flag.NewFlagSet("md-viewer agent "+configuration.command, flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator agent "+configuration.command, flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	viewerURL := flags.String("url", "", "running loopback md-viewer URL")
+	viewerURL := flags.String("url", "", "running loopback code-annotator URL")
 	status := flags.String("status", "", "status filter or target lifecycle status")
 	document := flags.String("document", "", "reviewable document path")
 	revision := flags.String("revision", "", "current document sidecar revision")
@@ -141,7 +141,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	return configuration, nil
 }
 
-// agentOrigin accepts only the loopback HTTP origin used by md-viewer and
+// agentOrigin accepts only the loopback HTTP origin used by code-annotator and
 // discards a harmless root path slash.
 func agentOrigin(value string) (string, error) {
 	parsed, err := url.Parse(value)
@@ -203,7 +203,7 @@ func sendAgentRequest(client *http.Client, configuration agentConfig, method, pa
 		request.Header.Set("Content-Type", "application/json")
 		request.Header.Set("Origin", configuration.origin)
 		request.Header.Set("If-Match", string(revision))
-		request.Header.Set("X-MD-Viewer-Token", token)
+		request.Header.Set("X-Code-Annotator-Token", token)
 	}
 	response, err := client.Do(request)
 	if err != nil {

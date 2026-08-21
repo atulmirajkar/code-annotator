@@ -19,10 +19,10 @@ import (
 	"testing"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/commands"
-	"atulm/md-viewer/internal/content"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/commands"
+	"atulm/code-annotator/internal/content"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -203,7 +203,7 @@ func TestOpenAnnotationStore(t *testing.T) {
 				t.Fatalf("content.Open() error = %v", err)
 			}
 			configuration := config{review: test.review}
-			wantRoot := filepath.Join(root.Path(), ".md-viewer", "annotations")
+			wantRoot := filepath.Join(root.Path(), ".code-annotator", "annotations")
 			if test.custom {
 				wantRoot = filepath.Join(t.TempDir(), "reviews")
 				configuration.annotationsDir = wantRoot

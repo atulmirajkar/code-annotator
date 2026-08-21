@@ -1,9 +1,9 @@
 ---
-name: md-viewer-annotations
-description: Process md-viewer annotations when asked to discover, implement, discuss, or report review work. Use the live HTTP API whenever a review server is running; use offline commands only after confirming no server is active, and never write sidecars directly.
+name: code-annotator-annotations
+description: Process code-annotator annotations when asked to discover, implement, discuss, or report review work. Use the live HTTP API whenever a review server is running; use offline commands only after confirming no server is active, and never write sidecars directly.
 ---
 
-# md-viewer annotations
+# code-annotator annotations
 
 Choose exactly one operating mode before reading or mutating annotations:
 
@@ -16,13 +16,13 @@ Never write annotation sidecars directly in either mode.
 
 ## Live server workflow
 
-From this repository use `go run ./cmd/md-viewer agent`; outside the source
-tree use an installed `md-viewer agent` command.
+From this repository use `go run ./cmd/code-annotator agent`; outside the source
+tree use an installed `code-annotator agent` command.
 
 1. Load the cross-document queue:
 
    ```sh
-   go run ./cmd/md-viewer agent queue \
+   go run ./cmd/code-annotator agent queue \
      --url <viewer-url> --status open,needs_changes
    ```
 
@@ -35,7 +35,7 @@ tree use an installed `md-viewer agent` command.
 3. Before changing files, acknowledge an `open` or `needs_changes` annotation:
 
    ```sh
-   go run ./cmd/md-viewer agent resolve \
+   go run ./cmd/code-annotator agent resolve \
      --url <viewer-url> --document <document> \
      --revision <revision> --id <annotation-id> --status acknowledged \
      --role agent --author <agent-name>
@@ -48,7 +48,7 @@ tree use an installed `md-viewer agent` command.
    that commit already exists:
 
    ```sh
-   go run ./cmd/md-viewer agent resolve \
+   go run ./cmd/code-annotator agent resolve \
      --url <viewer-url> --document <document> \
      --revision <revision> --id <annotation-id> --status applied \
      --role agent --author <agent-name> --summary <completed-work> \
@@ -61,7 +61,7 @@ state. Use `resolve --status rejected --message <reason>` only when the request
 cannot or should not be performed, not merely because clarification is needed.
 
 ```sh
-go run ./cmd/md-viewer agent reply \
+go run ./cmd/code-annotator agent reply \
   --url <viewer-url> --document <document> --revision <revision> \
   --id <annotation-id> --author <agent-name> --message <question-or-context>
 ```
@@ -69,13 +69,13 @@ go run ./cmd/md-viewer agent reply \
 ## Offline workflow
 
 Use this only after confirming that no review server is running. From this
-repository use `go run ./cmd/md-viewer annotations`; outside the source tree use
-an installed `md-viewer annotations` command.
+repository use `go run ./cmd/code-annotator annotations`; outside the source tree use
+an installed `code-annotator annotations` command.
 
 Discover actionable work with:
 
 ```sh
-go run ./cmd/md-viewer annotations export \
+go run ./cmd/code-annotator annotations export \
   --root <content-root> --status open,needs_changes
 ```
 
@@ -94,11 +94,11 @@ of retrying blindly.
 For example, acknowledge before editing and then report completed work:
 
 ```sh
-go run ./cmd/md-viewer annotations resolve \
+go run ./cmd/code-annotator annotations resolve \
   --root <content-root> --id <annotation-id> \
   --status acknowledged --role agent --author <agent-name>
 
-go run ./cmd/md-viewer annotations resolve \
+go run ./cmd/code-annotator annotations resolve \
   --root <content-root> --id <annotation-id> \
   --status applied --role agent --author <agent-name> \
   --summary <completed-work> [--commit <commit>]
@@ -106,7 +106,7 @@ go run ./cmd/md-viewer annotations resolve \
 
 ## Preserve the review contract
 
-- Never edit `.md-viewer` JSON sidecars directly and never use offline reads or
+- Never edit `.code-annotator` JSON sidecars directly and never use offline reads or
   mutations while the review server is running.
 - Never create a replacement annotation for a retry. Continue with the same ID
   and read the reviewer's latest `needs_changes` message before acknowledging.
@@ -118,5 +118,5 @@ go run ./cmd/md-viewer annotations resolve \
   supplied loopback viewer page and keeps it internal.
 - Report processed annotation IDs and final states to the user.
 
-Offline `md-viewer annotations` commands are the agent handoff only when no
+Offline `code-annotator annotations` commands are the agent handoff only when no
 review server is running; the live HTTP API remains authoritative otherwise.

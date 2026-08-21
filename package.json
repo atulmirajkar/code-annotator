@@ -1,5 +1,5 @@
 {
-  "name": "md-viewer-browser-tests",
+  "name": "code-annotator-browser-tests",
   "private": true,
   "scripts": {
     "test:browser": "playwright test"

@@ -16,13 +16,13 @@ import (
 	"strings"
 	"time"
 
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/commands"
-	"atulm/md-viewer/internal/content"
-	"atulm/md-viewer/internal/gitdiff"
-	"atulm/md-viewer/internal/launch"
-	mdrender "atulm/md-viewer/internal/render"
-	"atulm/md-viewer/internal/server"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/commands"
+	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/gitdiff"
+	"atulm/code-annotator/internal/launch"
+	mdrender "atulm/code-annotator/internal/render"
+	"atulm/code-annotator/internal/server"
 )
 
 const shutdownTimeout = 5 * time.Second
@@ -158,7 +158,7 @@ func newControlToken() (string, error) {
 }
 
 func parseConfig(args []string, stderr io.Writer) (config, error) {
-	flags := flag.NewFlagSet("md-viewer", flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	port := flags.Int("port", 0, "loopback port; 0 selects an available port")
 	noOpen := flags.Bool("no-open", false, "do not open the default browser")
@@ -169,7 +169,7 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	diffBase := flags.String("diff-base", "", "locally available Git revision for comparison")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: md-viewer [options] <directory>")
+		fmt.Fprintln(stderr, "Usage: code-annotator [options] <directory>")
 		fmt.Fprintln(stderr)
 		fmt.Fprintln(stderr, "Options:")
 		flags.PrintDefaults()
@@ -251,7 +251,7 @@ func openAnnotationStore(configuration config, root *content.Root) (*annotations
 	}
 	directory := configuration.annotationsDir
 	if directory == "" {
-		directory = filepath.Join(root.Path(), ".md-viewer", "annotations")
+		directory = filepath.Join(root.Path(), ".code-annotator", "annotations")
 	}
 	annotations, err := annotationstore.Open(directory)
 	if err != nil {

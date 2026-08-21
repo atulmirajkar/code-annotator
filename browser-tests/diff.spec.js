@@ -39,7 +39,7 @@ async function selectBetween(page, startSelector, startText, endSelector, endTex
 // annotations are loaded or restored.
 async function hasAnnotationHighlight(page, text) {
   return page.evaluate((selectedText) => {
-    const highlight = globalThis.CSS?.highlights?.get("md-viewer-annotations");
+    const highlight = globalThis.CSS?.highlights?.get("code-annotator-annotations");
     return highlight ? Array.from(highlight).some((range) => range.toString() === selectedText) : false;
   }, text);
 }
@@ -52,7 +52,7 @@ test.describe("side-by-side diff", () => {
     const currentPane = page.locator(".diff-current-pane");
     await expect(basePane).toBeVisible();
     await expect(currentPane).toBeVisible();
-    const fullCommit = await page.locator('meta[name="md-viewer-diff-commit"]').getAttribute("content");
+    const fullCommit = await page.locator('meta[name="code-annotator-diff-commit"]').getAttribute("content");
     const selector = page.locator(".revision-selector");
     await expect(selector).toBeEnabled();
     await expect(selector).toHaveValue(fullCommit);

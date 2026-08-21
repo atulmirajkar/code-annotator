@@ -124,7 +124,7 @@ func TestRunAgent(t *testing.T) {
 					if test.nonReview {
 						_, _ = io.WriteString(response, "<html></html>")
 					} else {
-						_, _ = io.WriteString(response, `<meta name="md-viewer-review-token" content="test-token">`)
+						_, _ = io.WriteString(response, `<meta name="code-annotator-review-token" content="test-token">`)
 					}
 					return
 				}
@@ -132,7 +132,7 @@ func TestRunAgent(t *testing.T) {
 					t.Errorf("request = %s %s, want %s %s", request.Method, request.URL.RequestURI(), test.wantMethod, test.wantPath)
 				}
 				if test.wantBody != nil {
-					if request.Header.Get("Origin") != server.URL || request.Header.Get("X-MD-Viewer-Token") != "test-token" || request.Header.Get("If-Match") != `"`+test.wantRevision+`"` {
+					if request.Header.Get("Origin") != server.URL || request.Header.Get("X-Code-Annotator-Token") != "test-token" || request.Header.Get("If-Match") != `"`+test.wantRevision+`"` {
 						t.Errorf("mutation headers = %#v", request.Header)
 					}
 					var body map[string]string

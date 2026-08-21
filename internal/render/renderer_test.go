@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"atulm/md-viewer/internal/gitdiff"
+	"atulm/code-annotator/internal/gitdiff"
 )
 
 func TestRenderCode(t *testing.T) {

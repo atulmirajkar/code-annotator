@@ -2,7 +2,7 @@
 
 ## Status
 
-Implemented. This document defines the first usable release of `md-viewer`.
+Implemented. This document defines the first usable release of `code-annotator`.
 Milestone progress is tracked in
 [`../../project_status.md`](../../project_status.md).
 
@@ -28,7 +28,7 @@ Given a readable directory, start a local web server that:
 The primary workflow is one command:
 
 ```sh
-md-viewer ./notes
+code-annotator ./notes
 ```
 
 Expected terminal output resembles:
@@ -52,7 +52,7 @@ The failure does not stop the server.
 ## Command-line contract
 
 ```text
-Usage: md-viewer [options] <directory>
+Usage: code-annotator [options] <directory>
 
 Options:
   --port <number>  loopback port; default 0 selects an available port
@@ -155,7 +155,7 @@ and lifecycle details.
 
 ## Acceptance criteria
 
-- `md-viewer ./docs` starts on loopback, prints its URL, and requests browser
+- `code-annotator ./docs` starts on loopback, prints its URL, and requests browser
   launch with that exact URL.
 - The index lists nested Markdown files and selects `README.md` by default.
 - GFM tables, task lists, strikethrough, and autolinks render correctly.

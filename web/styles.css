@@ -114,7 +114,7 @@ a { color: var(--accent); }
 .mermaid-error { padding: .75rem; border: 1px solid #b42318; border-radius: .45rem; color: #b42318; }
 .markdown-body blockquote { margin-left: 0; padding-left: 1rem; border-left: .25rem solid var(--border); color: var(--muted); }
 .markdown-body mark.annotation-highlight-fallback { border-radius: .15em; background: rgba(255, 204, 0, .38); color: inherit; }
-::highlight(md-viewer-annotations) { background: rgba(255, 204, 0, .38); color: inherit; }
+::highlight(code-annotator-annotations) { background: rgba(255, 204, 0, .38); color: inherit; }
 .markdown-body .annotation-navigation-target { border-radius: .2rem; outline: .2rem solid var(--accent); outline-offset: .25rem; animation: annotation-target-pulse .55s ease-in-out 2 alternate; }
 @keyframes annotation-target-pulse { from { outline-color: transparent; } to { outline-color: var(--accent); } }
 .markdown-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }

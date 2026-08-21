@@ -7,7 +7,7 @@ module.exports = defineConfig({
   reporter: "line",
   timeout: 30000,
   use: {
-    channel: process.env.MD_VIEWER_BROWSER_CHANNEL || "chrome",
+    channel: process.env.CODE_ANNOTATOR_BROWSER_CHANNEL || "chrome",
     headless: true,
     trace: "retain-on-failure",
   },

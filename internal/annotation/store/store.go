@@ -14,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"atulm/md-viewer/internal/annotation"
+	"atulm/code-annotator/internal/annotation"
 )
 
 var (
@@ -270,7 +270,7 @@ func readSidecarBytes(target string) ([]byte, Revision, error) {
 // rename on one filesystem, which is required for atomic replacement.
 func atomicWrite(target string, data []byte) (returnErr error) {
 	directory := filepath.Dir(target)
-	temporary, err := os.CreateTemp(directory, ".md-viewer-annotations-*.tmp")
+	temporary, err := os.CreateTemp(directory, ".code-annotator-annotations-*.tmp")
 	if err != nil {
 		return err
 	}

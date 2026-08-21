@@ -1,21 +1,21 @@
 # Prebuilt binaries
 
-This directory contains architecture-specific `md-viewer` binaries built from
+This directory contains architecture-specific `code-annotator` binaries built from
 the repository source.
 
 ```text
 dist/
-├── darwin-amd64/md-viewer
-├── darwin-arm64/md-viewer
-├── linux-amd64/md-viewer
-├── linux-arm64/md-viewer
-├── windows-amd64/md-viewer.exe
-└── windows-arm64/md-viewer.exe
+├── darwin-amd64/code-annotator
+├── darwin-arm64/code-annotator
+├── linux-amd64/code-annotator
+├── linux-arm64/code-annotator
+├── windows-amd64/code-annotator.exe
+└── windows-arm64/code-annotator.exe
 ```
 
 Choose the directory matching the operating system and CPU architecture. On
 macOS and Linux, the executable bit is stored in Git. If it is lost while
-copying or downloading a file, restore it with `chmod +x md-viewer`.
+copying or downloading a file, restore it with `chmod +x code-annotator`.
 
 ## Rebuild
 
@@ -33,7 +33,7 @@ The binaries embed the viewer template and CSS and require no runtime assets.
 They still need access to the Markdown directory supplied on the command line.
 Use [`SHA256SUMS`](SHA256SUMS) to verify the artifacts after copying them.
 
-Each binary also includes the live `md-viewer agent` HTTP client commands. The
-`md-viewer-annotations` agent skill is a separate artifact and is not bundled
+Each binary also includes the live `code-annotator agent` HTTP client commands. The
+`code-annotator-annotations` agent skill is a separate artifact and is not bundled
 inside the executable; follow the [skill installation instructions](../README.md#agent-skill)
 when an agent needs the guided annotation workflow.

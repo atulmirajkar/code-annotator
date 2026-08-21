@@ -2,7 +2,7 @@
 
 ## Overview
 
-`md-viewer` is a local command-line application containing an HTTP server. A
+`code-annotator` is a local command-line application containing an HTTP server. A
 user selects a directory at startup, and that directory becomes the immutable
 content root for the lifetime of the process. The application indexes Markdown
 and explicitly enabled source files, renders requested documents to safe HTML,
@@ -14,7 +14,7 @@ It has no database, client-side framework, or external service.
 ## System flow
 
 ```text
-md-viewer <directory>
+code-annotator <directory>
         |
         v
 validate and resolve content root
@@ -39,7 +39,7 @@ can accept connections.
 ## Proposed package layout
 
 ```text
-cmd/md-viewer/main.go       command-line parsing, process lifecycle, signals
+cmd/code-annotator/main.go       command-line parsing, process lifecycle, signals
 internal/content/           directory indexing and root-contained file lookup
 internal/annotation/        annotation schema, lifecycle, and anchor resolution
 internal/annotation/store/  constrained atomic JSON sidecar persistence
@@ -92,7 +92,7 @@ validates the complete sidecar, and saves optimistically.
 
 Read-only mode never opens or creates annotation storage. With `--review`, the
 application opens a separate symlink-resolved writable root. The default is
-`<content-root>/.md-viewer/annotations/`; `--annotations-dir` selects an
+`<content-root>/.code-annotator/annotations/`; `--annotations-dir` selects an
 alternate location and is invalid unless review mode is explicit. Mutation
 routes will receive this store rather than constructing writable paths in HTTP
 handlers.
@@ -100,7 +100,7 @@ handlers.
 After binding the loopback listener, review mode generates a 256-bit random
 session token and binds it to the exact selected HTTP origin. The token is
 embedded in review pages but is never printed or persisted. The shared mutation
-guard requires the exact `Origin`, the token in `X-MD-Viewer-Token`, an
+guard requires the exact `Origin`, the token in `X-Code-Annotator-Token`, an
 `application/json` content type, and a body no larger than 64 KiB. Mutation
 routes are not registered until their handlers use this guard.
 
@@ -110,7 +110,7 @@ commit ID, and the server pins that commit as the initial active comparison
 base. The revision selector in the source toolbar lets a reviewer re-pin the
 base to another locally available commit through `POST /api/git-comparison`,
 guarded by the exact loopback `Origin`, a distinct comparison control token in
-`X-MD-Viewer-Comparison-Token`, and `application/json`; the endpoint accepts
+`X-Code-Annotator-Comparison-Token`, and `application/json`; the endpoint accepts
 only a commit present in a freshly listed bounded option set, never an
 arbitrary revision string. Each page render obtains one value copy of the
 active base, uses it for changed-path and file-diff operations, and exposes

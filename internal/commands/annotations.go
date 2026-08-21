@@ -12,9 +12,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/content"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/content"
 )
 
 const maxListDocumentBytes int64 = 4 << 20
@@ -82,7 +82,7 @@ func RunAnnotations(args []string, stdout, stderr io.Writer) error {
 // parseExportConfig reuses list collection flags while requiring Markdown
 // output so future formats can be added without changing command semantics.
 func parseExportConfig(args []string, stderr io.Writer) (listConfig, error) {
-	flags := flag.NewFlagSet("md-viewer annotations export", flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator annotations export", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
@@ -92,7 +92,7 @@ func parseExportConfig(args []string, stderr io.Writer) (listConfig, error) {
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: md-viewer annotations export --root <directory> [options]")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations export --root <directory> [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -122,7 +122,7 @@ func parseExportConfig(args []string, stderr io.Writer) (listConfig, error) {
 
 // parseListConfig validates list flags without opening either filesystem root.
 func parseListConfig(args []string, stderr io.Writer) (listConfig, error) {
-	flags := flag.NewFlagSet("md-viewer annotations list", flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator annotations list", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
@@ -132,7 +132,7 @@ func parseListConfig(args []string, stderr io.Writer) (listConfig, error) {
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: md-viewer annotations list --root <directory> [options]")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations list --root <directory> [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -227,7 +227,7 @@ func collectList(configuration listConfig) (listOutput, error) {
 
 	directory := configuration.annotationsDir
 	if directory == "" {
-		directory = filepath.Join(root.Path(), ".md-viewer", "annotations")
+		directory = filepath.Join(root.Path(), ".code-annotator", "annotations")
 	}
 	info, err := os.Stat(directory)
 	if err != nil {

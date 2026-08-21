@@ -7,7 +7,7 @@
 
 The optional browser regression suite additionally requires Node.js, npm, and
 Google Chrome. These tools are used only for development tests and are not
-runtime dependencies of `md-viewer`.
+runtime dependencies of `code-annotator`.
 
 The Go toolchain downloads declared module dependencies during the first build.
 
@@ -16,13 +16,13 @@ The Go toolchain downloads declared module dependencies during the first build.
 From the repository root:
 
 ```sh
-go run ./cmd/md-viewer ./path/to/markdown-folder
+go run ./cmd/code-annotator ./path/to/markdown-folder
 ```
 
 For example:
 
 ```sh
-go run ./cmd/md-viewer ./docs
+go run ./cmd/code-annotator ./docs
 ```
 
 The application prints the selected content root and local URL. By default, it
@@ -31,20 +31,20 @@ opens that URL through `github.com/pkg/browser`.
 ## Build
 
 ```sh
-go build -o bin/md-viewer ./cmd/md-viewer
+go build -o bin/code-annotator ./cmd/code-annotator
 ```
 
 Run the resulting binary:
 
 ```sh
-./bin/md-viewer ./path/to/markdown-folder
+./bin/code-annotator ./path/to/markdown-folder
 ```
 
 On Windows, use an `.exe` output name:
 
 ```powershell
-go build -o bin/md-viewer.exe ./cmd/md-viewer
-./bin/md-viewer.exe ./docs
+go build -o bin/code-annotator.exe ./cmd/code-annotator
+./bin/code-annotator.exe ./docs
 ```
 
 ## Command-line options
@@ -52,26 +52,26 @@ go build -o bin/md-viewer.exe ./cmd/md-viewer
 Use a fixed loopback port:
 
 ```sh
-./bin/md-viewer --port 8080 ./docs
+./bin/code-annotator --port 8080 ./docs
 ```
 
 Start without opening a browser:
 
 ```sh
-./bin/md-viewer --no-open ./docs
+./bin/code-annotator --no-open ./docs
 ```
 
 Include the default Go, C#, JavaScript, TypeScript, JSON, and `.csproj` source
 files as escaped, line-numbered documents:
 
 ```sh
-./bin/md-viewer --include-code ./repository
+./bin/code-annotator --include-code ./repository
 ```
 
 Start an optional local Git comparison base at startup:
 
 ```sh
-./bin/md-viewer --include-code --diff-base origin/main ./repository
+./bin/code-annotator --include-code --diff-base origin/main ./repository
 ```
 
 The viewer does not fetch remotes; remote-tracking names must already exist in
@@ -81,7 +81,7 @@ startup and pinned as the initial comparison base.
 Replace that source extension set or add directory exclusions:
 
 ```sh
-./bin/md-viewer --code-extensions .go,.cs \
+./bin/code-annotator --code-extensions .go,.cs \
   --exclude-dirs generated,tmp ./repository
 ```
 
@@ -106,14 +106,14 @@ lifecycle, and agent-handoff workflow as Markdown, current-side only.
 Enable the annotation review storage boundary:
 
 ```sh
-./bin/md-viewer --review ./docs
+./bin/code-annotator --review ./docs
 ```
 
-The default sidecar directory is `<content-root>/.md-viewer/annotations/`. Use
+The default sidecar directory is `<content-root>/.code-annotator/annotations/`. Use
 an alternate location when the content root should remain untouched:
 
 ```sh
-./bin/md-viewer --review --annotations-dir ./reviews ./docs
+./bin/code-annotator --review --annotations-dir ./reviews ./docs
 ```
 
 `--annotations-dir` is rejected without `--review`. Review mode initializes and
@@ -132,16 +132,16 @@ by the operating system.
 List annotations without running the server:
 
 ```sh
-./bin/md-viewer annotations list --root ./docs \
+./bin/code-annotator annotations list --root ./docs \
   --status open,needs_changes --format json
 
-./bin/md-viewer annotations export --root ./docs \
+./bin/code-annotator annotations export --root ./docs \
   --status open,needs_changes --format markdown
 
-./bin/md-viewer annotations reply --root ./docs --id ann_... \
+./bin/code-annotator annotations reply --root ./docs --id ann_... \
   --author reviewer --message "Please retain the default."
 
-./bin/md-viewer annotations resolve --root ./docs --id ann_... \
+./bin/code-annotator annotations resolve --root ./docs --id ann_... \
   --status applied --role agent --author codex \
   --summary "Implemented request" --commit abc1234
 ```
@@ -163,8 +163,8 @@ its annotation HTTP API so browser and agent mutations share the same revision
 coordinator:
 
 ```sh
-./bin/md-viewer agent queue --url http://127.0.0.1:54321
-./bin/md-viewer agent resolve --url http://127.0.0.1:54321 \
+./bin/code-annotator agent queue --url http://127.0.0.1:54321
+./bin/code-annotator agent resolve --url http://127.0.0.1:54321 \
   --document README.md --revision <revision> --id ann_... \
   --status acknowledged --role agent --author codex
 ```
@@ -192,13 +192,13 @@ npm run test:browser
 
 The suite starts an isolated review server, writes annotations only beneath a
 temporary directory, and uses the installed Chrome browser in headless mode.
-Set `MD_VIEWER_BROWSER_CHANNEL` to another Playwright browser channel when
+Set `CODE_ANNOTATOR_BROWSER_CHANNEL` to another Playwright browser channel when
 needed. Browser traces and reports are ignored build artifacts.
 
 A minimal manual check is:
 
 1. Create a directory containing a Markdown file and a relative image.
-2. Start `md-viewer` with that directory.
+2. Start `code-annotator` with that directory.
 3. Confirm the browser opens and the document and image render.
 4. Edit the Markdown and refresh the page to see the update.
 5. Stop the server with `Ctrl-C` and confirm it exits cleanly.
@@ -208,7 +208,7 @@ A minimal manual check is:
 Install it into the active Go binary directory:
 
 ```sh
-go install ./cmd/md-viewer
+go install ./cmd/code-annotator
 ```
 
 Ensure the directory reported by `go env GOBIN`, or `$(go env GOPATH)/bin` when

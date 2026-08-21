@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/content"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/content"
 )
 
 // annotationView extends one persisted annotation with its location derived

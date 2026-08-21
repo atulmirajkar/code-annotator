@@ -1,10 +1,10 @@
 (() => {
   "use strict";
 
-  const changedOnlyStorageKey = "md-viewer.changed-only";
-  const sourceModeStorageKey = "md-viewer.source-mode";
-  const diffSplitStorageKey = "md-viewer.diff-split";
-  const panelStoragePrefix = "md-viewer.panel-collapsed.";
+  const changedOnlyStorageKey = "code-annotator.changed-only";
+  const sourceModeStorageKey = "code-annotator.source-mode";
+  const diffSplitStorageKey = "code-annotator.diff-split";
+  const panelStoragePrefix = "code-annotator.panel-collapsed.";
   const diffSplitMin = 20;
   const diffSplitMax = 80;
   const diffSplitStep = 2;
@@ -136,7 +136,7 @@
   // page in its existing File/Changes mode so the diff recomputes.
   function bindComparisonControl() {
     const control = document.querySelector(".diff-comparison-control");
-    const token = document.querySelector('meta[name="md-viewer-comparison-token"]')?.content || "";
+    const token = document.querySelector('meta[name="code-annotator-comparison-token"]')?.content || "";
     if (!control || !token) return;
     const selector = control.querySelector(".revision-selector");
     const status = control.querySelector(".diff-comparison-status");
@@ -190,7 +190,7 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-MD-Viewer-Comparison-Token": token,
+            "X-Code-Annotator-Comparison-Token": token,
           },
           body: JSON.stringify({ commit }),
         });

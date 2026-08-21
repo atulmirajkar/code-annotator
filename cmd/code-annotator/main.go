@@ -9,7 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"atulm/md-viewer/internal/app"
+	"atulm/code-annotator/internal/app"
 )
 
 func main() {
@@ -20,7 +20,7 @@ func main() {
 		if errors.Is(err, flag.ErrHelp) {
 			return
 		}
-		fmt.Fprintf(os.Stderr, "md-viewer: %v\n", err)
+		fmt.Fprintf(os.Stderr, "code-annotator: %v\n", err)
 		os.Exit(1)
 	}
 }

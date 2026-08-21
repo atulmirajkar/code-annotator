@@ -43,20 +43,20 @@ AI agent without modifying the source document.
 Start an explicitly writable review session:
 
 ```sh
-md-viewer --review ./docs
+code-annotator --review ./docs
 ```
 
 The default annotation directory is:
 
 ```text
-<content-root>/.md-viewer/annotations/
+<content-root>/.code-annotator/annotations/
 ```
 
 An alternate location can be selected when the content root should remain
 untouched:
 
 ```sh
-md-viewer --review --annotations-dir ./reviews ./docs
+code-annotator --review --annotations-dir ./reviews ./docs
 ```
 
 Without `--review`, the viewer retains its current read-only behavior and does
@@ -136,7 +136,7 @@ path beneath the annotation directory:
 
 ```text
 docs/designs/architecture.md
-.md-viewer/annotations/designs/architecture.md.json
+.code-annotator/annotations/designs/architecture.md.json
 ```
 
 This layout is predictable for humans and agents, produces focused Git diffs,
@@ -469,8 +469,8 @@ There is no “origin token.” These are separate values with different purpose
   only the origin captured after its loopback listener is bound.
 - The **review token** is a secret containing 256 random bits, generated anew
   for every review-mode process. The server embeds its URL-safe representation
-  in a `<meta name="md-viewer-review-token">` element on viewer pages. Trusted
-  viewer JavaScript reads it and sends it in the `X-MD-Viewer-Token` header on
+  in a `<meta name="code-annotator-review-token">` element on viewer pages. Trusted
+  viewer JavaScript reads it and sends it in the `X-Code-Annotator-Token` header on
   every mutation.
 
 The origin check rejects a request initiated by another website, even if that
@@ -489,7 +489,7 @@ the absence of CORS still prevents unrelated browser origins from reading it.
 ### Mutation request flow
 
 ```text
-md-viewer process        Viewer page JavaScript        Mutation guard
+code-annotator process        Viewer page JavaScript        Mutation guard
         |                          |                          |
         |-- bind loopback port ----|                          |
         |-- generate review token  |                          |
@@ -497,7 +497,7 @@ md-viewer process        Viewer page JavaScript        Mutation guard
         |                          |                          |
         |                          |-- POST/PATCH ----------->|
         |                          |   Origin: exact origin   |
-        |                          |   X-MD-Viewer-Token: ... |
+        |                          |   X-Code-Annotator-Token: ... |
         |                          |   Content-Type: JSON     |
         |                          |                          |
         |                          |                    verify origin
@@ -541,9 +541,9 @@ HTTP revision flow intended to order browser and agent decisions. If server
 state is unknown, the agent must ask before choosing this mode.
 
 ```sh
-md-viewer annotations list --root ./docs --status open,needs_changes --format json
-md-viewer annotations export --root ./docs --status open,needs_changes --format markdown
-md-viewer annotations resolve --root ./docs --id ann_... \
+code-annotator annotations list --root ./docs --status open,needs_changes --format json
+code-annotator annotations export --root ./docs --status open,needs_changes --format markdown
+code-annotator annotations resolve --root ./docs --id ann_... \
   --status applied --role agent --author codex \
   --commit abc1234 --summary "Implemented request"
 ```

@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/content"
-	"atulm/md-viewer/internal/gitdiff"
-	mdrender "atulm/md-viewer/internal/render"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/gitdiff"
+	mdrender "atulm/code-annotator/internal/render"
 )
 
 func TestIndexRendersReadmeAndNavigation(t *testing.T) {
@@ -151,7 +151,7 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 		wantStatus int
 		contains   []string
 	}{
-		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `class="source-text" data-source-start="0" data-source-end="12"`, `name="md-viewer-review-token"`, `id="annotation-sidebar"`}},
+		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `class="source-text" data-source-start="0" data-source-end="12"`, `name="code-annotator-review-token"`, `id="annotation-sidebar"`}},
 		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`, `"annotations":[{`}},
 		{name: "agent queue includes source metadata", path: "/api/annotations?status=open", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`}},
 		{name: "uncataloged asset has no annotation endpoint", path: "/api/annotations?document=notes.txt", wantStatus: http.StatusNotFound},
@@ -189,7 +189,7 @@ func TestGitComparisonMetadata(t *testing.T) {
 				RequestedBase:  "origin/main",
 				BaseCommit:     strings.Repeat("a", 40),
 			},
-			contains: []string{`name="md-viewer-diff-base" content="origin/main"`, `name="md-viewer-diff-commit" content="` + strings.Repeat("a", 40) + `"`},
+			contains: []string{`name="code-annotator-diff-base" content="origin/main"`, `name="code-annotator-diff-commit" content="` + strings.Repeat("a", 40) + `"`},
 		},
 		{name: "incomplete configuration", comparison: gitdiff.Config{RequestedBase: "HEAD"}, wantErr: "incomplete configuration"},
 	}
@@ -1485,7 +1485,7 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `class="document-search"`) || !strings.Contains(body, `src="/static/viewer.js"`) {
 				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
 			}
-			hasToken := strings.Contains(response.Body.String(), `name="md-viewer-review-token" content="`+token+`"`)
+			hasToken := strings.Contains(response.Body.String(), `name="code-annotator-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
 			}

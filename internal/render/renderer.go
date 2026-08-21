@@ -12,7 +12,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"atulm/md-viewer/internal/gitdiff"
+	"atulm/code-annotator/internal/gitdiff"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"

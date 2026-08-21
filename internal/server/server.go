@@ -18,18 +18,18 @@ import (
 	"strings"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/content"
-	"atulm/md-viewer/internal/gitdiff"
-	mdrender "atulm/md-viewer/internal/render"
-	"atulm/md-viewer/web"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/gitdiff"
+	mdrender "atulm/code-annotator/internal/render"
+	"atulm/code-annotator/web"
 )
 
 const (
 	maxDocumentBytes           int64 = 4 << 20
 	maxAnnotationMutationBytes int64 = 64 << 10
-	reviewTokenHeader                = "X-MD-Viewer-Token"
+	reviewTokenHeader                = "X-Code-Annotator-Token"
 )
 
 const (

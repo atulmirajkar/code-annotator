@@ -5,7 +5,7 @@ set -eu
 mermaid_version=11.17.0
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH='' cd -- "$script_dir/.." && pwd)
-staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/md-viewer-mermaid.XXXXXX")
+staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/code-annotator-mermaid.XXXXXX")
 
 cleanup() {
   rm -rf -- "$staging_dir"

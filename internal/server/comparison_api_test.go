@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
-	"atulm/md-viewer/internal/content"
-	"atulm/md-viewer/internal/gitdiff"
-	mdrender "atulm/md-viewer/internal/render"
+	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/gitdiff"
+	mdrender "atulm/code-annotator/internal/render"
 )
 
 const (

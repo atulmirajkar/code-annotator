@@ -1,4 +1,4 @@
-module atulm/md-viewer
+module atulm/code-annotator
 
 go 1.26.5
 

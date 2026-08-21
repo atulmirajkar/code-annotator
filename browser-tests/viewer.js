@@ -11,12 +11,12 @@ const runFile = promisify(execFile);
 // read from immutable fixtures while annotation writes go to a temporary root.
 const test = base.extend({
   viewer: [async ({}, use) => {
-    const annotationRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-annotations-"));
-    const contentRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-content-"));
+    const annotationRoot = await mkdtemp(path.join(tmpdir(), "code-annotator-browser-annotations-"));
+    const contentRoot = await mkdtemp(path.join(tmpdir(), "code-annotator-browser-content-"));
     await cp(path.join(__dirname, "fixtures"), contentRoot, { recursive: true });
     await initializeGitFixture(contentRoot);
     const server = spawn("go", [
-      "run", "./cmd/md-viewer",
+      "run", "./cmd/code-annotator",
       "-review",
       "-include-code",
 	  "-diff-base", "HEAD",

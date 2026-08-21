@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
 )
 
 // TestOfflineAnnotationWorkflow exercises the direct-store CLI contract from

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
-	annotationstore "atulm/md-viewer/internal/annotation/store"
-	"atulm/md-viewer/internal/content"
+	"atulm/code-annotator/internal/annotation"
+	annotationstore "atulm/code-annotator/internal/annotation/store"
+	"atulm/code-annotator/internal/content"
 )
 
 type replyConfig struct {
@@ -47,7 +47,7 @@ type mutationOutput struct {
 }
 
 func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
-	flags := flag.NewFlagSet("md-viewer annotations reply", flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator annotations reply", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
@@ -58,7 +58,7 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: md-viewer annotations reply --root <directory> --id <annotation> --author <name> --message <text>")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations reply --root <directory> --id <annotation> --author <name> --message <text>")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -93,7 +93,7 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 }
 
 func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) {
-	flags := flag.NewFlagSet("md-viewer annotations resolve", flag.ContinueOnError)
+	flags := flag.NewFlagSet("code-annotator annotations resolve", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
@@ -108,7 +108,7 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: md-viewer annotations resolve --root <directory> --id <annotation> --status <status> --role <role> --author <name> [options]")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations resolve --root <directory> --id <annotation> --status <status> --role <role> --author <name> [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -231,7 +231,7 @@ func openMutationRoots(rootPath, annotationsDir string) (*content.Root, *annotat
 	}
 	directory := annotationsDir
 	if directory == "" {
-		directory = filepath.Join(root.Path(), ".md-viewer", "annotations")
+		directory = filepath.Join(root.Path(), ".code-annotator", "annotations")
 	}
 	info, err := os.Stat(directory)
 	if err != nil {

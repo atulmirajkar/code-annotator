@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"atulm/md-viewer/internal/annotation"
+	"atulm/code-annotator/internal/annotation"
 )
 
 func TestStore(t *testing.T) {

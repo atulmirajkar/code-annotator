@@ -4,7 +4,7 @@ set -eu
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH='' cd -- "$script_dir/.." && pwd)
-staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/md-viewer-dist.XXXXXX")
+staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/code-annotator-dist.XXXXXX")
 
 cleanup() {
   rm -rf -- "$staging_dir"
@@ -31,34 +31,34 @@ build_target() {
   echo "Building $target_os/$target_arch..."
   GOOS=$target_os GOARCH=$target_arch \
     go build -trimpath -buildvcs=false -ldflags="-s -w" \
-    -o "$output_dir/$output_name" ./cmd/md-viewer
+    -o "$output_dir/$output_name" ./cmd/code-annotator
 }
 
-build_target darwin amd64 md-viewer
-build_target darwin arm64 md-viewer
-build_target linux amd64 md-viewer
-build_target linux arm64 md-viewer
-build_target windows amd64 md-viewer.exe
-build_target windows arm64 md-viewer.exe
+build_target darwin amd64 code-annotator
+build_target darwin arm64 code-annotator
+build_target linux amd64 code-annotator
+build_target linux arm64 code-annotator
+build_target windows amd64 code-annotator.exe
+build_target windows arm64 code-annotator.exe
 
 for platform in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 windows-amd64 windows-arm64; do
   mkdir -p "$project_dir/dist/$platform"
 done
 
-install -m 0755 "$staging_dir/darwin-amd64/md-viewer" "$project_dir/dist/darwin-amd64/md-viewer"
-install -m 0755 "$staging_dir/darwin-arm64/md-viewer" "$project_dir/dist/darwin-arm64/md-viewer"
-install -m 0755 "$staging_dir/linux-amd64/md-viewer" "$project_dir/dist/linux-amd64/md-viewer"
-install -m 0755 "$staging_dir/linux-arm64/md-viewer" "$project_dir/dist/linux-arm64/md-viewer"
-install -m 0644 "$staging_dir/windows-amd64/md-viewer.exe" "$project_dir/dist/windows-amd64/md-viewer.exe"
-install -m 0644 "$staging_dir/windows-arm64/md-viewer.exe" "$project_dir/dist/windows-arm64/md-viewer.exe"
+install -m 0755 "$staging_dir/darwin-amd64/code-annotator" "$project_dir/dist/darwin-amd64/code-annotator"
+install -m 0755 "$staging_dir/darwin-arm64/code-annotator" "$project_dir/dist/darwin-arm64/code-annotator"
+install -m 0755 "$staging_dir/linux-amd64/code-annotator" "$project_dir/dist/linux-amd64/code-annotator"
+install -m 0755 "$staging_dir/linux-arm64/code-annotator" "$project_dir/dist/linux-arm64/code-annotator"
+install -m 0644 "$staging_dir/windows-amd64/code-annotator.exe" "$project_dir/dist/windows-amd64/code-annotator.exe"
+install -m 0644 "$staging_dir/windows-arm64/code-annotator.exe" "$project_dir/dist/windows-arm64/code-annotator.exe"
 
 artifacts="
-dist/darwin-amd64/md-viewer
-dist/darwin-arm64/md-viewer
-dist/linux-amd64/md-viewer
-dist/linux-arm64/md-viewer
-dist/windows-amd64/md-viewer.exe
-dist/windows-arm64/md-viewer.exe
+dist/darwin-amd64/code-annotator
+dist/darwin-arm64/code-annotator
+dist/linux-amd64/code-annotator
+dist/linux-arm64/code-annotator
+dist/windows-amd64/code-annotator.exe
+dist/windows-arm64/code-annotator.exe
 "
 
 checksum_file="$staging_dir/SHA256SUMS"

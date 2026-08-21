@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	comparisonTokenHeader            = "X-MD-Viewer-Comparison-Token"
+	comparisonTokenHeader            = "X-Code-Annotator-Comparison-Token"
 	maxComparisonMutationBytes int64 = 4 << 10
 )
 

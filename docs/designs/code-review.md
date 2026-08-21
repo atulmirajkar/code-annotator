@@ -8,7 +8,7 @@
 
 ## Summary
 
-`md-viewer` can support code review without creating a second annotation
+`code-annotator` can support code review without creating a second annotation
 system. Source files are rendered as escaped, line-oriented text whose current
 file bytes carry the same source-position metadata used by Markdown review.
 Annotations continue to bind to the selected file's SHA-256 digest, exact quote,
@@ -181,22 +181,22 @@ Examples:
 
 ```sh
 # Review source without Git decorations.
-md-viewer --review --include-code .
+code-annotator --review --include-code .
 
 # Review the worktree against the last commit.
-md-viewer --review --include-code --diff-base HEAD .
+code-annotator --review --include-code --diff-base HEAD .
 
 # Review the worktree against the parent of the current commit.
-md-viewer --review --include-code --diff-base 'HEAD~1' .
+code-annotator --review --include-code --diff-base 'HEAD~1' .
 
 # Review the worktree against a local branch.
-md-viewer --review --include-code --diff-base main .
+code-annotator --review --include-code --diff-base main .
 
 # Review against an already-fetched remote-tracking branch.
-md-viewer --review --include-code --diff-base origin/main .
+code-annotator --review --include-code --diff-base origin/main .
 
 # Limit discovery to Go and C# and add a generated-code exclusion.
-md-viewer --review --include-code \
+code-annotator --review --include-code \
   --code-extensions .go,.cs --exclude-dirs generated \
   --diff-base origin/main .
 ```
@@ -585,7 +585,7 @@ the complete relative path:
 
 ```text
 internal/server/server.go
--> .md-viewer/annotations/internal/server/server.go.json
+-> .code-annotator/annotations/internal/server/server.go.json
 ```
 
 Diff-created annotations receive optional context:

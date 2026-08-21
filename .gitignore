@@ -45,4 +45,5 @@ go.work.sum
 .lavish/
 
 # Local annotation sidecars written by review mode
+.code-annotator/
 .md-viewer/

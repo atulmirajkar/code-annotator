@@ -30,7 +30,7 @@ and release verification are reviewed.
 
 ### 2. CLI and process lifecycle
 
-- [x] Add `cmd/md-viewer` entry point.
+- [x] Add `cmd/code-annotator` entry point.
 - [x] Parse the directory argument, `--port`, and `--no-open`.
 - [x] Validate and resolve the content root.
 - [x] Bind an OS-selected or explicit loopback port.

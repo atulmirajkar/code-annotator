@@ -1,4 +1,0 @@
-interface:
-  display_name: "md-viewer Annotations"
-  short_description: "Process document review annotations safely"
-  default_prompt: "Process actionable md-viewer annotations using the live API when a server runs, or offline commands only when it is stopped."

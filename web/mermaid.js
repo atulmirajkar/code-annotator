@@ -24,7 +24,7 @@
       if (definition.length > maxDiagramCharacters) {
         throw new Error(`diagram exceeds ${maxDiagramCharacters} characters`);
       }
-      const rendered = await mermaid.render(`md-viewer-mermaid-${index}`, definition);
+      const rendered = await mermaid.render(`code-annotator-mermaid-${index}`, definition);
       output.innerHTML = rendered.svg;
       if (diagram.dataset.sourceStart && diagram.dataset.sourceEnd) {
         output.tabIndex = 0;

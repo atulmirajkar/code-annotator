@@ -16,7 +16,7 @@
   const submitButton = form.querySelector('button[type="submit"]');
   const selectionScope = form.querySelector('input[name="scope"][value="selection"]');
   const documentScope = form.querySelector('input[name="scope"][value="document"]');
-  const reviewToken = document.querySelector('meta[name="md-viewer-review-token"]')?.content || "";
+  const reviewToken = document.querySelector('meta[name="code-annotator-review-token"]')?.content || "";
   const documentPath = panel.dataset.document;
   let currentRevision = "";
   let pendingSelection = null;
@@ -280,7 +280,7 @@
         headers: {
           "Content-Type": "application/json",
           "If-Match": JSON.stringify(currentRevision),
-          "X-MD-Viewer-Token": reviewToken,
+          "X-Code-Annotator-Token": reviewToken,
         },
         body: JSON.stringify(payload),
       });
@@ -358,8 +358,8 @@
       .filter(Boolean);
 
     if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
-      CSS.highlights.delete("md-viewer-annotations");
-      if (ranges.length > 0) CSS.highlights.set("md-viewer-annotations", new Highlight(...ranges));
+      CSS.highlights.delete("code-annotator-annotations");
+      if (ranges.length > 0) CSS.highlights.set("code-annotator-annotations", new Highlight(...ranges));
       return;
     }
     renderFallbackHighlights(ranges);
@@ -713,7 +713,7 @@
         headers: {
           "Content-Type": "application/json",
           "If-Match": JSON.stringify(currentRevision),
-          "X-MD-Viewer-Token": reviewToken,
+          "X-Code-Annotator-Token": reviewToken,
         },
         body: JSON.stringify({ document: documentPath, selection }),
       });
@@ -780,7 +780,7 @@
         headers: {
           "Content-Type": "application/json",
           "If-Match": JSON.stringify(currentRevision),
-          "X-MD-Viewer-Token": reviewToken,
+          "X-Code-Annotator-Token": reviewToken,
         },
         body: JSON.stringify({
           document: documentPath,
@@ -936,7 +936,7 @@
         headers: {
           "Content-Type": "application/json",
           "If-Match": JSON.stringify(currentRevision),
-          "X-MD-Viewer-Token": reviewToken,
+          "X-Code-Annotator-Token": reviewToken,
         },
         body: JSON.stringify(payload),
       });

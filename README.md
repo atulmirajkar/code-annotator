@@ -1,13 +1,18 @@
-# md-viewer
+# code-annotator
 
-`md-viewer` is a local Go web application for browsing Markdown and optionally
-enabled source files from a directory. It starts a server on the loopback
-interface, renders safe HTML, and opens the viewer in the user's default
-browser.
+`code-annotator` is a local Go web application for reviewing Markdown and
+source code from a directory. It starts a server on the loopback interface,
+renders safe HTML, and opens the viewer in the user's default browser. Beyond
+plain Markdown viewing, it supports side-by-side Git diff comparison and a
+full annotation review workflow, with browser and offline CLI tooling for
+human and AI-agent handoff.
 
 The MVP is implemented and ready to run from source or as a compiled binary.
 
 ## MVP goals
+
+These were the original MVP goals; annotation review and code review with Git
+diff comparison, described later in this document, were added afterward.
 
 - Accept a directory as a positional command-line argument.
 - Recursively list Markdown files under that directory.
@@ -30,32 +35,32 @@ remains available for line-level comments.
 Run directly from the repository:
 
 ```sh
-go run ./cmd/md-viewer ./docs
+go run ./cmd/code-annotator ./docs
 ```
 
 Or build and run the binary:
 
 ```sh
-go build -o bin/md-viewer ./cmd/md-viewer
-./bin/md-viewer ./docs
+go build -o bin/code-annotator ./cmd/code-annotator
+./bin/code-annotator ./docs
 ```
 
 Prebuilt binaries are available under [`dist/`](dist/):
 
 | Platform | Architecture | Binary |
 | --- | --- | --- |
-| macOS | arm64 (Apple silicon) | [`dist/darwin-arm64/md-viewer`](dist/darwin-arm64/md-viewer) |
-| macOS | amd64 (Intel) | [`dist/darwin-amd64/md-viewer`](dist/darwin-amd64/md-viewer) |
-| Linux | arm64 | [`dist/linux-arm64/md-viewer`](dist/linux-arm64/md-viewer) |
-| Linux | amd64 | [`dist/linux-amd64/md-viewer`](dist/linux-amd64/md-viewer) |
-| Windows | arm64 | [`dist/windows-arm64/md-viewer.exe`](dist/windows-arm64/md-viewer.exe) |
-| Windows | amd64 | [`dist/windows-amd64/md-viewer.exe`](dist/windows-amd64/md-viewer.exe) |
+| macOS | arm64 (Apple silicon) | [`dist/darwin-arm64/code-annotator`](dist/darwin-arm64/code-annotator) |
+| macOS | amd64 (Intel) | [`dist/darwin-amd64/code-annotator`](dist/darwin-amd64/code-annotator) |
+| Linux | arm64 | [`dist/linux-arm64/code-annotator`](dist/linux-arm64/code-annotator) |
+| Linux | amd64 | [`dist/linux-amd64/code-annotator`](dist/linux-amd64/code-annotator) |
+| Windows | arm64 | [`dist/windows-arm64/code-annotator.exe`](dist/windows-arm64/code-annotator.exe) |
+| Windows | amd64 | [`dist/windows-amd64/code-annotator.exe`](dist/windows-amd64/code-annotator.exe) |
 
 On macOS or Linux, make the selected binary executable if needed, then run it:
 
 ```sh
-chmod +x dist/darwin-arm64/md-viewer
-./dist/darwin-arm64/md-viewer ./docs
+chmod +x dist/darwin-arm64/code-annotator
+./dist/darwin-arm64/code-annotator ./docs
 ```
 
 Regenerate every platform binary after a source update with:
@@ -131,20 +136,20 @@ stale and document-level annotations remain panel-only. Closed and rejected
 annotations and their highlights are hidden by default and can be restored with
 the panel's history toggle. A stale text annotation can be reattached by
 selecting its replacement text and using the action on its card. By default, sidecars are stored under
-`<content-root>/.md-viewer/annotations/`. To select another location:
+`<content-root>/.code-annotator/annotations/`. To select another location:
 
 ```sh
-md-viewer --review --annotations-dir ./reviews ./docs
+code-annotator --review --annotations-dir ./reviews ./docs
 ```
 
 List annotations for agents or local tooling without starting the server:
 
 ```sh
-md-viewer annotations list --root ./docs --status open,needs_changes
-md-viewer annotations export --root ./docs --status open,needs_changes
-md-viewer annotations reply --root ./docs --id ann_... \
+code-annotator annotations list --root ./docs --status open,needs_changes
+code-annotator annotations export --root ./docs --status open,needs_changes
+code-annotator annotations reply --root ./docs --id ann_... \
   --author reviewer --message "Please retain the default."
-md-viewer annotations resolve --root ./docs --id ann_... \
+code-annotator annotations resolve --root ./docs --id ann_... \
   --status applied --role agent --author codex \
   --summary "Implemented request" --commit abc1234
 ```
@@ -166,8 +171,8 @@ When the review server is running, agents use the live HTTP client instead of
 the offline commands so browser and agent writes share one revision authority:
 
 ```sh
-md-viewer agent queue --url http://127.0.0.1:54321
-md-viewer agent resolve --url http://127.0.0.1:54321 \
+code-annotator agent queue --url http://127.0.0.1:54321
+code-annotator agent resolve --url http://127.0.0.1:54321 \
   --document README.md --revision <revision> --id ann_... \
   --status applied --role agent --author codex --summary "Implemented request"
 ```
@@ -189,40 +194,40 @@ npm run test:browser
 These tests start an isolated review server and cover Mermaid rendering,
 diagram selection, annotation mutation workflows, stale-anchor reattachment,
 and optimistic-concurrency conflicts. Node.js and Playwright are development
-dependencies only; released `md-viewer` binaries remain self-contained.
+dependencies only; released `code-annotator` binaries remain self-contained.
 
 ### Agent skill
 
 The executable and agent skill are separate artifacts. Installing the skill
-does not install or bundle the `md-viewer` binary. A working agent handoff has
+does not install or bundle the `code-annotator` binary. A working agent handoff has
 two setup steps:
 
-1. Make the API client available by installing or building `md-viewer` and
+1. Make the API client available by installing or building `code-annotator` and
    placing it on `PATH`. When working in this source repository, agents can use
-   `go run ./cmd/md-viewer` instead.
-2. Make the `md-viewer-annotations` skill available to the agent, either through
+   `go run ./cmd/code-annotator` instead.
+2. Make the `code-annotator-annotations` skill available to the agent, either through
    repository-local discovery or installation with the Skills CLI.
 
-The repository includes the `md-viewer-annotations` skill under
+The repository includes the `code-annotator-annotations` skill under
 `.agents/skills/`. Agents working from this repository can discover it without
 installation. Use the Skills CLI to install it from a local checkout for the
 current project:
 
 ```sh
-npx skills add . --skill md-viewer-annotations -y
+npx skills add . --skill code-annotator-annotations -y
 ```
 
 Install it for personal use across projects with:
 
 ```sh
-npx skills add . --skill md-viewer-annotations -g -y
+npx skills add . --skill code-annotator-annotations -g -y
 ```
 
 After the repository is published, the same convention supports installation
 without a checkout:
 
 ```sh
-npx skills add <owner>/<repository> --skill md-viewer-annotations -g -y
+npx skills add <owner>/<repository> --skill code-annotator-annotations -g -y
 ```
 
 The Skills CLI discovers the skill directly from `.agents/skills/`.

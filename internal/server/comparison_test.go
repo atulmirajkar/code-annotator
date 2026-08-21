@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"atulm/md-viewer/internal/gitdiff"
+	"atulm/code-annotator/internal/gitdiff"
 )
 
 // newComparisonRepository freezes a two-commit worktree with the base pinned at

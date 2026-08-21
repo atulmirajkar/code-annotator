@@ -41,7 +41,7 @@ test.describe("revision selector", () => {
     const options = await optionList(page);
     expect(options.length).toBeGreaterThan(1);
     // The active base starts as the tip commit shown on the diff toolbar.
-    const fullCommit = await page.locator('meta[name="md-viewer-diff-commit"]').getAttribute("content");
+    const fullCommit = await page.locator('meta[name="code-annotator-diff-commit"]').getAttribute("content");
     const active = options.find((option) => option.selected);
     expect(active.value).toBe(fullCommit);
     expect(active.text).toContain(fullCommit.slice(0, 12));

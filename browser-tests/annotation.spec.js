@@ -31,7 +31,7 @@ async function createSelectionAnnotation(page, comment) {
 // by Chromium. The fallback DOM marks are covered by unit-level rendering.
 async function hasAnnotationHighlight(page, text) {
   return page.evaluate((selectedText) => {
-    const highlight = globalThis.CSS?.highlights?.get("md-viewer-annotations");
+    const highlight = globalThis.CSS?.highlights?.get("code-annotator-annotations");
     return highlight ? Array.from(highlight).some((range) => range.toString() === selectedText) : false;
   }, text);
 }
@@ -179,7 +179,7 @@ test.describe("annotation review interactions", () => {
     await openAnnotations(page);
     await createSelectionAnnotation(page, "Keep my draft visible.");
 
-    const token = await page.locator('meta[name="md-viewer-review-token"]').getAttribute("content");
+    const token = await page.locator('meta[name="code-annotator-review-token"]').getAttribute("content");
     const current = await page.request.get(`${viewerURL}api/annotations?document=conflict.md`);
     const payload = await current.json();
     const external = await page.request.post(`${viewerURL}api/annotations`, {
@@ -187,7 +187,7 @@ test.describe("annotation review interactions", () => {
         "Content-Type": "application/json",
         "If-Match": JSON.stringify(payload.revision),
         "Origin": new URL(viewerURL).origin,
-        "X-MD-Viewer-Token": token,
+        "X-Code-Annotator-Token": token,
       },
       data: {
         document: "conflict.md",
@@ -229,7 +229,7 @@ test.describe("annotation review interactions", () => {
     await card.locator(".annotation-summary").click();
     await expect(card.locator(".annotation-quick-close")).toBeVisible();
 
-    const token = await page.locator('meta[name="md-viewer-review-token"]').getAttribute("content");
+    const token = await page.locator('meta[name="code-annotator-review-token"]').getAttribute("content");
     const current = await page.request.get(`${viewerURL}api/annotations?document=quick-close.md`);
     const payload = await current.json();
     const external = await page.request.post(`${viewerURL}api/annotations`, {
@@ -237,7 +237,7 @@ test.describe("annotation review interactions", () => {
         "Content-Type": "application/json",
         "If-Match": JSON.stringify(payload.revision),
         "Origin": new URL(viewerURL).origin,
-        "X-MD-Viewer-Token": token,
+        "X-Code-Annotator-Token": token,
       },
       data: {
         document: "quick-close.md",
