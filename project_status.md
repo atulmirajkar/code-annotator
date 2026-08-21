@@ -75,8 +75,8 @@ Embedded diagram rendering and live reload follow annotation review.
 
 ### 7. Mermaid and sequence diagrams
 
-- [ ] Pin Mermaid Tiny and retain its license in the embedded web assets.
-- [ ] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
+- [x] Pin Mermaid Tiny and retain its license in the embedded web assets.
+- [x] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
   network dependency.
 - [ ] Recognize fenced `mermaid` blocks and render them as client-side SVG.
 - [ ] Use strict Mermaid security, bounded diagram input, and a self-only script

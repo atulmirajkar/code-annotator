@@ -1,0 +1,3 @@
+# Preserve the published Mermaid bundle byte-for-byte. Its generated source
+# contains insignificant trailing whitespace that should not fail diff checks.
+web/vendor/mermaid/mermaid.tiny.js -whitespace
