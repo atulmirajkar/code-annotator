@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 	mdrender "atulm/md-viewer/internal/render"
 	"atulm/md-viewer/web"
@@ -29,11 +30,27 @@ const (
 
 // Server serves an index and rendered Markdown documents from a content root.
 type Server struct {
-	root     *content.Root
-	renderer *mdrender.Renderer
-	page     *template.Template
-	styles   template.CSS
-	handler  http.Handler
+	root        *content.Root
+	renderer    *mdrender.Renderer
+	annotations *annotationstore.Store
+	page        *template.Template
+	styles      template.CSS
+	handler     http.Handler
+}
+
+// Option configures an optional Server capability.
+type Option func(*Server) error
+
+// WithAnnotationStore enables read access to annotations. Write routes remain
+// unavailable until the review-session security boundary is configured.
+func WithAnnotationStore(store *annotationstore.Store) Option {
+	return func(server *Server) error {
+		if store == nil {
+			return errors.New("configure annotation API: nil store")
+		}
+		server.annotations = store
+		return nil
+	}
 }
 
 type pageData struct {
@@ -52,8 +69,8 @@ type documentView struct {
 	Selected  bool
 }
 
-// New creates the Markdown viewer handler.
-func New(root *content.Root, renderer *mdrender.Renderer) (*Server, error) {
+// New creates the Markdown viewer handler with optional capabilities.
+func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*Server, error) {
 	if root == nil {
 		return nil, errors.New("create server: nil content root")
 	}
@@ -80,11 +97,22 @@ func New(root *content.Root, renderer *mdrender.Renderer) (*Server, error) {
 		page:     page,
 		styles:   template.CSS(styles), // Embedded, application-owned CSS.
 	}
+	for _, option := range options {
+		if option == nil {
+			return nil, errors.New("create server: nil option")
+		}
+		if err := option(server); err != nil {
+			return nil, err
+		}
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /{$}", server.handleIndex)
 	mux.HandleFunc("GET /view/{path...}", server.handleDocument)
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
+	if server.annotations != nil {
+		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
+	}
 	server.handler = securityHeaders(mux)
 
 	return server, nil

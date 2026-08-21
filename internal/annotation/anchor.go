@@ -32,13 +32,13 @@ const (
 // AnchorResult is the current location and derived state of a source selector.
 // Byte offsets are valid only for exact and moved results.
 type AnchorResult struct {
-	State      AnchorState
-	Reason     StaleReason
-	StartByte  int
-	EndByte    int
-	StartLine  int
-	EndLine    int
-	Candidates int
+	State      AnchorState `json:"state"`
+	Reason     StaleReason `json:"reason,omitempty"`
+	StartByte  int         `json:"startByte,omitempty"`
+	EndByte    int         `json:"endByte,omitempty"`
+	StartLine  int         `json:"startLine,omitempty"`
+	EndLine    int         `json:"endLine,omitempty"`
+	Candidates int         `json:"candidates,omitempty"`
 }
 
 // NewSource creates a verified selector for the byte range [startByte, endByte)

@@ -73,9 +73,9 @@ Available flags:
 --annotations-dir <path>    Store annotations at a custom path; requires --review
 ```
 
-Review mode currently establishes the annotation storage boundary; its browser
-API and review interface are being delivered in subsequent milestone commits.
-By default, sidecars are stored under
+Review mode establishes the annotation storage boundary and enables the
+read-only annotation API. Mutation routes and the browser review interface are
+being delivered in subsequent milestone commits. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh

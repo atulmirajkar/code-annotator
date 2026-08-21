@@ -1,15 +1,20 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"atulm/md-viewer/internal/annotation"
+	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 	mdrender "atulm/md-viewer/internal/render"
 )
@@ -136,6 +141,129 @@ func TestHealth(t *testing.T) {
 	}
 	if got, want := response.Body.String(), "ok\n"; got != want {
 		t.Fatalf("body = %q, want %q", got, want)
+	}
+}
+
+func TestAnnotationAPI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		review          bool
+		method          string
+		document        string
+		storedSource    string
+		currentSource   string
+		wantStatus      int
+		wantAnnotations int
+		wantAnchor      annotation.AnchorState
+		wantReason      annotation.StaleReason
+		wantRevision    bool
+	}{
+		{name: "route absent outside review mode", method: http.MethodGet, document: "README.md", currentSource: "# Home", wantStatus: http.StatusNotFound},
+		{name: "missing document query", review: true, method: http.MethodGet, currentSource: "# Home", wantStatus: http.StatusNotFound},
+		{name: "unknown document", review: true, method: http.MethodGet, document: "missing.md", currentSource: "# Home", wantStatus: http.StatusNotFound},
+		{name: "empty sidecar", review: true, method: http.MethodGet, document: "README.md", currentSource: "# Home", wantStatus: http.StatusOK},
+		{name: "exact anchor", review: true, method: http.MethodGet, document: "README.md", storedSource: "Before selected after", currentSource: "Before selected after", wantStatus: http.StatusOK, wantAnnotations: 1, wantAnchor: annotation.AnchorExact, wantRevision: true},
+		{name: "stale anchor", review: true, method: http.MethodGet, document: "README.md", storedSource: "Before selected after", currentSource: "Selection was removed", wantStatus: http.StatusOK, wantAnnotations: 1, wantAnchor: annotation.AnchorStale, wantReason: annotation.StaleNotFound, wantRevision: true},
+		{name: "write route unavailable", review: true, method: http.MethodPost, document: "README.md", currentSource: "# Home", wantStatus: http.StatusMethodNotAllowed},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), test.currentSource)
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+
+			var options []Option
+			if test.review {
+				store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+				if err != nil {
+					t.Fatalf("annotationstore.Open() error = %v", err)
+				}
+				if test.storedSource != "" {
+					saveTestAnnotation(t, store, test.document, test.storedSource)
+				}
+				options = append(options, WithAnnotationStore(store))
+			}
+			viewer, err := New(root, mdrender.New(), options...)
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			requestPath := "/api/annotations"
+			if test.document != "" {
+				requestPath += "?document=" + url.QueryEscape(test.document)
+			}
+			request := httptest.NewRequest(test.method, requestPath, nil)
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if got := response.Code; got != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", got, test.wantStatus, response.Body.String())
+			}
+			if test.wantStatus != http.StatusOK {
+				return
+			}
+
+			var payload annotationListResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			if payload.Document != test.document || len(payload.Annotations) != test.wantAnnotations {
+				t.Fatalf("payload = %#v, want document %q and %d annotations", payload, test.document, test.wantAnnotations)
+			}
+			if test.wantRevision != (payload.Revision != "") {
+				t.Fatalf("revision = %q, want non-empty %t", payload.Revision, test.wantRevision)
+			}
+			if got, want := response.Header().Get("ETag"), strconv.Quote(payload.Revision); got != want {
+				t.Fatalf("ETag = %q, want %q", got, want)
+			}
+			if test.wantAnnotations > 0 {
+				anchor := payload.Annotations[0].Anchor
+				if anchor == nil || anchor.State != test.wantAnchor || anchor.Reason != test.wantReason {
+					t.Fatalf("anchor = %#v, want state %q and reason %q", anchor, test.wantAnchor, test.wantReason)
+				}
+			}
+		})
+	}
+}
+
+// saveTestAnnotation persists one selected-text annotation for API test setup.
+func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, sourceText string) {
+	t.Helper()
+	start := strings.Index(sourceText, "selected")
+	if start < 0 {
+		t.Fatal("test source does not contain selected text")
+	}
+	source, err := annotation.NewSource([]byte(sourceText), start, start+len("selected"))
+	if err != nil {
+		t.Fatalf("annotation.NewSource() error = %v", err)
+	}
+	now := time.Date(2026, 8, 20, 20, 0, 0, 0, time.UTC)
+	sidecar := annotation.Sidecar{
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      document,
+		Annotations: []annotation.Annotation{
+			{
+				ID:        "ann_api_test",
+				Intent:    annotation.IntentChangeRequest,
+				Status:    annotation.StatusOpen,
+				Comment:   "Update this selection.",
+				Author:    "reviewer",
+				CreatedAt: now,
+				UpdatedAt: now,
+				Source:    &source,
+				Thread:    []annotation.ThreadEntry{},
+			},
+		},
+	}
+	if _, err := store.Save(sidecar, ""); err != nil {
+		t.Fatalf("Store.Save() error = %v", err)
 	}
 }
 

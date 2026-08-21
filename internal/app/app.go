@@ -52,7 +52,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	if err != nil {
 		return err
 	}
-	viewer, err := server.New(root, mdrender.New())
+	var serverOptions []server.Option
+	if annotations != nil {
+		serverOptions = append(serverOptions, server.WithAnnotationStore(annotations))
+	}
+	viewer, err := server.New(root, mdrender.New(), serverOptions...)
 	if err != nil {
 		return fmt.Errorf("create Markdown viewer: %w", err)
 	}

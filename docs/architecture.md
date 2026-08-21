@@ -67,9 +67,17 @@ handlers.
 | `GET /view/{path}` | Safely load and render a `.md` file. |
 | `GET /asset/{path}` | Serve a document-relative local asset. |
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
+| `GET /api/annotations?document={path}` | In review mode, return annotations, current anchor state, and revision. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
+
+The annotation read route is registered only when `--review` supplies a store.
+It verifies that the requested Markdown document exists under the content root,
+loads its sidecar from the separate writable root, resolves text anchors against
+the current file bytes, and returns the revision in both JSON and `ETag` form.
+Mutation routes remain absent until origin and session-token protection is
+enabled.
 
 ## Key dependencies
 

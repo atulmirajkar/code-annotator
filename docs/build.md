@@ -70,9 +70,9 @@ an alternate location when the content root should remain untouched:
 ./bin/md-viewer --review --annotations-dir ./reviews ./docs
 ```
 
-`--annotations-dir` is rejected without `--review`. Review mode currently
-initializes and reports the writable store; mutation APIs and browser controls
-are scheduled in the next implementation commits.
+`--annotations-dir` is rejected without `--review`. Review mode initializes and
+reports the writable store and enables its read API; mutation APIs and browser
+controls are scheduled in the next implementation commits.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.
