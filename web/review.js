@@ -6,6 +6,7 @@
 
   const list = panel.querySelector(".annotation-list");
   const count = panel.querySelector(".annotation-count");
+  const showInactive = panel.querySelector(".show-inactive-annotations");
   const preview = panel.querySelector(".selection-preview");
   const previewQuote = panel.querySelector(".selection-quote");
   const previewRange = panel.querySelector(".selection-range");
@@ -20,6 +21,7 @@
   let currentRevision = "";
   let pendingSelection = null;
   let preserveSelection = false;
+  let annotationPayload = null;
   if (!documentPath) {
     showMessage("Open a Markdown document to review annotations.");
     return;
@@ -27,6 +29,9 @@
 
   loadAnnotations();
   form.addEventListener("submit", submitAnnotation);
+  showInactive.addEventListener("change", () => {
+    if (annotationPayload) renderAnnotations(annotationPayload);
+  });
   panel.addEventListener("pointerdown", () => { preserveSelection = true; });
   document.addEventListener("pointerup", () => {
     window.setTimeout(() => { preserveSelection = false; }, 0);
@@ -220,15 +225,27 @@
   // Render user-controlled content with textContent so comments and author
   // names can never become executable markup.
   function renderAnnotations(payload) {
+    annotationPayload = payload;
     list.replaceChildren();
     const annotations = Array.isArray(payload.annotations) ? payload.annotations : [];
-    renderAnnotationHighlights(annotations);
-    count.textContent = String(annotations.length);
-    if (annotations.length === 0) {
-      showMessage("No annotations for this document.");
+    const active = annotations.filter((annotation) => !isInactive(annotation));
+    const visible = showInactive.checked ? annotations : active;
+    renderAnnotationHighlights(visible);
+    count.textContent = annotations.length === active.length
+      ? String(active.length)
+      : `${active.length} active · ${annotations.length} total`;
+    if (visible.length === 0) {
+      showMessage(annotations.length === 0 ? "No annotations for this document." : "No active annotations.");
       return;
     }
-    annotations.forEach((annotation) => list.append(createCard(annotation)));
+    visible.forEach((annotation) => list.append(createCard(annotation)));
+  }
+
+  // Closed and rejected annotations retain their history in storage but are
+  // inactive for the current review, so they do not appear or highlight text
+  // unless the reviewer explicitly asks to inspect them.
+  function isInactive(annotation) {
+    return annotation.status === "closed" || annotation.status === "rejected";
   }
 
   // Highlight only anchors resolved against the current document. Stale and

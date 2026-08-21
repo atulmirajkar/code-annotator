@@ -137,6 +137,12 @@ send the review token and the latest sidecar revision to the shared transition
 endpoint. On a revision conflict, the browser reloads the authoritative list
 and asks the user to review the new state before retrying.
 
+The browser treats `closed` and `rejected` as inactive presentation states.
+They remain in the API response and sidecar, but the default panel filters out
+their cards before rendering and passes only active annotations to the highlight
+renderer. A history toggle rerenders the same authoritative payload with all
+annotations, preserving access to audit history and reopen transitions.
+
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
 preserves existing entries. Structured lifecycle activity is reserved for the

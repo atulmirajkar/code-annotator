@@ -79,10 +79,12 @@ and stale-anchor warnings. Selections across formatting elements show their
 Markdown byte range and are bound to the rendered document revision. Highlights
 and lifecycle controls let agents acknowledge, apply, or reject work and let
 reviewers close, reopen, or request more changes. Inline discussion replies are
-being delivered in a subsequent milestone commit. The creation form can attach a new annotation to the current
-selection or the whole document, and annotation cards preview their selected
-source and line range. Resolved selections are highlighted in the document;
-stale and document-level annotations remain panel-only. By default, sidecars are stored under
+being delivered in a subsequent milestone commit. The creation form can attach
+a new annotation to the current selection or the whole document, and annotation
+cards preview their selected source and line range. Resolved selections are highlighted in the document;
+stale and document-level annotations remain panel-only. Closed and rejected
+annotations and their highlights are hidden by default and can be restored with
+the panel's history toggle. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh

@@ -66,6 +66,7 @@ rendering and live reload follow annotation review.
 - [x] Add rendered-text selection, highlights, and the review panel.
 - [x] Add annotation list, export, reply, and resolve CLI commands.
 - [x] Add actor-aware annotation lifecycle controls to the browser panel.
+- [x] Hide closed and rejected cards and highlights behind a history toggle.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
 ### 7. Mermaid and sequence diagrams

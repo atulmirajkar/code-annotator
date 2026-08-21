@@ -634,6 +634,13 @@ creation. If another browser or agent writes first, the stale request receives
 to review the latest state before retrying. Ordinary inline discussion replies
 remain a separate control because they do not change lifecycle state.
 
+Closed and rejected annotations are complete or declined work, so the default
+document view excludes both their cards and their source highlights. The panel
+reports active and total counts and offers an explicit history toggle that
+restores the inactive cards and highlights. This keeps completed work available
+for inspection and reopening without implying that its source is still under
+review.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.
