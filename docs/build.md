@@ -112,6 +112,10 @@ The `resolve` command applies actor-controlled transitions and their required
 activity. For example, `applied` requires `--summary`, while `needs_changes` and
 `rejected` require `--message`.
 
+These commands are offline tooling. While a review server is live, agents use
+its annotation HTTP API so browser and agent mutations share the same revision
+coordinator; the repository agent skill provides that client workflow.
+
 ## Verify
 
 Format and test the code:

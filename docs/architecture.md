@@ -94,6 +94,7 @@ routes are not registered until their handlers use this guard.
 | `GET /view/{path}` | Safely load and render a `.md` file. |
 | `GET /asset/{path}` | Serve a document-relative local asset. |
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
+| `GET /api/annotations?status={states}` | Return the cross-document agent queue with a revision per sidecar. |
 | `GET /api/annotations?document={path}` | In review mode, return annotations, current anchor state, and revision. |
 | `POST /api/annotations` | In a secured review session, create a verified text or document annotation. |
 | `PATCH /api/annotations/{id}` | Atomically transition lifecycle state and append its structured activity. |
@@ -104,6 +105,9 @@ Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
 
 The annotation read route is registered only when `--review` supplies a store.
+Without a `document` query it traverses the stable content index, applies an
+optional status filter, and returns only documents with matching annotations.
+Each document carries its own sidecar revision for subsequent mutations.
 It verifies that the requested Markdown document exists under the content root,
 loads its sidecar from the separate writable root, resolves text anchors against
 the current file bytes, and returns the revision in both JSON and `ETag` form.

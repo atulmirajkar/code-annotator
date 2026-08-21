@@ -380,6 +380,7 @@ Mutation routes exist only in review mode.
 
 | Method and route | Purpose |
 | --- | --- |
+| `GET /api/annotations?status={states}` | List the cross-document agent queue with one revision per sidecar. |
 | `GET /api/annotations?document={path}` | List annotations and derived anchor state. |
 | `POST /api/annotations` | Create a text or document annotation. |
 | `PATCH /api/annotations/{id}` | Transition status or update allowed mutable fields. |
@@ -516,17 +517,15 @@ The complete local-write boundary is:
 - HTML escaping for comments; annotation Markdown rendering is out of scope.
 - No permissive CORS headers.
 
-Browser mutations use the guarded HTTP API. Offline CLI commands and local AI
-agents use the store directly under the invoking user's filesystem permissions,
-so they do not use a browser origin or review token. An agent integration that
-chooses to call the HTTP mutation API must instead be securely provisioned with
-the current process's origin and review token. The token cannot be obtained from
-logs because it is never logged.
+Browser and live-agent mutations use the same guarded HTTP API. A local agent is
+given the current viewer URL, reads the per-process review token from the served
+page, and sends the exact origin, token, and sidecar revision on every mutation.
+The token is never logged. Offline CLI commands remain available only when the
+server is not coordinating an active review session.
 
-## AI-agent handoff
+## Offline annotation tooling
 
-Sidecars are the canonical machine-readable interface. Add a CLI surface that
-does not require the server to be running:
+The CLI provides maintenance and inspection when the server is not running:
 
 ```sh
 md-viewer annotations list --root ./docs --status open,needs_changes --format json
@@ -563,7 +562,16 @@ requires an explicit `agent` or `reviewer` role plus author name, creates the
 target-specific activity and status-change entries together, validates the
 complete sidecar, and saves against the loaded revision.
 
-An agent workflow is:
+## Live AI-agent handoff
+
+The running webserver is the sole write coordinator for a live review. An agent
+uses `GET /api/annotations?status=open,needs_changes` to discover work. Every
+returned document includes its own `revision`; there is intentionally no queue
+ETag spanning multiple sidecars. The agent uses the document revision in a
+strong `If-Match` header for replies and transitions, alongside the exact
+viewer origin and review token.
+
+A live agent workflow is:
 
 1. List unresolved `question`, `suggestion`, and `change_request` annotations.
 2. Read each current document plus its quoted context.
@@ -573,9 +581,13 @@ An agent workflow is:
 5. If the reviewer responds with `needs_changes`, read the complete thread and
    make another attempt against the same annotation ID.
 6. Leave final closure to the reviewer.
+7. On `409`, reload the API queue and reconsider the action against the latest
+   status and complete thread. Never retry a stale mutation blindly.
 
-An MCP adapter or automatic watcher can be designed later over the same sidecar
-and CLI contracts. The viewer must not execute arbitrary agent commands.
+The repository skill provides a small API client so agents do not reproduce
+authentication headers or JSON shapes by hand. The client discovers the token
+from the supplied loopback viewer URL and never writes sidecars. The viewer must
+not execute arbitrary agent commands.
 
 ## Proposed packages
 

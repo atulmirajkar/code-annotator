@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -29,6 +30,14 @@ type annotationListResponse struct {
 	Document      string           `json:"document"`
 	Revision      string           `json:"revision"`
 	Annotations   []annotationView `json:"annotations"`
+}
+
+// annotationQueueResponse groups actionable annotations by document. Each
+// document retains its own revision because mutations use sidecar-scoped
+// optimistic concurrency.
+type annotationQueueResponse struct {
+	SchemaVersion int                      `json:"schemaVersion"`
+	Documents     []annotationListResponse `json:"documents"`
 }
 
 // createAnnotationRequest contains only reviewer-controlled fields. Lifecycle,
@@ -107,6 +116,10 @@ type reattachAnnotationResponse struct {
 // from the current Markdown bytes. It never mutates either root.
 func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.Request) {
 	document := request.URL.Query().Get("document")
+	if document == "" {
+		s.handleAnnotationQueue(response, request)
+		return
+	}
 	if err := annotation.ValidateDocumentPath(document); err != nil {
 		http.Error(response, "Markdown document not found", http.StatusNotFound)
 		return
@@ -145,6 +158,81 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 		// report this error when it is introduced.
 		return
 	}
+}
+
+// handleAnnotationQueue returns annotations across the stable content index.
+// Unlike a document response, the queue has no single ETag: every document
+// carries the revision required for mutations against its own sidecar.
+func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *http.Request) {
+	statuses, err := parseAnnotationStatuses(request.URL.Query().Get("status"))
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusBadRequest)
+		return
+	}
+	index, err := s.root.Index()
+	if err != nil {
+		http.Error(response, "could not index Markdown documents", http.StatusInternalServerError)
+		return
+	}
+
+	payload := annotationQueueResponse{SchemaVersion: annotation.SchemaVersion, Documents: []annotationListResponse{}}
+	for _, document := range index.Documents {
+		sidecar, revision, err := s.annotations.Load(document.Path)
+		if err != nil {
+			http.Error(response, "could not read annotations", http.StatusInternalServerError)
+			return
+		}
+		if len(sidecar.Annotations) == 0 {
+			continue
+		}
+		source, err := s.root.ReadFile(document.Path, maxDocumentBytes)
+		if err != nil {
+			s.writeAnnotationReadError(response, err)
+			return
+		}
+		views := make([]annotationView, 0, len(sidecar.Annotations))
+		for _, item := range sidecar.Annotations {
+			if len(statuses) > 0 {
+				if _, wanted := statuses[item.Status]; !wanted {
+					continue
+				}
+			}
+			view, err := resolveAnnotationView(source, item)
+			if err != nil {
+				http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+				return
+			}
+			views = append(views, view)
+		}
+		if len(views) == 0 {
+			continue
+		}
+		payload.Documents = append(payload.Documents, annotationListResponse{
+			SchemaVersion: sidecar.SchemaVersion,
+			Document:      sidecar.Document,
+			Revision:      string(revision),
+			Annotations:   views,
+		})
+	}
+
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	_ = json.NewEncoder(response).Encode(payload)
+}
+
+// parseAnnotationStatuses validates the optional comma-separated queue filter.
+func parseAnnotationStatuses(value string) (map[annotation.Status]struct{}, error) {
+	result := make(map[annotation.Status]struct{})
+	if strings.TrimSpace(value) == "" {
+		return result, nil
+	}
+	for _, raw := range strings.Split(value, ",") {
+		status := annotation.Status(strings.TrimSpace(raw))
+		if !status.Valid() {
+			return nil, fmt.Errorf("invalid annotation status %q", raw)
+		}
+		result[status] = struct{}{}
+	}
+	return result, nil
 }
 
 // handleCreateAnnotation verifies the selected Markdown bytes, appends one open

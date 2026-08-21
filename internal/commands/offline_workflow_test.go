@@ -12,9 +12,10 @@ import (
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 )
 
-// TestAgentHandoffWorkflow exercises the CLI contract an AI agent follows from
-// initial discovery through a reviewer-requested retry and final closure.
-func TestAgentHandoffWorkflow(t *testing.T) {
+// TestOfflineAnnotationWorkflow exercises the direct-store CLI contract from
+// initial discovery through a reviewer-requested retry and final closure. Live
+// agents use the HTTP API so browser and agent writes share one coordinator.
+func TestOfflineAnnotationWorkflow(t *testing.T) {
 	t.Parallel()
 
 	rootPath := t.TempDir()

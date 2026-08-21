@@ -162,7 +162,6 @@ func TestAnnotationAPI(t *testing.T) {
 		wantRevision    bool
 	}{
 		{name: "route absent outside review mode", method: http.MethodGet, document: "README.md", currentSource: "# Home", wantStatus: http.StatusNotFound},
-		{name: "missing document query", review: true, method: http.MethodGet, currentSource: "# Home", wantStatus: http.StatusNotFound},
 		{name: "unknown document", review: true, method: http.MethodGet, document: "missing.md", currentSource: "# Home", wantStatus: http.StatusNotFound},
 		{name: "empty sidecar", review: true, method: http.MethodGet, document: "README.md", currentSource: "# Home", wantStatus: http.StatusOK},
 		{name: "exact anchor", review: true, method: http.MethodGet, document: "README.md", storedSource: "Before selected after", currentSource: "Before selected after", wantStatus: http.StatusOK, wantAnnotations: 1, wantAnchor: annotation.AnchorExact, wantRevision: true},
@@ -231,6 +230,181 @@ func TestAnnotationAPI(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestAnnotationQueueAPI(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		status        string
+		seed          bool
+		wantStatus    int
+		wantDocuments int
+		wantErr       string
+	}{
+		{name: "all annotations", seed: true, wantStatus: http.StatusOK, wantDocuments: 1},
+		{name: "actionable filter", status: "open,needs_changes", seed: true, wantStatus: http.StatusOK, wantDocuments: 1},
+		{name: "no matching status", status: "closed", seed: true, wantStatus: http.StatusOK},
+		{name: "empty queue", wantStatus: http.StatusOK},
+		{name: "invalid status", status: "pending", wantStatus: http.StatusBadRequest, wantErr: "invalid annotation status"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			if test.seed {
+				saveTestAnnotation(t, store, "README.md", "Before selected after")
+			}
+			viewer, err := New(root, mdrender.New(), WithAnnotationStore(store))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			requestPath := "/api/annotations"
+			if test.status != "" {
+				requestPath += "?status=" + url.QueryEscape(test.status)
+			}
+			request := httptest.NewRequest(http.MethodGet, requestPath, nil)
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantErr != "" {
+				if !strings.Contains(response.Body.String(), test.wantErr) {
+					t.Fatalf("body = %q, want containing %q", response.Body.String(), test.wantErr)
+				}
+				return
+			}
+			var payload annotationQueueResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			if payload.SchemaVersion != annotation.SchemaVersion || len(payload.Documents) != test.wantDocuments {
+				t.Fatalf("queue = %#v, want %d documents", payload, test.wantDocuments)
+			}
+			if test.wantDocuments > 0 {
+				document := payload.Documents[0]
+				if document.Document != "README.md" || document.Revision == "" || len(document.Annotations) != 1 {
+					t.Fatalf("queued document = %#v", document)
+				}
+			}
+		})
+	}
+}
+
+func TestLiveAgentHandoffAPI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	rootPath := t.TempDir()
+	writeTestFile(t, filepath.Join(rootPath, "README.md"), "Review this document")
+	root, err := content.Open(rootPath)
+	if err != nil {
+		t.Fatalf("content.Open() error = %v", err)
+	}
+	store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	revision := saveTransitionAnnotation(t, store, annotation.StatusOpen)
+	viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	queueRequest := httptest.NewRequest(http.MethodGet, "/api/annotations?status=open,needs_changes", nil)
+	queueResponse := httptest.NewRecorder()
+	viewer.Handler().ServeHTTP(queueResponse, queueRequest)
+	if queueResponse.Code != http.StatusOK {
+		t.Fatalf("queue status = %d; body: %s", queueResponse.Code, queueResponse.Body.String())
+	}
+	var queue annotationQueueResponse
+	if err := json.Unmarshal(queueResponse.Body.Bytes(), &queue); err != nil {
+		t.Fatalf("json.Unmarshal(queue) error = %v", err)
+	}
+	if len(queue.Documents) != 1 || queue.Documents[0].Revision != string(revision) || len(queue.Documents[0].Annotations) != 1 {
+		t.Fatalf("queue = %#v", queue)
+	}
+
+	initialRevision := string(revision)
+	steps := []struct {
+		name         string
+		method       string
+		path         string
+		body         string
+		stale        bool
+		wantStatus   int
+		wantState    annotation.Status
+		keepRevision bool
+	}{
+		{name: "agent acknowledges", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
+		{name: "stale browser revision conflicts", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","author":"reviewer","message":"Concurrent note"}`, stale: true, wantStatus: http.StatusConflict, keepRevision: true},
+		{name: "agent replies with current revision", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","author":"codex","message":"I retained the existing behavior."}`, wantStatus: http.StatusCreated, wantState: annotation.StatusAcknowledged},
+		{name: "agent applies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","actorRole":"agent","author":"codex","summary":"Updated the documentation.","commit":"abc1234"}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
+		{name: "agent cannot close", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusBadRequest, keepRevision: true},
+		{name: "reviewer requests changes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"needs_changes","actorRole":"reviewer","author":"atul","message":"Keep the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusNeedsChanges},
+		{name: "agent acknowledges retry", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
+		{name: "agent reapplies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","actorRole":"agent","author":"codex","summary":"Restored the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
+		{name: "reviewer closes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","actorRole":"reviewer","author":"atul"}`, wantStatus: http.StatusOK, wantState: annotation.StatusClosed},
+	}
+
+	for _, step := range steps {
+		t.Run(step.name, func(t *testing.T) {
+			request := httptest.NewRequest(step.method, step.path, strings.NewReader(step.body))
+			request.Header.Set("Origin", origin)
+			request.Header.Set(reviewTokenHeader, token)
+			request.Header.Set("Content-Type", "application/json")
+			if step.stale {
+				request.Header.Set("If-Match", strconv.Quote(initialRevision))
+			} else {
+				request.Header.Set("If-Match", strconv.Quote(string(revision)))
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != step.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, step.wantStatus, response.Body.String())
+			}
+			if step.keepRevision {
+				return
+			}
+			var payload transitionAnnotationResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			if payload.Annotation.Status != step.wantState || payload.Revision == "" {
+				t.Fatalf("mutation payload = %#v", payload)
+			}
+			revision = annotationstore.Revision(payload.Revision)
+		})
+	}
+
+	finalQueue := httptest.NewRequest(http.MethodGet, "/api/annotations?status=open,needs_changes", nil)
+	finalResponse := httptest.NewRecorder()
+	viewer.Handler().ServeHTTP(finalResponse, finalQueue)
+	if finalResponse.Code != http.StatusOK {
+		t.Fatalf("final queue status = %d; body: %s", finalResponse.Code, finalResponse.Body.String())
+	}
+	if err := json.Unmarshal(finalResponse.Body.Bytes(), &queue); err != nil {
+		t.Fatalf("json.Unmarshal(final queue) error = %v", err)
+	}
+	if len(queue.Documents) != 0 {
+		t.Fatalf("final actionable queue = %#v, want empty", queue)
 	}
 }
 
