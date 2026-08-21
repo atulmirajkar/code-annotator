@@ -19,6 +19,7 @@ import (
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/commands"
 	"atulm/md-viewer/internal/content"
+	"atulm/md-viewer/internal/gitdiff"
 	"atulm/md-viewer/internal/launch"
 	mdrender "atulm/md-viewer/internal/render"
 	"atulm/md-viewer/internal/server"
@@ -35,6 +36,7 @@ type config struct {
 	includeCode    bool
 	codeExtensions string
 	excludeDirs    string
+	diffBase       string
 }
 
 // Run parses args, starts the local viewer, and blocks until ctx is canceled or
@@ -61,6 +63,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	if err != nil {
 		return fmt.Errorf("open Markdown directory: %w", err)
 	}
+	comparison, err := openGitComparison(ctx, configuration, root)
+	if err != nil {
+		return err
+	}
 	annotations, err := openAnnotationStore(configuration, root)
 	if err != nil {
 		return err
@@ -79,6 +85,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 		return err
 	}
 	serverOptions = append(serverOptions, server.WithIndexOptions(indexOptions))
+	if comparison != nil {
+		serverOptions = append(serverOptions, server.WithGitComparison(*comparison))
+	}
 	if annotations != nil {
 		token, err := newReviewToken()
 		if err != nil {
@@ -94,6 +103,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	fmt.Fprintf(stdout, "Serving %s at %s\n", root.Path(), viewerURL)
 	if annotations != nil {
 		fmt.Fprintf(stdout, "Review mode enabled; annotations: %s\n", annotations.Root())
+	}
+	if comparison != nil {
+		fmt.Fprintf(stdout, "Git comparison: %s (%s)\n", comparison.RequestedBase, comparison.BaseCommit)
 	}
 	fmt.Fprintln(stdout, "Press Ctrl-C to stop")
 
@@ -150,6 +162,7 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	includeCode := flags.Bool("include-code", false, "include supported source files")
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
+	diffBase := flags.String("diff-base", "", "locally available Git revision for comparison")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer [options] <directory>")
 		fmt.Fprintln(stderr)
@@ -174,12 +187,26 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 		rootPath: flags.Arg(0), port: *port, noOpen: *noOpen, review: *review,
 		annotationsDir: *annotationsDir, includeCode: *includeCode,
 		codeExtensions: *codeExtensions, excludeDirs: *excludeDirs,
+		diffBase: *diffBase,
 	}
 	if _, err := catalogOptions(configuration); err != nil {
 		return config{}, err
 	}
 
 	return configuration, nil
+}
+
+// openGitComparison resolves the optional display name once so a moving branch
+// cannot change comparison identity while the viewer process is running.
+func openGitComparison(ctx context.Context, configuration config, root *content.Root) (*gitdiff.Config, error) {
+	if configuration.diffBase == "" {
+		return nil, nil
+	}
+	comparison, err := gitdiff.Open(ctx, root.Path(), configuration.diffBase)
+	if err != nil {
+		return nil, fmt.Errorf("configure Git comparison: %w", err)
+	}
+	return &comparison, nil
 }
 
 // catalogOptions applies CLI implication and default-exclusion semantics before

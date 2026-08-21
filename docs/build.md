@@ -68,6 +68,15 @@ files as escaped, line-numbered documents:
 ./bin/md-viewer --include-code ./repository
 ```
 
+Freeze an optional local Git comparison base at startup:
+
+```sh
+./bin/md-viewer --include-code --diff-base origin/main ./repository
+```
+
+The viewer does not fetch remotes; remote-tracking names must already exist in
+the local repository.
+
 Replace that source extension set or add directory exclusions:
 
 ```sh

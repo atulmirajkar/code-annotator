@@ -20,6 +20,7 @@ import (
 	"atulm/md-viewer/internal/annotation"
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
+	"atulm/md-viewer/internal/gitdiff"
 	mdrender "atulm/md-viewer/internal/render"
 	"atulm/md-viewer/web"
 )
@@ -49,6 +50,7 @@ type Server struct {
 	renderer     *mdrender.Renderer
 	annotations  *annotationstore.Store
 	review       *reviewSession
+	comparison   *gitdiff.Config
 	page         *template.Template
 	styles       []byte
 	reviewJS     []byte
@@ -110,6 +112,8 @@ type pageData struct {
 	DocumentSHA256 string
 	HasMermaid     bool
 	IsCode         bool
+	DiffBase       string
+	DiffCommit     string
 }
 
 type documentView struct {
@@ -124,6 +128,18 @@ type documentView struct {
 func WithIndexOptions(options content.IndexOptions) Option {
 	return func(server *Server) error {
 		server.indexOptions = options
+		return nil
+	}
+}
+
+// WithGitComparison exposes one startup-resolved comparison identity. Per-file
+// patch generation is added separately and cannot replace this frozen base.
+func WithGitComparison(configuration gitdiff.Config) Option {
+	return func(server *Server) error {
+		if configuration.RepositoryRoot == "" || configuration.RequestedBase == "" || configuration.BaseCommit == "" {
+			return errors.New("configure Git comparison: incomplete configuration")
+		}
+		server.comparison = &configuration
 		return nil
 	}
 }
@@ -432,6 +448,10 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     hasMermaid,
 		IsCode:         isCode,
+	}
+	if s.comparison != nil {
+		data.DiffBase = s.comparison.RequestedBase
+		data.DiffCommit = s.comparison.BaseCommit
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

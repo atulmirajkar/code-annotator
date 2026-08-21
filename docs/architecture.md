@@ -94,6 +94,12 @@ guard requires the exact `Origin`, the token in `X-MD-Viewer-Token`, an
 `application/json` content type, and a body no larger than 64 KiB. Mutation
 routes are not registered until their handlers use this guard.
 
+When `--diff-base` is configured, startup asks `internal/gitdiff` to discover
+the containing worktree and resolve the requested local revision to a full
+commit ID. The server receives that immutable configuration and exposes the
+requested name and resolved commit as read-only page metadata. Per-file patch
+generation cannot replace or reinterpret the base during the server lifetime.
+
 ## HTTP routes
 
 | Route | Purpose |

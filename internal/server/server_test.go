@@ -17,6 +17,7 @@ import (
 	"atulm/md-viewer/internal/annotation"
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
+	"atulm/md-viewer/internal/gitdiff"
 	mdrender "atulm/md-viewer/internal/render"
 )
 
@@ -161,6 +162,55 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
 			}
+			for _, want := range test.contains {
+				if !strings.Contains(response.Body.String(), want) {
+					t.Errorf("response missing %q", want)
+				}
+			}
+		})
+	}
+}
+
+func TestGitComparisonMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		comparison gitdiff.Config
+		wantErr    string
+		contains   []string
+	}{
+		{
+			name: "frozen base metadata",
+			comparison: gitdiff.Config{
+				RepositoryRoot: "/repository",
+				RequestedBase:  "origin/main",
+				BaseCommit:     strings.Repeat("a", 40),
+			},
+			contains: []string{`name="md-viewer-diff-base" content="origin/main"`, `name="md-viewer-diff-commit" content="` + strings.Repeat("a", 40) + `"`},
+		},
+		{name: "incomplete configuration", comparison: gitdiff.Config{RequestedBase: "HEAD"}, wantErr: "incomplete configuration"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "# Home")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			viewer, err := New(root, mdrender.New(), WithGitComparison(test.comparison))
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("New() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			response := getResponse(t, viewer.Handler(), "/")
 			for _, want := range test.contains {
 				if !strings.Contains(response.Body.String(), want) {
 					t.Errorf("response missing %q", want)

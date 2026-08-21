@@ -86,12 +86,18 @@ Available flags:
 --include-code              Include the default supported source extensions
 --code-extensions <csv>     Replace the source extension set; implies --include-code
 --exclude-dirs <csv>        Add directory base names to exclude from discovery
+--diff-base <revision>      Freeze a locally available Git commit for comparison
 ```
 
 For example, `--include-code` adds escaped, line-numbered Go, C#, JavaScript,
 TypeScript, JSON, and `.csproj` files. With `--review`, these source files use
 the same selection, annotation, thread, lifecycle, and agent handoff workflows
-as Markdown. Git comparison remains pending milestone work.
+as Markdown. Side-by-side Git diff presentation remains pending milestone work.
+
+`--diff-base` accepts a locally resolvable commit, branch, tag, or
+remote-tracking ref such as `HEAD~1` or `origin/main`. It never fetches. The
+revision is resolved to an immutable full commit at startup, and startup fails
+if the content root is outside its Git worktree or the revision is unavailable.
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,

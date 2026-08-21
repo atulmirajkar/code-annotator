@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -41,6 +42,7 @@ func TestParseConfig(t *testing.T) {
 		{name: "include default code", args: []string{"--include-code", "./docs"}, want: config{rootPath: "./docs", includeCode: true}},
 		{name: "custom code implies include", args: []string{"--code-extensions", ".go,.cs", "./docs"}, want: config{rootPath: "./docs", codeExtensions: ".go,.cs"}},
 		{name: "custom exclusions", args: []string{"--exclude-dirs", "generated,tmp", "./docs"}, want: config{rootPath: "./docs", excludeDirs: "generated,tmp"}},
+		{name: "Git comparison", args: []string{"--diff-base", "origin/main", "./docs"}, want: config{rootPath: "./docs", diffBase: "origin/main"}},
 		{name: "invalid extension", args: []string{"--code-extensions", "go", "./docs"}, wantErr: "configure content catalog"},
 		{name: "annotations without review", args: []string{"--annotations-dir", "./reviews", "./docs"}, wantErr: "requires --review"},
 		{name: "missing directory", wantErr: "exactly one"},
@@ -99,6 +101,78 @@ func TestCatalogOptions(t *testing.T) {
 				t.Fatalf("catalogOptions() = %#v, want %#v", got, test.want)
 			}
 		})
+	}
+}
+
+func TestOpenGitComparison(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		diffBase   string
+		repository bool
+		wantNil    bool
+		wantErr    string
+	}{
+		{name: "disabled", wantNil: true},
+		{name: "frozen HEAD", diffBase: "HEAD", repository: true},
+		{name: "missing revision", diffBase: "missing", repository: true, wantErr: "configure Git comparison"},
+		{name: "outside worktree", diffBase: "HEAD", wantErr: "configure Git comparison"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			if test.repository {
+				initializeAppTestRepository(t, rootPath)
+			}
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			comparison, err := openGitComparison(context.Background(), config{diffBase: test.diffBase}, root)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("openGitComparison() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("openGitComparison() error = %v", err)
+			}
+			if test.wantNil {
+				if comparison != nil {
+					t.Fatalf("openGitComparison() = %#v, want nil", comparison)
+				}
+				return
+			}
+			if comparison == nil || comparison.RequestedBase != test.diffBase || comparison.BaseCommit == "" {
+				t.Fatalf("openGitComparison() = %#v", comparison)
+			}
+		})
+	}
+}
+
+// initializeAppTestRepository creates one local commit without reading global
+// author configuration, providing a deterministic startup-resolution fixture.
+func initializeAppTestRepository(t *testing.T, repository string) {
+	t.Helper()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is unavailable")
+	}
+	commands := [][]string{
+		{"init", "-b", "main"},
+		{"add", "README.md"},
+		{"-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "initial"},
+	}
+	if err := os.WriteFile(filepath.Join(repository, "README.md"), []byte("# Test"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	for _, arguments := range commands {
+		command := exec.Command("git", append([]string{"-C", repository}, arguments...)...)
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git %v error = %v: %s", arguments, err, output)
+		}
 	}
 }
 
