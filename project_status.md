@@ -84,7 +84,7 @@ Embedded diagram rendering and live reload follow annotation review.
 - [x] Preserve the source code block and show a useful message when diagram
   parsing or rendering fails.
 - [x] Add responsive diagram styling and viewer-theme integration.
-- [ ] Treat a rendered diagram as one source-backed annotation region rather
+- [x] Treat a rendered diagram as one source-backed annotation region rather
   than mapping individual SVG labels to Markdown offsets.
 - [ ] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
   integration tests.

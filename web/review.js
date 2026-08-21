@@ -41,6 +41,50 @@
     // selectionchange covers mouse, touch, and keyboard expansion regardless
     // of which element owns focus or where a drag gesture ends.
     document.addEventListener("selectionchange", updateSelectionPreview);
+    markdown.addEventListener("click", captureDiagramClick);
+    markdown.addEventListener("keydown", captureDiagramKeydown);
+  }
+
+  // A rendered diagram has no stable label-to-Markdown mapping. Treat a click
+  // anywhere on its SVG as a selection of the complete fenced definition.
+  function captureDiagramClick(event) {
+    const output = event.target.closest?.(".mermaid-output");
+    if (output) captureDiagramSelection(output.closest(".mermaid-diagram"));
+  }
+
+  function captureDiagramKeydown(event) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const output = event.target.closest?.(".mermaid-output");
+    if (!output) return;
+    event.preventDefault();
+    captureDiagramSelection(output.closest(".mermaid-diagram"));
+  }
+
+  function captureDiagramSelection(diagram) {
+    const startByte = Number.parseInt(diagram?.dataset.sourceStart, 10);
+    const endByte = Number.parseInt(diagram?.dataset.sourceEnd, 10);
+    const documentSHA256 = markdown.dataset.documentSha256;
+    const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
+    if (!Number.isInteger(startByte) || !Number.isInteger(endByte) || endByte <= startByte || !documentSHA256 || !exact) return;
+
+    // Removing an old DOM range emits selectionchange. Preserve this synthetic
+    // region until that event has passed so it cannot clear the new selection.
+    preserveSelection = true;
+    window.getSelection()?.removeAllRanges();
+    window.setTimeout(() => { preserveSelection = false; }, 0);
+    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
+    diagram.classList.add("annotation-selection");
+    preview.dataset.startByte = String(startByte);
+    preview.dataset.endByte = String(endByte);
+    preview.dataset.exact = exact;
+    preview.dataset.documentSha256 = documentSHA256;
+    pendingSelection = { startByte, endByte, documentSHA256 };
+    selectionScope.disabled = false;
+    selectionScope.checked = true;
+    previewQuote.textContent = exact;
+    previewRange.textContent = `bytes ${startByte}–${endByte} · complete diagram`;
+    preview.hidden = false;
+    updateReattachControls();
   }
 
   // Map any ordered pair of source-backed endpoints. Byte gaps may contain
@@ -145,6 +189,7 @@
     previewQuote.textContent = "";
     previewRange.textContent = "";
     pendingSelection = null;
+    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
     selectionScope.disabled = true;
     documentScope.checked = true;
     updateReattachControls();
@@ -212,6 +257,7 @@
 
   function forceClearSelectionPreview() {
     pendingSelection = null;
+    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
     preview.hidden = true;
     previewQuote.textContent = "";
     previewRange.textContent = "";
@@ -255,6 +301,7 @@
   // document-level annotations remain visible in the panel without a range.
   function renderAnnotationHighlights(annotations) {
     clearFallbackHighlights();
+    renderDiagramHighlights(annotations);
     const ranges = annotations
       .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
       .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
@@ -266,6 +313,19 @@
       return;
     }
     renderFallbackHighlights(ranges);
+  }
+
+  // Diagram annotations highlight the rendered region as a whole; their
+  // hidden source ranges remain available for quote previews and fallback APIs.
+  function renderDiagramHighlights(annotations) {
+    const activeRanges = annotations
+      .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
+      .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
+    markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
+      const start = Number.parseInt(diagram.dataset.sourceStart, 10);
+      const end = Number.parseInt(diagram.dataset.sourceEnd, 10);
+      diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === start && range[1] === end));
+    });
   }
 
   function sourceRange(startByte, endByte) {

@@ -1154,7 +1154,7 @@ func TestStaticAssets(t *testing.T) {
 		wantType     string
 		wantContents []string
 	}{
-		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle"}},
+		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle", "captureDiagramSelection", "renderDiagramHighlights"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},

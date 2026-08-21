@@ -55,6 +55,9 @@ a { color: var(--accent); }
 .mermaid-source pre { margin-top: .5rem; }
 .mermaid-output { max-width: 100%; overflow-x: auto; text-align: center; }
 .mermaid-output svg { display: inline-block; max-width: 100%; height: auto; }
+.mermaid-diagram[data-source-start] .mermaid-output { cursor: pointer; }
+.mermaid-diagram[data-source-start] .mermaid-output:focus-visible { outline: .2rem solid var(--accent); outline-offset: .3rem; }
+.mermaid-diagram.annotation-selection, .mermaid-diagram.annotation-highlight-region { border-radius: .55rem; box-shadow: 0 0 0 .2rem rgba(255, 204, 0, .55); }
 .mermaid-error { padding: .75rem; border: 1px solid #b42318; border-radius: .45rem; color: #b42318; }
 .markdown-body blockquote { margin-left: 0; padding-left: 1rem; border-left: .25rem solid var(--border); color: var(--muted); }
 .markdown-body mark.annotation-highlight-fallback { border-radius: .15em; background: rgba(255, 204, 0, .38); color: inherit; }

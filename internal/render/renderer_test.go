@@ -239,9 +239,18 @@ func TestRenderFencedCodeBlocks(t *testing.T) {
 			source: "```mermaid\ngraph TD\n  A-->B\n```\n",
 			review: true,
 			wantContains: []string{
-				`<div class="mermaid-diagram">`,
+				`<div class="mermaid-diagram" data-source-start="11" data-source-end="28">`,
 				`class="source-text source-code-text" data-source-start="11"`,
 			},
+		},
+		{
+			name:   "empty Mermaid fence has no annotation region",
+			source: "```mermaid\n```\n",
+			review: true,
+			wantContains: []string{
+				`<div class="mermaid-diagram">`,
+			},
+			wantNotContain: []string{`data-source-start=`},
 		},
 		{
 			name:   "ordinary fence remains code",

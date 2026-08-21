@@ -290,6 +290,15 @@ the same fenced block. The fence and info string are excluded, and selections
 that cross into or out of the block are rejected. Indented code blocks remain a
 follow-up because their rendered indentation does not map one-to-one to source.
 
+A rendered Mermaid SVG is intentionally one annotation region rather than a
+collection of selectable labels. In review mode the surrounding diagram stores
+the byte range of the complete fenced definition, excluding the opening and
+closing fences. Clicking the rendered diagram, or focusing it and pressing
+Enter or Space, previews and submits that complete range. Active annotations
+outline the whole rendered diagram. The collapsible source retains its ordinary
+line-level ranges for reviewers who need to discuss only part of the diagram
+definition.
+
 ## Persistence and concurrency
 
 ### Store behavior

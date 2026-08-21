@@ -26,6 +26,10 @@
       }
       const rendered = await mermaid.render(`md-viewer-mermaid-${index}`, definition);
       output.innerHTML = rendered.svg;
+      if (diagram.dataset.sourceStart && diagram.dataset.sourceEnd) {
+        output.tabIndex = 0;
+        output.setAttribute("aria-label", "Rendered Mermaid diagram. Select the complete diagram for annotation.");
+      }
       rendered.bindFunctions?.(output);
     } catch (cause) {
       output.hidden = true;

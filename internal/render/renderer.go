@@ -175,7 +175,15 @@ func (r *fencedCodeRenderer) renderFencedCodeBlock(writer util.BufWriter, source
 	}
 
 	if isMermaidBlock(block, source) {
-		_, _ = writer.WriteString(`<div class="mermaid-diagram"><details class="mermaid-source"><summary>Diagram source</summary><pre><code class="language-mermaid">`)
+		_, _ = writer.WriteString(`<div class="mermaid-diagram"`)
+		if start, end, ok := mermaidSourceRange(block); r.sourcePositions && ok {
+			_, _ = writer.WriteString(` data-source-start="`)
+			_, _ = writer.WriteString(strconv.Itoa(start))
+			_, _ = writer.WriteString(`" data-source-end="`)
+			_, _ = writer.WriteString(strconv.Itoa(end))
+			_, _ = writer.WriteString(`"`)
+		}
+		_, _ = writer.WriteString(`><details class="mermaid-source"><summary>Diagram source</summary><pre><code class="language-mermaid">`)
 		r.renderLines(writer, source, block)
 		return ast.WalkContinue, nil
 	}
@@ -214,6 +222,15 @@ func (r *fencedCodeRenderer) renderLines(writer util.BufWriter, source []byte, b
 // making Markdown authors depend on a particular capitalization.
 func isMermaidBlock(block *ast.FencedCodeBlock, source []byte) bool {
 	return strings.EqualFold(string(block.Language(source)), "mermaid")
+}
+
+// mermaidSourceRange returns the complete diagram definition while excluding
+// the opening fence, language label, and closing fence.
+func mermaidSourceRange(block *ast.FencedCodeBlock) (int, int, bool) {
+	if block.Lines().Len() == 0 {
+		return 0, 0, false
+	}
+	return block.Lines().At(0).Start, block.Lines().At(block.Lines().Len() - 1).Stop, true
 }
 
 // Render converts source into an HTML fragment. documentPath is the URL-style
