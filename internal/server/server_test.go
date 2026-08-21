@@ -234,6 +234,164 @@ func TestAnnotationAPI(t *testing.T) {
 	}
 }
 
+func TestCreateAnnotationAPI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	selectedBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":7,"endByte":15,"exact":"selected"}}`
+	documentBody := `{"document":"README.md","intent":"question","comment":"Why this document?","author":"reviewer"}`
+	tests := []struct {
+		name          string
+		body          string
+		ifMatch       *string
+		seedSidecar   bool
+		omitToken     bool
+		wantStatus    int
+		wantSelection bool
+		wantConflict  bool
+	}{
+		{name: "selected text", body: selectedBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantSelection: true},
+		{name: "document level", body: documentBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated},
+		{name: "missing review token", body: documentBody, ifMatch: stringPointer(`""`), omitToken: true, wantStatus: http.StatusForbidden},
+		{name: "missing revision", body: documentBody, wantStatus: http.StatusPreconditionRequired},
+		{name: "malformed revision", body: documentBody, ifMatch: stringPointer("unquoted"), wantStatus: http.StatusBadRequest},
+		{name: "stale revision", body: documentBody, ifMatch: stringPointer(`""`), seedSidecar: true, wantStatus: http.StatusConflict, wantConflict: true},
+		{name: "selection text mismatch", body: strings.Replace(selectedBody, `"exact":"selected"`, `"exact":"different"`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusConflict},
+		{name: "selection range invalid", body: strings.Replace(selectedBody, `"endByte":15`, `"endByte":100`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
+		{name: "invalid intent", body: strings.Replace(documentBody, `"question"`, `"unsupported"`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
+		{name: "unknown field", body: strings.TrimSuffix(documentBody, "}") + `,"status":"closed"}`, ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
+		{name: "multiple JSON values", body: documentBody + `{}`, ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
+		{name: "oversized body", body: `"` + strings.Repeat("x", int(maxAnnotationMutationBytes)+1) + `"`, ifMatch: stringPointer(`""`), wantStatus: http.StatusRequestEntityTooLarge},
+		{name: "non-Markdown document", body: strings.Replace(documentBody, "README.md", "image.png", 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusNotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeTestFile(t, filepath.Join(rootPath, "image.png"), "not Markdown")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			if test.seedSidecar {
+				seed := annotation.Sidecar{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{}}
+				if _, err := store.Save(seed, ""); err != nil {
+					t.Fatalf("seed Store.Save() error = %v", err)
+				}
+			}
+			viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/api/annotations", strings.NewReader(test.body))
+			request.Header.Set("Origin", origin)
+			request.Header.Set("Content-Type", "application/json")
+			if !test.omitToken {
+				request.Header.Set(reviewTokenHeader, token)
+			}
+			if test.ifMatch != nil {
+				request.Header.Set("If-Match", *test.ifMatch)
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantConflict && response.Header().Get("ETag") == "" {
+				t.Fatal("conflict response is missing current ETag")
+			}
+			if test.wantStatus != http.StatusCreated {
+				return
+			}
+
+			var payload createAnnotationResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			if !strings.HasPrefix(payload.Annotation.ID, "ann_") || payload.Revision == "" {
+				t.Fatalf("created payload = %#v", payload)
+			}
+			if got := response.Header().Get("ETag"); got != strconv.Quote(payload.Revision) {
+				t.Fatalf("ETag = %q, want %q", got, strconv.Quote(payload.Revision))
+			}
+			if got := response.Header().Get("Location"); got != "/api/annotations/"+payload.Annotation.ID {
+				t.Fatalf("Location = %q, want created annotation location", got)
+			}
+			if test.wantSelection {
+				if payload.Annotation.Source == nil || payload.Annotation.Source.Selector.Exact != "selected" || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorExact {
+					t.Fatalf("selected annotation = %#v", payload.Annotation)
+				}
+			} else if payload.Annotation.Source != nil || payload.Annotation.Anchor != nil {
+				t.Fatalf("document annotation has source or anchor: %#v", payload.Annotation)
+			}
+			stored, revision, err := store.Load("README.md")
+			if err != nil {
+				t.Fatalf("Store.Load() error = %v", err)
+			}
+			if len(stored.Annotations) != 1 || string(revision) != payload.Revision {
+				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
+			}
+		})
+	}
+}
+
+func TestParseIfMatch(t *testing.T) {
+	t.Parallel()
+
+	digest := strings.Repeat("a", 64)
+	tests := []struct {
+		name       string
+		values     []string
+		want       annotationstore.Revision
+		wantStatus int
+	}{
+		{name: "missing", wantStatus: http.StatusPreconditionRequired},
+		{name: "empty revision", values: []string{`""`}},
+		{name: "digest", values: []string{strconv.Quote(digest)}, want: annotationstore.Revision(digest)},
+		{name: "unquoted", values: []string{digest}, wantStatus: http.StatusBadRequest},
+		{name: "weak", values: []string{`W/""`}, wantStatus: http.StatusBadRequest},
+		{name: "multiple", values: []string{`""`, strconv.Quote(digest)}, wantStatus: http.StatusBadRequest},
+		{name: "comma list", values: []string{`"", "` + digest + `"`}, wantStatus: http.StatusBadRequest},
+		{name: "short digest", values: []string{`"aa"`}, wantStatus: http.StatusBadRequest},
+		{name: "uppercase digest", values: []string{strconv.Quote(strings.ToUpper(digest))}, wantStatus: http.StatusBadRequest},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			request := httptest.NewRequest(http.MethodPost, "/api/annotations", nil)
+			for _, value := range test.values {
+				request.Header.Add("If-Match", value)
+			}
+			got, status, err := parseIfMatch(request)
+			if test.wantStatus != 0 {
+				if err == nil || status != test.wantStatus {
+					t.Fatalf("parseIfMatch() = %q, status %d, error %v; want status %d", got, status, err, test.wantStatus)
+				}
+				return
+			}
+			if err != nil || status != 0 || got != test.want {
+				t.Fatalf("parseIfMatch() = %q, status %d, error %v; want %q", got, status, err, test.want)
+			}
+		})
+	}
+}
+
+// stringPointer returns a stable pointer for optional string table fields.
+func stringPointer(value string) *string {
+	return &value
+}
+
 func TestReviewSessionConfiguration(t *testing.T) {
 	t.Parallel()
 

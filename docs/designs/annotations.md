@@ -372,6 +372,21 @@ The first milestone should not permanently delete annotations. A mistaken
 comment can transition to `rejected` with an explanation, preserving review
 history and Git traceability.
 
+Annotation creation requires the sidecar ETag returned by the preceding `GET`
+in a strong `If-Match` header. The empty ETag (`If-Match: ""`) represents a
+sidecar that does not exist yet. Missing preconditions return `428`; a stale
+revision returns `409` with the current ETag so the client can reload instead of
+overwriting another writer's annotations.
+
+The create body contains `document`, `intent`, `comment`, `author`, and an
+optional `selection` with `startByte`, exclusive `endByte`, and `exact` quote.
+The server reads the current Markdown, recreates the SHA-256 digest, quote
+context, and line range from those offsets, and rejects a quote mismatch rather
+than trusting browser-derived selector metadata. Without `selection`, the
+annotation applies to the document. The server owns the initial `open` status,
+UTC timestamps, empty thread, and sortable collision-resistant `ann_` ID.
+Unknown request fields and multiple JSON values are rejected.
+
 ## Local write security
 
 Loopback does not by itself make mutation endpoints safe: a malicious website

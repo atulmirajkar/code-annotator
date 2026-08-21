@@ -74,8 +74,9 @@ Available flags:
 ```
 
 Review mode establishes the annotation storage boundary and enables the
-read-only annotation API. Mutation routes and the browser review interface are
-being delivered in subsequent milestone commits. By default, sidecars are stored under
+annotation read API plus secured annotation creation. The browser review
+interface and remaining mutation routes are being delivered in subsequent
+milestone commits. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh

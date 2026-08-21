@@ -71,8 +71,8 @@ an alternate location when the content root should remain untouched:
 ```
 
 `--annotations-dir` is rejected without `--review`. Review mode initializes and
-reports the writable store and enables its read API; mutation APIs and browser
-controls are scheduled in the next implementation commits.
+reports the writable store and enables annotation reads and secured creation.
+Browser controls plus status, reply, and reattachment routes remain pending.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

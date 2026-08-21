@@ -222,7 +222,11 @@ func TestRunLaunchesReadyServerAndToleratesFailure(t *testing.T) {
 	}
 
 	deadline := time.Now().Add(2 * time.Second)
-	for !strings.Contains(stderr.String(), launchError.Error()) && time.Now().Before(deadline) {
+	for time.Now().Before(deadline) {
+		warning := stderr.String()
+		if strings.Contains(warning, launchError.Error()) && strings.Contains(warning, viewerURL) {
+			break
+		}
 		time.Sleep(10 * time.Millisecond)
 	}
 	if warning := stderr.String(); !strings.Contains(warning, launchError.Error()) || !strings.Contains(warning, viewerURL) {

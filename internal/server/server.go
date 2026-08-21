@@ -198,6 +198,9 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
+	if server.review != nil {
+		mux.Handle("POST /api/annotations", server.protectReviewMutation(http.HandlerFunc(server.handleCreateAnnotation)))
+	}
 	server.handler = securityHeaders(mux)
 
 	return server, nil

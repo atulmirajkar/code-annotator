@@ -75,6 +75,7 @@ routes are not registered until their handlers use this guard.
 | `GET /asset/{path}` | Serve a document-relative local asset. |
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
 | `GET /api/annotations?document={path}` | In review mode, return annotations, current anchor state, and revision. |
+| `POST /api/annotations` | In a secured review session, create a verified text or document annotation. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
@@ -83,8 +84,9 @@ The annotation read route is registered only when `--review` supplies a store.
 It verifies that the requested Markdown document exists under the content root,
 loads its sidecar from the separate writable root, resolves text anchors against
 the current file bytes, and returns the revision in both JSON and `ETag` form.
-Mutation routes remain absent until origin and session-token protection is
-enabled.
+The creation route requires the session security checks and a strong `If-Match`
+sidecar ETag. It recreates source selectors from current Markdown bytes rather
+than trusting hashes or context supplied by the browser.
 
 ## Key dependencies
 
