@@ -62,6 +62,16 @@ a { color: var(--accent); }
 .selection-label { display: block; margin-bottom: .35rem; color: var(--accent); font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
 .selection-quote { display: block; max-height: 6rem; overflow-y: auto; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .selection-range { display: block; margin-top: .35rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .7rem; }
+.annotation-form { display: grid; gap: .7rem; margin-bottom: 1rem; padding: .85rem; border: 1px solid var(--border); border-radius: .55rem; }
+.annotation-form > label > span, .annotation-form legend { display: block; margin-bottom: .3rem; color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.annotation-form input[type="text"], .annotation-form input:not([type]), .annotation-form select, .annotation-form textarea { width: 100%; padding: .5rem .55rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); color: var(--text); font: inherit; }
+.annotation-form textarea { resize: vertical; }
+.annotation-form fieldset { display: flex; gap: .8rem; margin: 0; padding: 0; border: 0; }
+.annotation-form fieldset label { font-size: .82rem; }
+.annotation-form button { justify-self: start; padding: .5rem .75rem; border: 0; border-radius: .4rem; background: var(--accent); color: var(--surface); font: inherit; font-weight: 700; cursor: pointer; }
+.annotation-form button:disabled { cursor: wait; opacity: .65; }
+.annotation-form-status { min-height: 1.2em; margin: 0; color: var(--muted); font-size: .78rem; }
+.annotation-form-status.error { color: #b42318; }
 .annotation-list { display: grid; gap: .75rem; }
 .annotation-card { padding: .85rem; border: 1px solid var(--border); border-radius: .55rem; background: var(--background); }
 .annotation-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }

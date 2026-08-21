@@ -7,9 +7,9 @@ Last updated: 2026-08-20
 **Phase:** Annotation review implementation; release tag pending.
 
 The manual-refresh MVP and secured annotation APIs are implemented. Review-mode
-pages now include a read-only annotation panel; selection, highlights, and
-browser mutation controls remain. Embedded diagram rendering and live reload
-follow annotation review.
+pages include selection mapping, annotation display, and secured creation;
+highlights and remaining browser mutation controls remain. Embedded diagram
+rendering and live reload follow annotation review.
 
 ## Milestones
 
@@ -121,5 +121,5 @@ follow annotation review.
 
 ## Next milestone
 
-Add the browser annotation creation form as the next independently reviewable
+Add source-backed annotation highlights as the next independently reviewable
 annotation UI commit.

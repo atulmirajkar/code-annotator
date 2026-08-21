@@ -50,6 +50,32 @@
         <q class="selection-quote"></q>
         <span class="selection-range"></span>
       </section>
+      <form class="annotation-form">
+        <label>
+          <span>Author</span>
+          <input name="author" value="reviewer" required>
+        </label>
+        <label>
+          <span>Intent</span>
+          <select name="intent">
+            <option value="change_request">Change request</option>
+            <option value="suggestion">Suggestion</option>
+            <option value="question">Question</option>
+            <option value="approval">Approval</option>
+          </select>
+        </label>
+        <label>
+          <span>Comment</span>
+          <textarea name="comment" rows="4" required></textarea>
+        </label>
+        <fieldset>
+          <legend>Attach to</legend>
+          <label><input type="radio" name="scope" value="selection" disabled> Selection</label>
+          <label><input type="radio" name="scope" value="document" checked> Document</label>
+        </fieldset>
+        <p class="annotation-form-status" role="status" aria-live="polite"></p>
+        <button type="submit">Add annotation</button>
+      </form>
       <div class="annotation-list" aria-live="polite">
         <p class="review-message">Loading annotations…</p>
       </div>

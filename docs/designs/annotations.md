@@ -584,6 +584,13 @@ annotation view, displays lifecycle and stale-anchor state, and renders all
 user-controlled strings through DOM text nodes. Selection mapping, highlights,
 and mutation controls follow as independent reviewable changes.
 
+The creation form supports document-level and currently captured text
+annotations. It submits the review token, the latest sidecar revision as a
+strong `If-Match`, and the digest-bound selection when selected scope is active.
+After a successful create it reloads the authoritative list and revision. A
+document or sidecar conflict keeps the comment in the form and asks the reviewer
+to refresh and select again.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.

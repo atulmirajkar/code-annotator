@@ -949,7 +949,7 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
 			}
-			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
+			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
 			if hasPanel != test.wantPanel {
 				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
 			}
@@ -976,7 +976,7 @@ func TestReviewScript(t *testing.T) {
 		wantType    string
 		wantContent string
 	}{
-		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContent: "renderAnnotations"},
+		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContent: "submitAnnotation"},
 		{name: "reject post", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
 	}
 

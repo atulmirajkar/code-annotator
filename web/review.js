@@ -10,21 +10,27 @@
   const previewQuote = panel.querySelector(".selection-quote");
   const previewRange = panel.querySelector(".selection-range");
   const markdown = document.querySelector(".markdown-body");
+  const form = panel.querySelector(".annotation-form");
+  const formStatus = panel.querySelector(".annotation-form-status");
+  const submitButton = form.querySelector('button[type="submit"]');
+  const selectionScope = form.querySelector('input[name="scope"][value="selection"]');
+  const documentScope = form.querySelector('input[name="scope"][value="document"]');
+  const reviewToken = document.querySelector('meta[name="md-viewer-review-token"]')?.content || "";
   const documentPath = panel.dataset.document;
+  let currentRevision = "";
+  let pendingSelection = null;
+  let preserveSelection = false;
   if (!documentPath) {
     showMessage("Open a Markdown document to review annotations.");
     return;
   }
 
-  fetch(`/api/annotations?document=${encodeURIComponent(documentPath)}`, {
-    headers: { Accept: "application/json" },
-  })
-    .then((response) => {
-      if (!response.ok) throw new Error(`annotation request failed: ${response.status}`);
-      return response.json();
-    })
-    .then(renderAnnotations)
-    .catch(() => showMessage("Could not load annotations. Refresh to try again."));
+  loadAnnotations();
+  form.addEventListener("submit", submitAnnotation);
+  panel.addEventListener("pointerdown", () => { preserveSelection = true; });
+  document.addEventListener("pointerup", () => {
+    window.setTimeout(() => { preserveSelection = false; }, 0);
+  });
 
   if (markdown) {
     // selectionchange covers mouse, touch, and keyboard expansion regardless
@@ -71,6 +77,9 @@
     preview.dataset.endByte = String(endByte);
     preview.dataset.exact = exact;
     preview.dataset.documentSha256 = documentSHA256;
+    pendingSelection = { startByte, endByte, documentSHA256 };
+    selectionScope.disabled = false;
+    selectionScope.checked = true;
     previewQuote.textContent = exact;
     previewRange.textContent = `bytes ${startByte}–${endByte}`;
     preview.hidden = false;
@@ -121,6 +130,7 @@
   }
 
   function clearSelectionPreview() {
+    if ((preserveSelection || panel.contains(document.activeElement)) && pendingSelection) return;
     preview.hidden = true;
     delete preview.dataset.startByte;
     delete preview.dataset.endByte;
@@ -128,6 +138,83 @@
     delete preview.dataset.documentSha256;
     previewQuote.textContent = "";
     previewRange.textContent = "";
+    pendingSelection = null;
+    selectionScope.disabled = true;
+    documentScope.checked = true;
+  }
+
+  async function loadAnnotations() {
+    try {
+      const response = await fetch(`/api/annotations?document=${encodeURIComponent(documentPath)}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`annotation request failed: ${response.status}`);
+      const payload = await response.json();
+      currentRevision = typeof payload.revision === "string" ? payload.revision : "";
+      renderAnnotations(payload);
+    } catch (_) {
+      showMessage("Could not load annotations. Refresh to try again.");
+    }
+  }
+
+  async function submitAnnotation(event) {
+    event.preventDefault();
+    setFormStatus("Saving…");
+    submitButton.disabled = true;
+
+    const fields = new FormData(form);
+    const payload = {
+      document: documentPath,
+      intent: fields.get("intent"),
+      comment: fields.get("comment"),
+      author: fields.get("author"),
+    };
+    if (fields.get("scope") === "selection" && pendingSelection) {
+      payload.selection = pendingSelection;
+    }
+
+    try {
+      const response = await fetch("/api/annotations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": JSON.stringify(currentRevision),
+          "X-MD-Viewer-Token": reviewToken,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          await loadAnnotations();
+          throw new Error("The document or annotations changed. Refresh and select again.");
+        }
+        throw new Error((await response.text()).trim() || `Could not save annotation (${response.status}).`);
+      }
+
+      form.elements.comment.value = "";
+      window.getSelection()?.removeAllRanges();
+      forceClearSelectionPreview();
+      await loadAnnotations();
+      setFormStatus("Annotation added.");
+    } catch (error) {
+      setFormStatus(error.message || "Could not save annotation.", true);
+    } finally {
+      submitButton.disabled = false;
+    }
+  }
+
+  function forceClearSelectionPreview() {
+    pendingSelection = null;
+    preview.hidden = true;
+    previewQuote.textContent = "";
+    previewRange.textContent = "";
+    selectionScope.disabled = true;
+    documentScope.checked = true;
+  }
+
+  function setFormStatus(message, error = false) {
+    formStatus.textContent = message;
+    formStatus.classList.toggle("error", error);
   }
 
   // Render user-controlled content with textContent so comments and author

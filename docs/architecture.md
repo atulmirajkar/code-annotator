@@ -98,6 +98,10 @@ requires both endpoints to share that block and never includes its fences.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather
 than trusting hashes or context supplied by the browser.
+The browser creation form uses the revision from its latest annotation read,
+preserves a captured selection while focus moves into the panel, and reloads
+the authoritative list after a successful write. Conflicts retain the draft
+comment and require a refreshed document selection.
 
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
