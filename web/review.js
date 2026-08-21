@@ -31,9 +31,8 @@
     markdown.addEventListener("keyup", updateSelectionPreview);
   }
 
-  // Map a selection only when both endpoints belong to one annotated source
-  // span. Crossing spans could include invisible Markdown delimiters and is
-  // intentionally deferred until the mapping can remain exact.
+  // Map a selection across one or more source-contiguous spans. A byte gap
+  // indicates invisible Markdown syntax or unsupported rendered content.
   function updateSelectionPreview() {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
@@ -43,24 +42,24 @@
     const range = selection.getRangeAt(0);
     const startSpan = sourceSpan(range.startContainer);
     const endSpan = sourceSpan(range.endContainer);
-    if (!startSpan || startSpan !== endSpan || !markdown.contains(startSpan)) {
+    if (!startSpan || !endSpan || !markdown.contains(startSpan) || !markdown.contains(endSpan)) {
       clearSelectionPreview();
       return;
     }
 
     const sourceStart = Number.parseInt(startSpan.dataset.sourceStart, 10);
-    const sourceEnd = Number.parseInt(startSpan.dataset.sourceEnd, 10);
-    const spanText = startSpan.textContent || "";
+    const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd, 10);
+    const spans = sourceSpanRange(startSpan, endSpan);
     const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
-    const endOffset = textOffset(startSpan, range.endContainer, range.endOffset);
+    const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
     const exact = range.toString();
-    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || startOffset < 0 || endOffset <= startOffset || !exact) {
+    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || startOffset < 0 || endOffset < 0 || !exact) {
       clearSelectionPreview();
       return;
     }
 
-    const startByte = sourceStart + utf8Length(spanText.slice(0, startOffset));
-    const endByte = sourceStart + utf8Length(spanText.slice(0, endOffset));
+    const startByte = sourceStart + utf8Length((startSpan.textContent || "").slice(0, startOffset));
+    const endByte = Number.parseInt(endSpan.dataset.sourceStart, 10) + utf8Length((endSpan.textContent || "").slice(0, endOffset));
     if (endByte > sourceEnd) {
       clearSelectionPreview();
       return;
@@ -76,6 +75,22 @@
   function sourceSpan(node) {
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     return element ? element.closest(".source-text") : null;
+  }
+
+  // Return the ordered span chain only when its Markdown byte ranges touch.
+  function sourceSpanRange(startSpan, endSpan) {
+    const spans = Array.from(markdown.querySelectorAll(".source-text"));
+    const startIndex = spans.indexOf(startSpan);
+    const endIndex = spans.indexOf(endSpan);
+    if (startIndex < 0 || endIndex < startIndex) return null;
+
+    const selected = spans.slice(startIndex, endIndex + 1);
+    for (let index = 1; index < selected.length; index++) {
+      const previousEnd = Number.parseInt(selected[index - 1].dataset.sourceEnd, 10);
+      const currentStart = Number.parseInt(selected[index].dataset.sourceStart, 10);
+      if (!Number.isInteger(previousEnd) || previousEnd !== currentStart) return null;
+    }
+    return selected;
   }
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.

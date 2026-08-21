@@ -145,6 +145,14 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 			},
 		},
 		{
+			name:   "soft line break remains source contiguous",
+			source: "first line\nsecond line\n",
+			contains: []string{
+				`data-source-start="5" data-source-end="11"> line`,
+				`data-source-start="11" data-source-end="17">second`,
+			},
+		},
+		{
 			name:     "escaped text is not mapped",
 			source:   `Escaped \* marker`,
 			excludes: []string{`data-source-start="0"`},

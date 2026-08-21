@@ -88,7 +88,7 @@ It verifies that the requested Markdown document exists under the content root,
 loads its sidecar from the separate writable root, resolves text anchors against
 the current file bytes, and returns the revision in both JSON and `ETag` form.
 Review-mode rendering adds source byte ranges to eligible goldmark text
-segments. The browser maps a selection contained by one segment from DOM
+segments. The browser maps selections across byte-contiguous segments from DOM
 UTF-16 offsets to Markdown UTF-8 byte offsets; normal viewer output is unchanged.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather

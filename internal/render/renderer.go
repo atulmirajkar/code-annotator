@@ -64,11 +64,16 @@ func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, no
 	textNode := node.(*ast.Text)
 	value := textNode.Segment.Value(source)
 	eligible := !bytes.ContainsAny(value, "\\&\r\n")
+	endByte := textNode.Segment.Stop
+	includeSoftBreak := eligible && textNode.SoftLineBreak() && endByte < len(source) && source[endByte] == '\n'
+	if includeSoftBreak {
+		endByte++
+	}
 	if eligible {
 		_, _ = writer.WriteString(`<span class="source-text" data-source-start="`)
 		_, _ = writer.WriteString(strconv.Itoa(textNode.Segment.Start))
 		_, _ = writer.WriteString(`" data-source-end="`)
-		_, _ = writer.WriteString(strconv.Itoa(textNode.Segment.Stop))
+		_, _ = writer.WriteString(strconv.Itoa(endByte))
 		_, _ = writer.WriteString(`">`)
 	}
 	if textNode.IsRaw() {
@@ -76,12 +81,15 @@ func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, no
 	} else {
 		r.writer.Write(writer, value)
 	}
+	if includeSoftBreak {
+		_ = writer.WriteByte('\n')
+	}
 	if eligible {
 		_, _ = writer.WriteString(`</span>`)
 	}
 	if textNode.HardLineBreak() {
 		_, _ = writer.WriteString("<br>\n")
-	} else if textNode.SoftLineBreak() {
+	} else if textNode.SoftLineBreak() && !includeSoftBreak {
 		_ = writer.WriteByte('\n')
 	}
 	return ast.WalkContinue, nil
