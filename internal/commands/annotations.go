@@ -65,6 +65,12 @@ func RunAnnotations(args []string, stdout, stderr io.Writer) error {
 			return err
 		}
 		return runReply(configuration, stdout)
+	case "resolve":
+		configuration, err := parseResolveConfig(args[1:], stderr)
+		if err != nil {
+			return err
+		}
+		return runResolve(configuration, stdout)
 	default:
 		return fmt.Errorf("unknown annotations subcommand %q", args[0])
 	}

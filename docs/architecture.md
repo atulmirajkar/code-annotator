@@ -67,6 +67,10 @@ content index for one globally unique annotation ID, appends a validated
 ordinary reply, validates the complete sidecar, and saves against the revision
 loaded during lookup. Missing storage is an error rather than an instruction to
 create a new annotation root.
+Transition-entry construction lives in `internal/annotation` and is shared by
+the HTTP handler and `annotations resolve`. The offline command locates the same
+stable ID, applies actor-role validation, appends activity plus status change,
+validates the complete sidecar, and saves optimistically.
 
 Read-only mode never opens or creates annotation storage. With `--review`, the
 application opens a separate symlink-resolved writable root. The default is

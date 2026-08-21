@@ -532,7 +532,8 @@ does not require the server to be running:
 md-viewer annotations list --root ./docs --status open,needs_changes --format json
 md-viewer annotations export --root ./docs --status open,needs_changes --format markdown
 md-viewer annotations resolve --root ./docs --id ann_... \
-  --status applied --actor codex --commit abc1234 --summary "Implemented request"
+  --status applied --role agent --author codex \
+  --commit abc1234 --summary "Implemented request"
 ```
 
 JSON output returns the schema objects without presentation text. Markdown
@@ -556,6 +557,11 @@ content index, assigns a `msg_` ID and timestamp, and appends only an ordinary
 discussion event. It preserves lifecycle status and saves with the revision
 loaded during lookup so a concurrent sidecar edit is rejected rather than
 overwritten.
+
+Offline `resolve` uses the same domain transition builder as the HTTP API. It
+requires an explicit `agent` or `reviewer` role plus author name, creates the
+target-specific activity and status-change entries together, validates the
+complete sidecar, and saves against the loaded revision.
 
 An agent workflow is:
 

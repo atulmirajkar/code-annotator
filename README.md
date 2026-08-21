@@ -95,6 +95,9 @@ md-viewer annotations list --root ./docs --status open,needs_changes
 md-viewer annotations export --root ./docs --status open,needs_changes
 md-viewer annotations reply --root ./docs --id ann_... \
   --author reviewer --message "Please retain the default."
+md-viewer annotations resolve --root ./docs --id ann_... \
+  --status applied --role agent --author codex \
+  --summary "Implemented request" --commit abc1234
 ```
 
 `list` emits deterministic JSON. `export` produces an agent-friendly Markdown
@@ -104,6 +107,8 @@ content root; omitting `--status` includes every lifecycle state.
 `reply` appends an ordinary discussion entry directly to the matching sidecar
 and returns the updated annotation and revision as JSON. It does not change the
 annotation lifecycle state.
+`resolve` performs the same actor-validated lifecycle transitions as the HTTP
+API and records both structured activity and status history atomically.
 
 ## Documentation
 

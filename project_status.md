@@ -64,7 +64,7 @@ rendering and live reload follow annotation review.
 - [x] Implement atomic sidecar persistence and stale-anchor detection.
 - [x] Implement annotation HTTP APIs with origin and session-token protection.
 - [x] Add rendered-text selection, highlights, and the review panel.
-- [ ] Add annotation list, export, reply, and resolve CLI commands.
+- [x] Add annotation list, export, reply, and resolve CLI commands.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
 ### 7. Mermaid and sequence diagrams
@@ -121,5 +121,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add the actor-validated offline lifecycle transition command as the next
-independently reviewable commit.
+Add browser reply and lifecycle controls as the next independently reviewable
+commit.

@@ -91,6 +91,10 @@ List annotations without running the server:
 
 ./bin/md-viewer annotations reply --root ./docs --id ann_... \
   --author reviewer --message "Please retain the default."
+
+./bin/md-viewer annotations resolve --root ./docs --id ann_... \
+  --status applied --role agent --author codex \
+  --summary "Implemented request" --commit abc1234
 ```
 
 Use `--annotations-dir ./reviews` when review mode used an external sidecar
@@ -101,6 +105,9 @@ source selections, current anchor state, reviewer comments, and thread history.
 The `reply` command is a mutation: it requires an existing annotation directory,
 appends one ordinary thread entry, and uses the loaded revision for optimistic
 concurrency. It never changes lifecycle status.
+The `resolve` command applies actor-controlled transitions and their required
+activity. For example, `applied` requires `--summary`, while `needs_changes` and
+`rejected` require `--message`.
 
 ## Verify
 

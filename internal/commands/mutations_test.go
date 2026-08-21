@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"atulm/md-viewer/internal/annotation"
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 )
 
@@ -105,6 +106,87 @@ func TestRunAnnotationReply(t *testing.T) {
 			}
 			if len(stored.Annotations[0].Thread) != 2 || string(revision) != result.Revision {
 				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
+			}
+		})
+	}
+}
+
+func TestParseResolveConfig(t *testing.T) {
+	t.Parallel()
+
+	valid := []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "agent", "--author", "codex"}
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "valid", args: valid},
+		{name: "missing status", args: []string{"--root", "./docs", "--id", "ann_test", "--role", "agent", "--author", "codex"}, wantErr: "--status is required"},
+		{name: "invalid status", args: append(append([]string{}, valid[:4]...), "--status", "pending", "--role", "agent", "--author", "codex"), wantErr: "invalid annotation status"},
+		{name: "invalid role", args: []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "owner", "--author", "codex"}, wantErr: "invalid annotation actor role"},
+		{name: "positional", args: append(append([]string{}, valid...), "extra"), wantErr: "does not accept positional"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := parseResolveConfig(test.args, io.Discard)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("parseResolveConfig() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseResolveConfig() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestRunAnnotationResolve(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		status     string
+		role       string
+		wantStatus annotation.Status
+		wantErr    string
+	}{
+		{name: "agent acknowledges", status: "acknowledged", role: "agent", wantStatus: annotation.StatusAcknowledged},
+		{name: "cannot skip acknowledgement", status: "applied", role: "agent", wantErr: "cannot transition"},
+		{name: "reviewer cannot acknowledge", status: "acknowledged", role: "reviewer", wantErr: "cannot transition"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeCommandFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeCommandFile(t, filepath.Join(rootPath, "guide.md"), "Guide text")
+			annotationsDir := filepath.Join(t.TempDir(), "annotations")
+			seedCommandAnnotations(t, annotationsDir)
+
+			args := []string{"resolve", "--root", rootPath, "--annotations-dir", annotationsDir, "--id", "ann_readme", "--status", test.status, "--role", test.role, "--author", "codex"}
+			var output bytes.Buffer
+			err := RunAnnotations(args, &output, io.Discard)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("RunAnnotations() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RunAnnotations() error = %v", err)
+			}
+			var result mutationOutput
+			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; output: %s", err, output.String())
+			}
+			thread := result.Annotation.Thread
+			if result.Annotation.Status != test.wantStatus || len(thread) != 3 || thread[1].Kind != annotation.ThreadAcknowledgement || thread[2].Kind != annotation.ThreadStatusChange {
+				t.Fatalf("transition output = %#v", result)
 			}
 		})
 	}

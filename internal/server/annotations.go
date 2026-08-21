@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -15,8 +14,6 @@ import (
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 )
-
-var errTransitionIdentifier = errors.New("generate transition identifier")
 
 // annotationView extends one persisted annotation with its location derived
 // from the current Markdown source. Document-level annotations have no anchor.
@@ -378,7 +375,7 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 	}
 	entries, err := transitionEntries(*updated, input, now)
 	if err != nil {
-		if errors.Is(err, errTransitionIdentifier) {
+		if errors.Is(err, annotation.ErrTransitionIdentifier) {
 			http.Error(response, "could not generate transition identifier", http.StatusInternalServerError)
 			return
 		}
@@ -512,72 +509,7 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 // transitionEntries builds the immutable activity history required by one
 // already-validated status transition, followed by its status-change event.
 func transitionEntries(current annotation.Annotation, input transitionAnnotationRequest, now time.Time) ([]annotation.ThreadEntry, error) {
-	if strings.TrimSpace(input.Author) == "" {
-		return nil, errors.New("author is required")
-	}
-	entries := make([]annotation.ThreadEntry, 0, 2)
-	activity := annotation.ThreadEntry{Author: input.Author, CreatedAt: now}
-	switch input.Status {
-	case annotation.StatusAcknowledged:
-		if input.Message != "" || input.Summary != "" || input.Commit != "" {
-			return nil, errors.New("acknowledgement does not accept message, summary, or commit")
-		}
-		activity.Kind = annotation.ThreadAcknowledgement
-	case annotation.StatusApplied:
-		if input.Message != "" {
-			return nil, errors.New("applied transition does not accept message")
-		}
-		activity.Kind = annotation.ThreadResolution
-		activity.Summary = input.Summary
-		activity.Commit = input.Commit
-	case annotation.StatusNeedsChanges:
-		if input.Summary != "" || input.Commit != "" {
-			return nil, errors.New("needs_changes transition does not accept summary or commit")
-		}
-		activity.Kind = annotation.ThreadReview
-		activity.Message = input.Message
-	case annotation.StatusRejected:
-		if input.Summary != "" || input.Commit != "" {
-			return nil, errors.New("rejected transition does not accept summary or commit")
-		}
-		activity.Kind = annotation.ThreadReply
-		activity.Message = input.Message
-	case annotation.StatusClosed, annotation.StatusOpen:
-		if input.Message != "" || input.Summary != "" || input.Commit != "" {
-			return nil, errors.New("status transition does not accept message, summary, or commit")
-		}
-	default:
-		return nil, fmt.Errorf("unsupported transition target %q", input.Status)
-	}
-
-	if activity.Kind != "" {
-		identifier, err := annotation.NewThreadID(now)
-		if err != nil {
-			return nil, fmt.Errorf("%w: activity: %v", errTransitionIdentifier, err)
-		}
-		activity.ID = identifier
-		if err := activity.Validate(); err != nil {
-			return nil, err
-		}
-		entries = append(entries, activity)
-	}
-	statusIdentifier, err := annotation.NewThreadID(now)
-	if err != nil {
-		return nil, fmt.Errorf("%w: status change: %v", errTransitionIdentifier, err)
-	}
-	statusChange := annotation.ThreadEntry{
-		ID:         statusIdentifier,
-		Kind:       annotation.ThreadStatusChange,
-		Author:     input.Author,
-		ActorRole:  input.ActorRole,
-		FromStatus: current.Status,
-		ToStatus:   input.Status,
-		CreatedAt:  now,
-	}
-	if err := statusChange.Validate(); err != nil {
-		return nil, err
-	}
-	return append(entries, statusChange), nil
+	return annotation.TransitionEntries(current, annotation.TransitionInput{Status: input.Status, ActorRole: input.ActorRole, Author: input.Author, Message: input.Message, Summary: input.Summary, Commit: input.Commit}, now)
 }
 
 // findAnnotation returns the index of identifier or -1 when the sidecar does
