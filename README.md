@@ -132,16 +132,29 @@ annotation sidecars.
 
 The repository includes the `md-viewer-annotations` skill under
 `.agents/skills/`. Agents working from this repository can discover it without
-installation. To make the skill available to personal Codex sessions outside
-this checkout, copy it into the personal skills directory:
+installation. Use the Skills CLI to install it from a local checkout for the
+current project:
 
 ```sh
-mkdir -p ~/.codex/skills
-cp -R .agents/skills/md-viewer-annotations ~/.codex/skills/
+npx skills add . --skill md-viewer-annotations -y
 ```
 
-The installed skill expects an `md-viewer` binary on `PATH`; the repository
-version instead uses `go run ./cmd/md-viewer` so it exercises current source.
+Install it for personal use across projects with:
+
+```sh
+npx skills add . --skill md-viewer-annotations -g -y
+```
+
+After the repository is published, the same convention supports installation
+without a checkout:
+
+```sh
+npx skills add <owner>/<repository> --skill md-viewer-annotations -g -y
+```
+
+The Skills CLI discovers the skill directly from `.agents/skills/`. The
+installed skill expects an `md-viewer` binary on `PATH`; repository-local use
+instead invokes `go run ./cmd/md-viewer` to exercise current source.
 
 ## Documentation
 
