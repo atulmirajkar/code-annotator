@@ -68,6 +68,18 @@ the server-verified source quote and byte range.
 
 ### Changes view
 
+The first Changes view uses a **unified layout**, not two side-by-side panes.
+Deleted base rows and current rows are interleaved in one vertical stream with
+old and new line-number gutters. This fits the existing single document column,
+remains usable when either sidebar is open, and gives current-side annotations
+one unambiguous rendered surface.
+
+A side-by-side layout is deferred. It would require synchronized scrolling,
+responsive pane behavior, duplication or mapping of unchanged regions, and a
+clear selection policy for the read-only base pane. Adding it later would be a
+presentation option over the same parsed `FileDiff`; it would not change the
+initial unified diff or current-side anchor model.
+
 The Changes view renders the complete current file, not only Git hunks. Current
 lines retain their exact source ranges and receive one of these visual states:
 
