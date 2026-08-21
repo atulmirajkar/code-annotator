@@ -274,16 +274,86 @@ persisting.
 
 ## Persistence and concurrency
 
-- Serialize writes per sidecar within the process.
-- Write a complete sidecar to a temporary file in the destination directory,
-  sync it, and atomically rename it over the prior version.
-- Create annotation directories with user-only write intent and ordinary
-  repository-readable files.
-- Include a sidecar revision or ETag on reads and require it on mutations.
-- Return `409 Conflict` when a browser attempts to update an old revision.
+### Store behavior
+
+The store opens one absolute, symlink-resolved writable root and mirrors each
+validated Markdown path beneath it with a `.json` suffix. It creates directories
+with mode `0700` and sidecar files with mode `0600`, subject to the process
+umask. A missing sidecar loads as an empty schema for the requested document and
+has an empty revision.
+
+Every non-empty revision is the lowercase SHA-256 digest of the exact persisted
+JSON bytes, including formatting and the trailing newline. A save supplies the
+revision returned by its earlier load. While holding the store mutex, the store
+reads the current bytes and rejects a mismatched revision with `ErrConflict`
+before writing. The HTTP layer maps that error to `409 Conflict` and returns the
+current revision so the caller can reload and reconcile.
+
+Supported-schema rewrites preserve JSON fields unknown to this version. Unknown
+fields are merged only into retained objects and list entries with matching
+stable IDs. Known fields use the submitted values, and removed annotations,
+thread entries, or optional objects are not resurrected. This merge protects
+forward-compatible metadata; it is not a concurrent-edit merge. Revision
+checking protects known fields and annotations added by another writer.
+
+Writes use a temporary file in the destination directory. The store sets mode
+`0600`, writes and syncs the complete JSON, closes it, and renames it over the
+target so readers do not observe a partial document. On supported systems it
+also syncs the parent directory to persist the rename. Document paths are
+canonical slash-separated relative Markdown paths. Every existing directory
+component and final sidecar is inspected without following symlinks, and the
+resolved result must remain under the writable root.
+
+The mutex coordinates operations through the same in-process `Store` instance.
+It does not lock an external process that writes sidecars directly. Agents and
+the browser should therefore mutate annotations through the webserver API or
+future CLI store commands. Direct multi-process writes would require a shared
+cross-process locking protocol; otherwise an external write can occur after the
+revision check and before the rename.
+
+### Optimistic-concurrency interaction
+
+```mermaid
+sequenceDiagram
+    participant Reviewer as Reviewer browser
+    participant API as Review API
+    participant Store as Sidecar store
+    participant Agent as AI agent
+
+    Reviewer->>API: GET annotations
+    API->>Store: Load(document)
+    Store-->>API: sidecar + revision R1
+    API-->>Reviewer: annotations + ETag R1
+
+    Agent->>API: Load and update annotation
+    API->>Store: Save(updated, expected R1)
+    Store->>Store: Read current revision R1
+    Store->>Store: Atomic write
+    Store-->>API: revision R2
+    API-->>Agent: saved with R2
+
+    Reviewer->>API: Save reviewer edit with R1
+    API->>Store: Save(updated, expected R1)
+    Store->>Store: Read current revision R2
+    Store-->>API: ErrConflict + current R2
+    API-->>Reviewer: 409 Conflict + ETag R2
+
+    Reviewer->>API: Reload annotations
+    API->>Store: Load(document)
+    Store-->>API: agent changes + revision R2
+    API-->>Reviewer: reconcile against R2
+    Reviewer->>API: Save reconciled edit with R2
+    API->>Store: Save(updated, expected R2)
+    Store-->>API: revision R3
+    API-->>Reviewer: saved with ETag R3
+```
+
+A client must never retry the same stale payload automatically because doing so
+could discard the intervening agent change.
+
 - Never modify the Markdown document as part of an annotation write.
-- Validate all annotation and document paths through a dedicated writable-root
-  boundary; do not reuse unchecked URL paths.
+- Never reuse unchecked URL paths at the annotation writable-root boundary.
+- Never treat unknown-field preservation as resolution of a revision conflict.
 
 ## HTTP API
 
