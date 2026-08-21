@@ -9,7 +9,7 @@ Last updated: 2026-08-20
 The MVP scope is implemented with automated unit, handler, lifecycle, race, and
 cross-platform build verification. Markdown and asset updates are read from disk
 on browser refresh. Annotation review is the next product milestone, followed by
-live reload.
+embedded diagram rendering and live reload.
 
 ## Milestones
 
@@ -67,7 +67,23 @@ live reload.
 - [ ] Add annotation list, export, reply, and resolve CLI commands.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
-### 7. Live reload
+### 7. Mermaid and sequence diagrams
+
+- [ ] Pin Mermaid Tiny and retain its license in the embedded web assets.
+- [ ] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
+  network dependency.
+- [ ] Recognize fenced `mermaid` blocks and render them as client-side SVG.
+- [ ] Use strict Mermaid security, bounded diagram input, and a self-only script
+  Content Security Policy without `unsafe-inline`.
+- [ ] Preserve the source code block and show a useful message when diagram
+  parsing or rendering fails.
+- [ ] Add responsive diagram styling and viewer-theme integration.
+- [ ] Treat a rendered diagram as one source-backed annotation region rather
+  than mapping individual SVG labels to Markdown offsets.
+- [ ] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
+  integration tests.
+
+### 8. Live reload
 
 - [ ] Watch the selected content directory for Markdown and asset changes.
 - [ ] Notify connected browser sessions using Server-Sent Events.
@@ -88,7 +104,9 @@ live reload.
 | Browser-launch failure is non-fatal | Approved |
 | Annotations stored separately from Markdown in versioned JSON sidecars | Proposed |
 | Annotation review scheduled before live reload | Approved |
-| Live reload deferred to post-annotation milestone 7 | Approved |
+| Mermaid rendered client-side from an embedded pinned bundle | Proposed |
+| Mermaid uses strict security and no runtime CDN or browser automation | Proposed |
+| Live reload deferred until after annotation and diagram milestones | Approved |
 | Editing and network sharing deferred | Approved |
 
 ## Known risks
