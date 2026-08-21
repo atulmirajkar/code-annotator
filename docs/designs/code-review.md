@@ -351,7 +351,7 @@ to:
 
 ```text
 git -C <repository> diff \
-  --no-ext-diff --no-textconv --unified=0 \
+  --no-color --no-ext-diff --no-textconv --unified=0 \
   <base-commit> -- :(literal)<relative-path>
 ```
 
@@ -365,6 +365,88 @@ The parser accepts ordinary textual unified patches and validates every hunk
 range against the current source line count. Malformed, oversized, binary, or
 unsupported patches produce an unavailable Changes view while File view remains
 usable.
+
+### File diff evaluation and row alignment
+
+A file Changes request has three authoritative inputs:
+
+1. `base`: the blob at `<BaseCommit>:<repository-relative-path>`, read through
+   a bounded Git command;
+2. `current`: the same cataloged file read through `content.Root`, preserving
+   its exact current bytes;
+3. `patch`: a bounded, zero-context textual Git diff from `BaseCommit` to the
+   combined current index/worktree result for that literal path.
+
+If the path has no blob at `BaseCommit`, but it is a current catalog member, the
+base is empty and the entire current file is treated as added. This covers both
+untracked files and tracked files introduced after the frozen base. A missing
+current file never reaches this flow because it is absent from the current
+catalog. Base, current, and patch must be UTF-8 text without NUL bytes; binary
+markers and oversized inputs make Changes unavailable while File view remains
+usable.
+
+The parser does not use a general-purpose line-diff algorithm after Git has
+already produced hunks. It treats hunk coordinates as the change boundaries,
+verifies hunk text against both source snapshots, and reconstructs the complete
+display sequence as follows:
+
+1. Split base and current bytes into logical lines without normalizing the
+   source. Visible line text excludes LF and an optional preceding CR. A final
+   line terminator does not create an extra display row.
+2. Parse each header of the form
+   `@@ -oldStart,oldCount +newStart,newCount @@`. An omitted count means one.
+   For a zero-count range, `start` is the insertion position; otherwise the
+   zero-based source index is `start - 1`.
+3. Require hunks to be ordered, non-overlapping, and within both source line
+   arrays. The number of old and new hunk records must exactly match the header.
+4. Reconstruct the region omitted before each zero-context hunk. The omitted
+   base and current regions must have equal line counts and identical text;
+   each pair becomes an `unchanged` row.
+5. Verify every `-` record against the next base line, every `+` record against
+   the next current line, and any context record against both. Git's
+   `\ No newline at end of file` marker affects neither text nor row count.
+6. Within each contiguous change group, pair deleted and added lines by their
+   order. A pair becomes `modified`; an unpaired added line becomes `added`;
+   an unpaired deleted line becomes `deleted`. This is line alignment, not an
+   assertion that the paired lines are semantically related or a character-level
+   diff.
+7. Verify and append the unchanged suffix after the final hunk. Every base and
+   current line must be consumed exactly once.
+
+For example:
+
+```text
+base                 current
+1  one               1  one
+2  old-a             2  new
+3  old-b             3  tail
+4  tail
+```
+
+produces:
+
+| Kind | Base line/text | Current line/text |
+| --- | --- | --- |
+| unchanged | 1 `one` | 1 `one` |
+| modified | 2 `old-a` | 2 `new` |
+| deleted | 3 `old-b` | — |
+| unchanged | 4 `tail` | 3 `tail` |
+
+The row model stores base text because the left pane renders the immutable
+blob. Current text is not duplicated in `Row`; the renderer slices it from the
+already-loaded current source using `CurrentStart` and `CurrentEnd`. These are
+byte offsets, not rune or browser UTF-16 offsets. For each non-deleted row they
+cover visible content only, leaving CR/LF terminators as gaps just like File
+view. Deleted rows have `NewLine == 0` and zero current offsets, making them
+structurally non-selectable. Empty current lines may also have equal start/end
+offsets, but remain distinguishable by their nonzero `NewLine`.
+
+The parser rejects rather than approximates when a header is malformed, a hunk
+overlaps another hunk, line counts disagree, hunk text does not match either
+snapshot, omitted unchanged text differs, a textual difference has no hunk, or
+the patch contains unsupported/binary data. This strict source consistency is
+what allows current-side annotation byte ranges to retain the same validation
+contract in File and Changes views.
 
 ### Tracked and untracked files
 
