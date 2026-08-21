@@ -561,6 +561,11 @@ web/                       selection, highlights, review panel, filters
 Each slice should be a separately reviewable commit with unit tests and a green
 `go test ./...` result.
 
+The initial panel is deliberately read-only: it fetches the active document's
+annotation view, displays lifecycle and stale-anchor state, and renders all
+user-controlled strings through DOM text nodes. Selection mapping, highlights,
+and mutation controls follow as independent reviewable changes.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.

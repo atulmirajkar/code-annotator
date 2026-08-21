@@ -43,6 +43,7 @@ type Server struct {
 	review      *reviewSession
 	page        *template.Template
 	styles      template.CSS
+	reviewJS    []byte
 	handler     http.Handler
 }
 
@@ -175,12 +176,17 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer styles: %w", err)
 	}
+	reviewJS, err := fs.ReadFile(web.Files, "review.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review script: %w", err)
+	}
 
 	server := &Server{
 		root:     root,
 		renderer: renderer,
 		page:     page,
 		styles:   template.CSS(styles), // Embedded, application-owned CSS.
+		reviewJS: reviewJS,
 	}
 	for _, option := range options {
 		if option == nil {
@@ -195,6 +201,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /view/{path...}", server.handleDocument)
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
+	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
@@ -207,6 +214,13 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	server.handler = securityHeaders(mux)
 
 	return server, nil
+}
+
+// handleReviewScript serves the embedded annotation UI without requiring a
+// runtime asset directory. The script is inert on pages outside review mode.
+func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewJS)
 }
 
 // Handler returns the complete HTTP handler for the viewer.
@@ -370,7 +384,7 @@ func escapedRoutePath(request *http.Request, prefix string) string {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Cache-Control", "no-store")
-		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'unsafe-inline'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 		response.Header().Set("Referrer-Policy", "no-referrer")
 		response.Header().Set("X-Content-Type-Options", "nosniff")
 		response.Header().Set("X-Frame-Options", "DENY")

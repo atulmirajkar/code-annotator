@@ -901,7 +901,7 @@ func TestReviewMutationProtection(t *testing.T) {
 	}
 }
 
-func TestReviewTokenPageEmbedding(t *testing.T) {
+func TestReviewPageEmbedding(t *testing.T) {
 	t.Parallel()
 
 	token := strings.Repeat("t", 32)
@@ -909,9 +909,10 @@ func TestReviewTokenPageEmbedding(t *testing.T) {
 		name      string
 		review    bool
 		wantToken bool
+		wantPanel bool
 	}{
 		{name: "read-only page omits token"},
-		{name: "review page embeds token", review: true, wantToken: true},
+		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true},
 	}
 
 	for _, test := range tests {
@@ -939,6 +940,45 @@ func TestReviewTokenPageEmbedding(t *testing.T) {
 			hasToken := strings.Contains(response.Body.String(), `name="md-viewer-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
+			}
+			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
+			if hasPanel != test.wantPanel {
+				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
+			}
+		})
+	}
+}
+
+func TestReviewScript(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		method      string
+		wantStatus  int
+		wantType    string
+		wantContent string
+	}{
+		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContent: "renderAnnotations"},
+		{name: "reject post", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			handler := newTestHandler(t, nil)
+			request := httptest.NewRequest(test.method, "/static/review.js", nil)
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantType != "" && response.Header().Get("Content-Type") != test.wantType {
+				t.Errorf("Content-Type = %q, want %q", response.Header().Get("Content-Type"), test.wantType)
+			}
+			if test.wantContent != "" && !strings.Contains(response.Body.String(), test.wantContent) {
+				t.Errorf("script does not contain %q", test.wantContent)
 			}
 		})
 	}

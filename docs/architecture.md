@@ -45,7 +45,7 @@ internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
-web/                        embedded HTML templates and CSS
+web/                        embedded HTML, CSS, and review-panel JavaScript
 ```
 
 Package boundaries should remain small. In particular, `internal/content`

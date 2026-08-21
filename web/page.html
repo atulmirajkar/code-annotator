@@ -12,7 +12,7 @@
     <a class="brand" href="/">md-viewer</a>
     <span class="root" title="{{.Root}}">{{.Root}}</span>
   </header>
-  <div class="layout">
+  <div class="layout{{if .ReviewToken}} review-layout{{end}}">
     <nav class="sidebar" aria-label="Markdown documents">
       <h2>Documents</h2>
       {{if .Documents}}
@@ -39,6 +39,18 @@
       <article class="markdown-body">{{.Content}}</article>
       {{end}}
     </main>
+    {{if .ReviewToken}}
+    <aside class="review-panel" data-document="{{.Selected}}" aria-labelledby="review-heading">
+      <div class="review-heading-row">
+        <h2 id="review-heading">Annotations</h2>
+        <span class="annotation-count" aria-live="polite"></span>
+      </div>
+      <div class="annotation-list" aria-live="polite">
+        <p class="review-message">Loading annotations…</p>
+      </div>
+    </aside>
+    {{end}}
   </div>
+  {{if .ReviewToken}}<script src="/static/review.js" defer></script>{{end}}
 </body>
 </html>

@@ -4,12 +4,12 @@ Last updated: 2026-08-20
 
 ## Current state
 
-**Phase:** Manual-refresh MVP implemented; release tag pending.
+**Phase:** Annotation review implementation; release tag pending.
 
-The MVP scope is implemented with automated unit, handler, lifecycle, race, and
-cross-platform build verification. Markdown and asset updates are read from disk
-on browser refresh. Annotation review is the next product milestone, followed by
-embedded diagram rendering and live reload.
+The manual-refresh MVP and secured annotation APIs are implemented. Review-mode
+pages now include a read-only annotation panel; selection, highlights, and
+browser mutation controls remain. Embedded diagram rendering and live reload
+follow annotation review.
 
 ## Milestones
 
@@ -121,5 +121,5 @@ embedded diagram rendering and live reload.
 
 ## Next milestone
 
-Review and approve the annotation design, then break milestone 6 into small
-implementation commits.
+Add rendered-text selection and source-range mapping as the next independently
+reviewable annotation UI commit.
