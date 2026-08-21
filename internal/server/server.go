@@ -1,4 +1,4 @@
-// Package server exposes Markdown content through an HTTP viewer.
+// Package server exposes reviewable local content through an HTTP viewer.
 package server
 
 import (
@@ -42,19 +42,20 @@ const (
 	mermaidContentSecurityPolicy = "default-src 'none'; img-src 'self' data: http: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
 )
 
-// Server serves an index and rendered Markdown documents from a content root.
+// Server serves an index and rendered documents from a content root.
 type Server struct {
-	root        *content.Root
-	renderer    *mdrender.Renderer
-	annotations *annotationstore.Store
-	review      *reviewSession
-	page        *template.Template
-	styles      []byte
-	reviewJS    []byte
-	viewerJS    []byte
-	mermaidJS   []byte
-	mermaidTiny []byte
-	handler     http.Handler
+	root         *content.Root
+	indexOptions content.IndexOptions
+	renderer     *mdrender.Renderer
+	annotations  *annotationstore.Store
+	review       *reviewSession
+	page         *template.Template
+	styles       []byte
+	reviewJS     []byte
+	viewerJS     []byte
+	mermaidJS    []byte
+	mermaidTiny  []byte
+	handler      http.Handler
 }
 
 // reviewSession contains the browser-bound authority required for annotation
@@ -115,6 +116,15 @@ type documentView struct {
 	Directory string
 	URL       string
 	Selected  bool
+	Kind      string
+}
+
+// WithIndexOptions configures the reviewable content catalog.
+func WithIndexOptions(options content.IndexOptions) Option {
+	return func(server *Server) error {
+		server.indexOptions = options
+		return nil
+	}
 }
 
 // validateReviewOrigin accepts only an HTTP origin with a loopback IP host and
@@ -297,9 +307,9 @@ func (s *Server) HTTPServer(address string) *http.Server {
 }
 
 func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request) {
-	index, err := s.root.Index()
+	index, err := s.root.IndexWithOptions(s.indexOptions)
 	if err != nil {
-		http.Error(response, "could not index Markdown documents", http.StatusInternalServerError)
+		http.Error(response, "could not index documents", http.StatusInternalServerError)
 		return
 	}
 	if index.DefaultPath == "" {
@@ -317,14 +327,9 @@ func (s *Server) handleDocument(response http.ResponseWriter, request *http.Requ
 		http.NotFound(response, request)
 		return
 	}
-	if !strings.EqualFold(filepath.Ext(documentPath), ".md") {
-		http.NotFound(response, request)
-		return
-	}
-
-	index, err := s.root.Index()
+	index, err := s.root.IndexWithOptions(s.indexOptions)
 	if err != nil {
-		http.Error(response, "could not index Markdown documents", http.StatusInternalServerError)
+		http.Error(response, "could not index documents", http.StatusInternalServerError)
 		return
 	}
 	s.renderDocument(response, index, documentPath)
@@ -359,6 +364,11 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 }
 
 func (s *Server) renderDocument(response http.ResponseWriter, index content.Index, documentPath string) {
+	document, ok := findDocument(index, documentPath)
+	if !ok {
+		http.Error(response, "document not found", http.StatusNotFound)
+		return
+	}
 	source, err := s.root.ReadFile(documentPath, maxDocumentBytes)
 	if err != nil {
 		s.writeContentError(response, err)
@@ -366,17 +376,23 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 	}
 
 	var fragment []byte
-	if s.review != nil {
+	if document.Kind == content.KindCode {
+		fragment, err = s.renderer.RenderCode(source, false)
+	} else if s.review != nil {
 		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
 	} else {
 		fragment, err = s.renderer.Render(source, documentPath)
 	}
 	if err != nil {
-		http.Error(response, "could not render Markdown document", http.StatusInternalServerError)
+		if errors.Is(err, mdrender.ErrUnsupportedText) {
+			http.Error(response, "source file is not valid UTF-8 text", http.StatusUnsupportedMediaType)
+			return
+		}
+		http.Error(response, "could not render document", http.StatusInternalServerError)
 		return
 	}
 	digest := ""
-	if s.review != nil {
+	if s.review != nil && document.Kind == content.KindMarkdown {
 		digest = annotation.DocumentSHA256(source)
 	}
 	s.renderPage(response, index, documentPath, fragment, digest)
@@ -390,6 +406,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 			Directory: document.Directory,
 			URL:       routeURL("/view/", document.Path),
 			Selected:  document.Path == selected,
+			Kind:      string(document.Kind),
 		})
 	}
 
@@ -410,7 +427,8 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     hasMermaid,
 	}
-	if s.review != nil {
+	selectedDocument, selectedFound := findDocument(index, selected)
+	if s.review != nil && (!selectedFound || selectedDocument.Kind == content.KindMarkdown) {
 		data.ReviewToken = s.review.token
 	}
 	if err := s.page.Execute(response, data); err != nil {
@@ -420,14 +438,24 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 	}
 }
 
+// findDocument performs an exact membership check against the safe catalog.
+func findDocument(index content.Index, documentPath string) (content.Document, bool) {
+	for _, document := range index.Documents {
+		if document.Path == documentPath {
+			return document, true
+		}
+	}
+	return content.Document{}, false
+}
+
 func (s *Server) writeContentError(response http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, content.ErrTooLarge):
-		http.Error(response, "Markdown document is too large", http.StatusRequestEntityTooLarge)
+		http.Error(response, "document is too large", http.StatusRequestEntityTooLarge)
 	case content.IsNotExist(err), errors.Is(err, content.ErrInvalidPath), errors.Is(err, content.ErrOutsideRoot), errors.Is(err, content.ErrNotRegular):
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
+		http.Error(response, "document not found", http.StatusNotFound)
 	default:
-		http.Error(response, "could not read Markdown document", http.StatusInternalServerError)
+		http.Error(response, "could not read document", http.StatusInternalServerError)
 	}
 }
 

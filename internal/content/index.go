@@ -179,6 +179,9 @@ func NewIndexOptions(codeExtensions, excludedDirectories []string) (IndexOptions
 // normalizeNames canonicalizes one ordered, case-insensitive configuration
 // list while rejecting values that could be interpreted as paths.
 func normalizeNames(values []string, limit int, extension bool) ([]string, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
 	if len(values) > limit {
 		return nil, fmt.Errorf("at most %d values are allowed", limit)
 	}

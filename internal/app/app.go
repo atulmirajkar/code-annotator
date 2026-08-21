@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	annotationstore "atulm/md-viewer/internal/annotation/store"
@@ -31,6 +32,9 @@ type config struct {
 	noOpen         bool
 	review         bool
 	annotationsDir string
+	includeCode    bool
+	codeExtensions string
+	excludeDirs    string
 }
 
 // Run parses args, starts the local viewer, and blocks until ctx is canceled or
@@ -70,6 +74,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 
 	viewerURL := "http://" + listener.Addr().String() + "/"
 	var serverOptions []server.Option
+	indexOptions, err := catalogOptions(configuration)
+	if err != nil {
+		return err
+	}
+	serverOptions = append(serverOptions, server.WithIndexOptions(indexOptions))
 	if annotations != nil {
 		token, err := newReviewToken()
 		if err != nil {
@@ -138,6 +147,9 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	noOpen := flags.Bool("no-open", false, "do not open the default browser")
 	review := flags.Bool("review", false, "enable writable annotation review mode")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory (requires --review)")
+	includeCode := flags.Bool("include-code", false, "include supported source files")
+	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
+	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer [options] <directory>")
 		fmt.Fprintln(stderr)
@@ -158,14 +170,44 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	if *annotationsDir != "" && !*review {
 		return config{}, errors.New("--annotations-dir requires --review")
 	}
+	configuration := config{
+		rootPath: flags.Arg(0), port: *port, noOpen: *noOpen, review: *review,
+		annotationsDir: *annotationsDir, includeCode: *includeCode,
+		codeExtensions: *codeExtensions, excludeDirs: *excludeDirs,
+	}
+	if _, err := catalogOptions(configuration); err != nil {
+		return config{}, err
+	}
 
-	return config{
-		rootPath:       flags.Arg(0),
-		port:           *port,
-		noOpen:         *noOpen,
-		review:         *review,
-		annotationsDir: *annotationsDir,
-	}, nil
+	return configuration, nil
+}
+
+// catalogOptions applies CLI implication and default-exclusion semantics before
+// delegating validation and normalization to the content package.
+func catalogOptions(configuration config) (content.IndexOptions, error) {
+	extensions := splitCSV(configuration.codeExtensions)
+	includeCode := configuration.includeCode || len(extensions) > 0
+	if includeCode && len(extensions) == 0 {
+		extensions = content.DefaultCodeExtensions()
+	}
+	excluded := splitCSV(configuration.excludeDirs)
+	if includeCode {
+		excluded = append(content.DefaultExcludedDirectories(), excluded...)
+	}
+	options, err := content.NewIndexOptions(extensions, excluded)
+	if err != nil {
+		return content.IndexOptions{}, fmt.Errorf("configure content catalog: %w", err)
+	}
+	return options, nil
+}
+
+// splitCSV preserves invalid empty entries for the catalog validator while
+// treating an entirely omitted flag as no values.
+func splitCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 // openAnnotationStore establishes the writable boundary for review mode. The

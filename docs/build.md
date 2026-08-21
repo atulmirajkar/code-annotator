@@ -61,6 +61,25 @@ Start without opening a browser:
 ./bin/md-viewer --no-open ./docs
 ```
 
+Include the default Go, C#, JavaScript, TypeScript, JSON, and `.csproj` source
+files as escaped, line-numbered documents:
+
+```sh
+./bin/md-viewer --include-code ./repository
+```
+
+Replace that source extension set or add directory exclusions:
+
+```sh
+./bin/md-viewer --code-extensions .go,.cs \
+  --exclude-dirs generated,tmp ./repository
+```
+
+`--code-extensions` implies `--include-code`. Source discovery excludes
+`node_modules`, `vendor`, `bin`, and `obj` by default. Code review annotations
+and Git comparison are later milestone slices; this stage provides safe plain
+source viewing only.
+
 Enable the annotation review storage boundary:
 
 ```sh

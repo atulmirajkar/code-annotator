@@ -1,8 +1,9 @@
 # md-viewer
 
-`md-viewer` is a local Go web application for browsing and reading Markdown
-files from a directory. It starts a server on the loopback interface, renders
-Markdown as HTML, and opens the viewer in the user's default browser.
+`md-viewer` is a local Go web application for browsing Markdown and optionally
+enabled source files from a directory. It starts a server on the loopback
+interface, renders safe HTML, and opens the viewer in the user's default
+browser.
 
 The MVP is implemented and ready to run from source or as a compiled binary.
 
@@ -82,7 +83,14 @@ Available flags:
 --no-open                   Start the server without opening a browser
 --review                    Enable writable annotation review mode
 --annotations-dir <path>    Store annotations at a custom path; requires --review
+--include-code              Include the default supported source extensions
+--code-extensions <csv>     Replace the source extension set; implies --include-code
+--exclude-dirs <csv>        Add directory base names to exclude from discovery
 ```
+
+For example, `--include-code` adds escaped, line-numbered Go, C#, JavaScript,
+TypeScript, JSON, and `.csproj` files. Code annotations and Git comparison are
+still pending milestone work.
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,

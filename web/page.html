@@ -17,7 +17,7 @@
     <span class="root" title="{{.Root}}">{{.Root}}</span>
   </header>
   <div class="layout{{if .ReviewToken}} review-layout{{end}}">
-    <nav class="sidebar" id="documents-sidebar" aria-label="Markdown documents">
+    <nav class="sidebar" id="documents-sidebar" aria-label="Reviewable documents">
       <h2>Documents</h2>
       {{if .Documents}}
       <label class="document-search">
@@ -30,19 +30,20 @@
         <li>
           <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
             {{if .Directory}}<span class="directory">{{.Directory}}/</span>{{end}}{{.Name}}
+            {{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}
           </a>
         </li>
         {{end}}
       </ul>
       {{else}}
-      <p class="empty-nav">No Markdown files found.</p>
+      <p class="empty-nav">No reviewable documents found.</p>
       {{end}}
     </nav>
     <main class="document">
       {{if .Empty}}
       <section class="empty-state">
-        <h1>No Markdown files found</h1>
-        <p>Add a <code>.md</code> file below this directory, then refresh the page.</p>
+        <h1>No reviewable documents found</h1>
+        <p>Add a Markdown file or enable supported source files, then refresh the page.</p>
       </section>
       {{else}}
       <article class="markdown-body"{{if .DocumentSHA256}} data-document-sha256="{{.DocumentSHA256}}"{{end}}>{{.Content}}</article>

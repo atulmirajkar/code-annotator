@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -37,6 +38,10 @@ func TestParseConfig(t *testing.T) {
 		{name: "options", args: []string{"--port", "8080", "--no-open", "./notes"}, want: config{rootPath: "./notes", port: 8080, noOpen: true}},
 		{name: "review defaults", args: []string{"--review", "./docs"}, want: config{rootPath: "./docs", review: true}},
 		{name: "custom annotations", args: []string{"--review", "--annotations-dir", "./reviews", "./docs"}, want: config{rootPath: "./docs", review: true, annotationsDir: "./reviews"}},
+		{name: "include default code", args: []string{"--include-code", "./docs"}, want: config{rootPath: "./docs", includeCode: true}},
+		{name: "custom code implies include", args: []string{"--code-extensions", ".go,.cs", "./docs"}, want: config{rootPath: "./docs", codeExtensions: ".go,.cs"}},
+		{name: "custom exclusions", args: []string{"--exclude-dirs", "generated,tmp", "./docs"}, want: config{rootPath: "./docs", excludeDirs: "generated,tmp"}},
+		{name: "invalid extension", args: []string{"--code-extensions", "go", "./docs"}, wantErr: "configure content catalog"},
 		{name: "annotations without review", args: []string{"--annotations-dir", "./reviews", "./docs"}, wantErr: "requires --review"},
 		{name: "missing directory", wantErr: "exactly one"},
 		{name: "extra directory", args: []string{"one", "two"}, wantErr: "exactly one"},
@@ -65,6 +70,33 @@ func TestParseConfig(t *testing.T) {
 				if got != tt.want {
 					t.Fatalf("parseConfig() = %#v, want %#v", got, tt.want)
 				}
+			}
+		})
+	}
+}
+
+func TestCatalogOptions(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		configuration config
+		want          content.IndexOptions
+	}{
+		{name: "markdown defaults", configuration: config{}, want: content.IndexOptions{}},
+		{name: "code defaults", configuration: config{includeCode: true}, want: content.IndexOptions{CodeExtensions: content.DefaultCodeExtensions(), ExcludedDirectories: content.DefaultExcludedDirectories()}},
+		{name: "custom extensions replace defaults", configuration: config{codeExtensions: ".go,.cs"}, want: content.IndexOptions{CodeExtensions: []string{".go", ".cs"}, ExcludedDirectories: content.DefaultExcludedDirectories()}},
+		{name: "custom exclusion without code", configuration: config{excludeDirs: "generated"}, want: content.IndexOptions{ExcludedDirectories: []string{"generated"}}},
+		{name: "custom exclusion extends code defaults", configuration: config{includeCode: true, excludeDirs: "generated"}, want: content.IndexOptions{CodeExtensions: content.DefaultCodeExtensions(), ExcludedDirectories: append(content.DefaultExcludedDirectories(), "generated")}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := catalogOptions(test.configuration)
+			if err != nil {
+				t.Fatalf("catalogOptions() error = %v", err)
+			}
+			if !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("catalogOptions() = %#v, want %#v", got, test.want)
 			}
 		})
 	}

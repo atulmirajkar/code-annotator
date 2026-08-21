@@ -51,6 +51,7 @@ a { color: var(--accent); }
 .documents a:hover { background: var(--background); }
 .documents a.selected { background: var(--accent-soft); color: var(--accent); font-weight: 650; }
 .directory { color: var(--muted); }
+.document-kind { margin-left: .35rem; color: var(--muted); font-size: .65rem; text-transform: uppercase; }
 .empty-nav { padding: 0 .5rem; color: var(--muted); font-size: .9rem; }
 .document { min-width: 0; padding: clamp(1.5rem, 5vw, 4rem); }
 .markdown-body { max-width: 54rem; margin: 0 auto; line-height: 1.7; }
@@ -61,6 +62,11 @@ a { color: var(--accent); }
 .markdown-body pre { overflow-x: auto; padding: 1rem; border: 1px solid var(--border); border-radius: .55rem; background: var(--code); }
 .markdown-body code { padding: .12em .32em; border-radius: .3rem; background: var(--code); font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .9em; font-variant-ligatures: none; }
 .markdown-body pre code { display: block; min-width: max-content; padding: 0; background: transparent; font-size: .85rem; line-height: 1.5; tab-size: 4; white-space: pre; }
+.source-view { overflow-x: auto; border: 1px solid var(--border); border-radius: .55rem; background: var(--code); }
+.source-lines { min-width: max-content; margin: 0; padding: 1rem 0; list-style: none; counter-reset: none; }
+.source-line { display: grid; grid-template-columns: 4rem minmax(0, 1fr); min-height: 1.5em; padding-right: 1rem; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .85rem; line-height: 1.5; white-space: pre; }
+.source-line-number { padding-right: 1rem; color: var(--muted); text-align: right; user-select: none; }
+.source-line code { padding: 0; background: transparent; font: inherit; white-space: pre; }
 .mermaid-diagram { margin: 1.5rem 0; }
 .mermaid-source { margin-bottom: .75rem; color: var(--muted); font-size: .85rem; }
 .mermaid-source summary { cursor: pointer; }

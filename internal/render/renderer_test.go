@@ -1,9 +1,47 @@
 package render
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
+
+func TestRenderCode(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		source   []byte
+		review   bool
+		contains []string
+		wantErr  error
+	}{
+		{name: "escapes source", source: []byte("if a < b && b > c {}\n"), contains: []string{`data-line="1"`, `if a &lt; b &amp;&amp; b &gt; c {}`}},
+		{name: "review byte ranges with CRLF gaps", source: []byte("café\r\nnext"), review: true, contains: []string{`data-source-start="0" data-source-end="5">café`, `data-source-start="7" data-source-end="11">next`}},
+		{name: "empty file", source: nil, contains: []string{`data-line="1"`, `<code></code>`}},
+		{name: "invalid UTF-8", source: []byte{0xff}, wantErr: ErrUnsupportedText},
+		{name: "NUL byte", source: []byte{'a', 0, 'b'}, wantErr: ErrUnsupportedText},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			output, err := New().RenderCode(test.source, test.review)
+			if test.wantErr != nil {
+				if !errors.Is(err, test.wantErr) {
+					t.Fatalf("RenderCode() error = %v, want %v", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RenderCode() error = %v", err)
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(string(output), want) {
+					t.Errorf("RenderCode() output missing %q:\n%s", want, output)
+				}
+			}
+		})
+	}
+}
 
 func TestRenderGitHubFlavoredMarkdown(t *testing.T) {
 	t.Parallel()

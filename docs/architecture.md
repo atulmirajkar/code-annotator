@@ -5,7 +5,8 @@
 `md-viewer` is a local command-line application containing an HTTP server. A
 user selects a directory at startup, and that directory becomes the immutable
 content root for the lifetime of the process. The application indexes Markdown
-files, renders requested documents to HTML, and serves referenced local assets.
+and explicitly enabled source files, renders requested documents to safe HTML,
+and serves referenced local assets.
 
 The MVP is a single Go binary with embedded page templates and static styling.
 It has no database, client-side framework, or external service.
@@ -25,7 +26,7 @@ listen on 127.0.0.1:<selected port>
 serve HTTP requests          browser.OpenURL(server URL)
         |
         v
-index -> safe file lookup -> Markdown renderer -> HTML response
+catalog -> safe file lookup -> Markdown or source renderer -> HTML response
                                |
                                v
                          local asset requests

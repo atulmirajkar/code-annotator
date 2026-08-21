@@ -66,6 +66,53 @@ func TestDocumentRoute(t *testing.T) {
 	}
 }
 
+func TestCodeDocumentRoute(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		path       string
+		body       []byte
+		wantStatus int
+		contains   []string
+	}{
+		{name: "escaped Go source", path: "main.go", body: []byte("package main\nvar less = 1 < 2\n"), wantStatus: http.StatusOK, contains: []string{`class="source-view"`, `var less = 1 &lt; 2`, `class="document-kind">code`}},
+		{name: "invalid UTF-8", path: "bad.go", body: []byte{0xff}, wantStatus: http.StatusUnsupportedMediaType},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			if err := os.WriteFile(filepath.Join(rootPath, test.path), test.body, 0o644); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			options, err := content.NewIndexOptions([]string{".go"}, nil)
+			if err != nil {
+				t.Fatalf("content.NewIndexOptions() error = %v", err)
+			}
+			viewer, err := New(root, mdrender.New(), WithIndexOptions(options))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/view/"+test.path, nil))
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(response.Body.String(), want) {
+					t.Errorf("response missing %q", want)
+				}
+			}
+		})
+	}
+}
+
 func TestDocumentRouteDecodesPercentOnce(t *testing.T) {
 	t.Parallel()
 
@@ -96,7 +143,7 @@ func TestIndexEmptyState(t *testing.T) {
 	if got, want := response.Code, http.StatusOK; got != want {
 		t.Fatalf("status = %d, want %d", got, want)
 	}
-	if !strings.Contains(response.Body.String(), "No Markdown files found") {
+	if !strings.Contains(response.Body.String(), "No reviewable documents found") {
 		t.Fatalf("response does not contain empty state: %s", response.Body.String())
 	}
 }

@@ -3,11 +3,14 @@ package render
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
+	"html"
 	"net/url"
 	"path"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -19,6 +22,8 @@ import (
 )
 
 const blockedDestination = "#invalid-local-path"
+
+var ErrUnsupportedText = errors.New("source is not valid UTF-8 text")
 
 // Renderer converts GitHub Flavored Markdown to HTML. It retains goldmark's
 // safe defaults, including omission of raw HTML and dangerous URLs.
@@ -244,6 +249,50 @@ func (r *Renderer) Render(source []byte, documentPath string) ([]byte, error) {
 // spans carry Markdown byte ranges for exact browser selection mapping.
 func (r *Renderer) RenderWithSourcePositions(source []byte, documentPath string) ([]byte, error) {
 	return r.render(r.reviewMarkdown, source, documentPath)
+}
+
+// RenderCode converts UTF-8 source into escaped, line-oriented HTML. Review
+// mode adds byte ranges only to visible content; line terminators remain gaps.
+func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
+	if !utf8.Valid(source) || bytes.IndexByte(source, 0) >= 0 {
+		return nil, ErrUnsupportedText
+	}
+	var output strings.Builder
+	output.WriteString(`<div class="source-view"><ol class="source-lines">`)
+	start := 0
+	line := 1
+	for start < len(source) {
+		end := bytes.IndexByte(source[start:], '\n')
+		if end < 0 {
+			end = len(source)
+		} else {
+			end += start
+		}
+		contentEnd := end
+		if contentEnd > start && source[contentEnd-1] == '\r' {
+			contentEnd--
+		}
+		fmt.Fprintf(&output, `<li class="source-line" data-line="%d"><span class="source-line-number" aria-hidden="true">%d</span><code>`, line, line)
+		if review && contentEnd > start {
+			fmt.Fprintf(&output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, contentEnd)
+		}
+		output.WriteString(html.EscapeString(string(source[start:contentEnd])))
+		if review && contentEnd > start {
+			output.WriteString(`</span>`)
+		}
+		output.WriteString(`</code></li>`)
+		line++
+		if end == len(source) {
+			start = end
+		} else {
+			start = end + 1
+		}
+	}
+	if len(source) == 0 {
+		output.WriteString(`<li class="source-line" data-line="1"><span class="source-line-number" aria-hidden="true">1</span><code></code></li>`)
+	}
+	output.WriteString(`</ol></div>`)
+	return []byte(output.String()), nil
 }
 
 func (r *Renderer) render(markdown goldmark.Markdown, source []byte, documentPath string) ([]byte, error) {
