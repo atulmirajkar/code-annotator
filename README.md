@@ -194,6 +194,7 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 - [MVP design](docs/designs/mvp.md)
 - [Annotation review design](docs/designs/annotations.md)
+- [Code review and Git diff design](docs/designs/code-review.md)
 - [Architecture](docs/architecture.md)
 - [Build and run](docs/build.md)
 - [Project status](project_status.md)

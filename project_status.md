@@ -96,7 +96,17 @@ release verification is reviewed.
 - [x] Add case-insensitive document-path lookup in the document sidebar.
 - [x] Add browser coverage for panel collapse, lookup, and navigation.
 
-### 9. Live reload
+### 9. Code review and Git diff
+
+- [x] Define the proposed current-file code review and diff architecture.
+- [ ] Approve code discovery extensions and default excluded directories.
+- [ ] Approve current-side-only annotations and read-only deleted rows.
+- [ ] Approve immutable startup Git base semantics and annotation context.
+- [ ] Implement safe code rendering and reuse annotation workflows.
+- [ ] Implement bounded Git comparison and current-file diff presentation.
+- [ ] Extend agent handoff and browser coverage to code review.
+
+### 10. Live reload
 
 - [ ] Watch the selected content directory for Markdown and asset changes.
 - [ ] Notify connected browser sessions using Server-Sent Events.
@@ -134,6 +144,6 @@ release verification is reviewed.
 
 ## Next milestone
 
-Review the collapsible panels, document lookup, browser coverage, and refreshed
-distribution artifacts. Begin live-reload design or implementation only after
-maintainer approval.
+Review and approve the decisions in `docs/designs/code-review.md`, then implement
+that milestone in small commits. Live reload remains deferred until code review
+is complete and separately approved.
