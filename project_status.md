@@ -115,9 +115,17 @@ release verification is reviewed.
 - [x] Approve current-side-only annotations and read-only deleted rows.
 - [x] Approve immutable startup Git base semantics and annotation context.
 - [x] Implement safe code rendering and reuse annotation workflows.
-- [ ] Implement bounded Git comparison and current-file diff presentation.
+- [x] Implement bounded Git comparison, strict unified-patch alignment, and
+  side-by-side current-file diff presentation.
 - [x] Add a changed-only document filter backed by the configured Git base.
 - [x] Extend agent handoff and browser coverage to code review.
+- [x] Keep base and current code in independent horizontal scroll panes so long
+  lines cannot cross the divider or obscure change highlighting.
+- [ ] Complete diff-specific browser coverage for current-side annotation
+  creation, restored highlights, forbidden base/cross-pane selection, tab
+  navigation, narrow layouts, and light/dark themes.
+- [ ] Update user-facing build/run documentation and refresh distributions
+  after the code-review milestone receives maintainer approval.
 
 ### 11. Live reload
 
@@ -166,6 +174,8 @@ release verification is reviewed.
 
 ## Next milestone
 
-Review and approve the decisions in `docs/designs/code-review.md`, then implement
-that milestone in small commits. Live reload remains deferred until code review
-is complete and separately approved.
+Finish the remaining diff-specific browser scenarios listed under milestone 10.
+The side-by-side renderer, Git retrieval, route, File/Changes tabs, and
+independent pane scrolling are implemented. Then update user-facing docs and
+distribution binaries, stop for maintainer review, and only afterward begin
+the separately reviewed live-reload milestone.

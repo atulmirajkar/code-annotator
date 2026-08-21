@@ -72,12 +72,15 @@ the left and the complete current worktree file is always on the right. Each
 display row aligns corresponding base and current lines; a missing side renders
 an empty, non-selectable cell. The right pane is the only annotation surface.
 
-Both panes share one vertical scroll container, so aligned rows cannot drift.
-They use separate horizontal overflow within a common diff canvas. On narrow
-screens the canvas retains two minimum-width panes and scrolls horizontally
-instead of stacking or swapping their order. Collapsing either application
-sidebar gives the diff canvas more room without changing base-left/current-right
-semantics.
+Both panes participate in the same vertical document flow, and every displayed
+line is a fixed-height row, so aligned rows cannot drift. Each equal-width pane
+has its own horizontal scroll container. Long base text therefore remains
+clipped to and scrollable within the left pane, while long current text behaves
+the same way on the right; neither may paint across the center divider. Change
+backgrounds extend through the complete scrollable width of their line. On
+narrow screens the panes remain side by side instead of stacking or swapping
+their order. Collapsing either application sidebar gives both panes more room
+without changing base-left/current-right semantics.
 
 The Changes view renders the complete current file, not only Git hunks. Current
 lines retain their exact source ranges and receive one of these visual states:
@@ -787,3 +790,37 @@ Each slice should be independently reviewable:
 
 These boundaries produce a useful code-review system while preserving the
 existing annotation model and keeping Git exposure narrow.
+
+## Implementation status and session handoff
+
+Status as of 2026-08-21:
+
+- Code discovery, source rendering, source annotations, agent handoff metadata,
+  immutable Git-base resolution, changed-path discovery, and Changed-only
+  filtering are complete.
+- Bounded base-blob and patch retrieval, strict unified-patch parsing, complete
+  aligned row reconstruction, and renderer validation are complete.
+- `GET /view/{path}?mode=diff`, File/Changes tabs, base-left/current-right
+  rendering, failure fallback, light/dark change colors, and independent
+  horizontal pane scrolling are complete.
+- A browser regression fixture verifies that long lines stay inside their pane,
+  both panes scroll independently, and the current-side highlight covers its
+  complete line. The focused browser test passes.
+
+The next session should continue with small commits in this order:
+
+1. Add browser tests for current-side multi-line selection, annotation creation,
+   reload/highlight restoration, and annotation-to-source navigation in Changes
+   view.
+2. Add browser tests proving base-side and cross-pane selections are rejected.
+3. Cover File/Changes navigation, narrow viewport behavior, and both color
+   schemes; fix only defects exposed by those tests.
+4. Reconcile README, architecture, build instructions, and this milestone with
+   the implemented behavior; run release verification and rebuild `dist/`.
+5. Stop for maintainer review. Do not begin live reload until that review is
+   explicitly approved.
+
+The relevant implementation commits immediately preceding this handoff are
+`12990aa` (bounded retrieval), `bdac319` (side-by-side renderer), and `fe2db24`
+(Changes route and UI). The pane-overflow correction and its browser regression
+belong to the handoff commit containing this section.

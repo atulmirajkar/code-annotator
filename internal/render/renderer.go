@@ -311,19 +311,22 @@ func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool
 		return nil, err
 	}
 
-	var output strings.Builder
-	output.WriteString(`<div class="diff-view"><div class="diff-column-headings" aria-hidden="true"><span>Base</span><span>Current</span></div><div class="diff-rows">`)
+	var basePane, currentPane strings.Builder
 	for _, row := range diff.Rows {
-		fmt.Fprintf(&output, `<div class="diff-row diff-%s">`, row.Kind)
-		renderDiffCell(&output, "base", diffMarker(row.Kind, false), row.OldLine, row.BaseText, 0, 0, false)
+		renderDiffCell(&basePane, "base", row.Kind, diffMarker(row.Kind, false), row.OldLine, row.BaseText, 0, 0, false)
 		currentText := ""
 		if row.NewLine > 0 {
 			currentText = string(current[row.CurrentStart:row.CurrentEnd])
 		}
-		renderDiffCell(&output, "current", diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review)
-		output.WriteString(`</div>`)
+		renderDiffCell(&currentPane, "current", row.Kind, diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review)
 	}
-	output.WriteString(`</div></div>`)
+
+	var output strings.Builder
+	output.WriteString(`<div class="diff-view"><div class="diff-column-headings" aria-hidden="true"><span>Base</span><span>Current</span></div><div class="diff-panes"><div class="diff-pane diff-base-pane">`)
+	output.WriteString(basePane.String())
+	output.WriteString(`</div><div class="diff-pane diff-current-pane">`)
+	output.WriteString(currentPane.String())
+	output.WriteString(`</div></div></div>`)
 	return []byte(output.String()), nil
 }
 
@@ -393,8 +396,8 @@ func sourceRanges(source []byte) [][2]int {
 
 // renderDiffCell writes one escaped diff cell. A zero line number represents
 // the intentionally empty half of an added or deleted row.
-func renderDiffCell(output *strings.Builder, side, marker string, line int, content string, start, end int, review bool) {
-	fmt.Fprintf(output, `<div class="diff-cell diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, marker)
+func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, marker string, line int, content string, start, end int, review bool) {
+	fmt.Fprintf(output, `<div class="diff-cell diff-%s diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, kind, marker)
 	if line > 0 {
 		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
 		if review && side == "current" && end > start {
