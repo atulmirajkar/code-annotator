@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -20,8 +19,8 @@ const (
 )
 
 // newComparisonAPIServer builds a viewer whose content root is a two-commit
-// worktree with the moving base frozen at the tip and comparison control
-// enabled. It returns the server plus the initial and tip commit IDs.
+// worktree with the base pinned at the tip and comparison control enabled. It
+// returns the server plus the initial and tip commit IDs.
 func newComparisonAPIServer(t *testing.T, origin, token string) (*Server, string, string) {
 	t.Helper()
 	requireComparisonGit(t)
@@ -40,10 +39,6 @@ func newComparisonAPIServer(t *testing.T, origin, token string) (*Server, string
 	if err != nil {
 		t.Fatalf("gitdiff.Open() error = %v", err)
 	}
-	options, err := configuration.RecentCommits(context.Background())
-	if err != nil {
-		t.Fatalf("RecentCommits() error = %v", err)
-	}
 	root, err := content.Open(repository)
 	if err != nil {
 		t.Fatalf("content.Open() error = %v", err)
@@ -52,14 +47,14 @@ func newComparisonAPIServer(t *testing.T, origin, token string) (*Server, string
 	if err != nil {
 		t.Fatalf("content.NewIndexOptions() error = %v", err)
 	}
-	viewer, err := New(root, mdrender.New(), WithIndexOptions(indexOptions), WithGitComparison(configuration, options, origin, token))
+	viewer, err := New(root, mdrender.New(), WithIndexOptions(indexOptions), WithGitComparison(configuration, origin, token))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
 	return viewer, initial, tip
 }
 
-func getComparisonState(t *testing.T, handler http.Handler) (comparisonStateView, string) {
+func getComparisonState(t *testing.T, handler http.Handler) comparisonStateView {
 	t.Helper()
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/git-comparison", nil))
@@ -70,18 +65,15 @@ func getComparisonState(t *testing.T, handler http.Handler) (comparisonStateView
 	if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil {
 		t.Fatalf("decode state error = %v; body: %s", err, response.Body.String())
 	}
-	return view, response.Header().Get("ETag")
+	return view
 }
 
-func postComparison(t *testing.T, handler http.Handler, body, ifMatch string, decorate func(*http.Request)) *httptest.ResponseRecorder {
+func postComparison(t *testing.T, handler http.Handler, body string, decorate func(*http.Request)) *httptest.ResponseRecorder {
 	t.Helper()
 	request := httptest.NewRequest(http.MethodPost, "/api/git-comparison", strings.NewReader(body))
 	request.Header.Set("Content-Type", "application/json")
 	request.Header.Set("Origin", testComparisonOrigin)
 	request.Header.Set(comparisonTokenHeader, testComparisonToken)
-	if ifMatch != "" {
-		request.Header.Set("If-Match", strconv.Quote(ifMatch))
-	}
 	if decorate != nil {
 		decorate(request)
 	}
@@ -90,66 +82,31 @@ func postComparison(t *testing.T, handler http.Handler, body, ifMatch string, de
 	return response
 }
 
-func TestComparisonStateReportsOptions(t *testing.T) {
+func TestComparisonStateReportsOptionsAndDistances(t *testing.T) {
 	t.Parallel()
 	viewer, initial, tip := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
-	view, etag := getComparisonState(t, viewer.Handler())
+	view := getComparisonState(t, viewer.Handler())
 
-	if view.ActiveCommit != tip || view.Explicit {
-		t.Fatalf("state active = %s explicit = %t, want moving tip %s", view.ActiveCommit, view.Explicit, tip)
+	if view.ActiveCommit != tip {
+		t.Fatalf("state active = %s, want tip %s", view.ActiveCommit, tip)
 	}
-	if etag != strconv.Quote(view.Revision) {
-		t.Fatalf("ETag = %s, want %s", etag, strconv.Quote(view.Revision))
-	}
-	if !hasOption(view.Options, initial) || !hasOption(view.Options, tip) {
-		t.Fatalf("options missing initial or tip: %#v", view.Options)
-	}
-	configured := 0
+	distances := map[string]*int{}
 	for _, option := range view.Options {
-		if option.Configured {
-			configured++
-			if option.Commit != tip || option.Name != "HEAD" {
-				t.Errorf("configured option = %#v, want tip %s named HEAD", option, tip)
-			}
-		}
+		distances[option.Commit] = option.HeadDistance
 	}
-	if configured != 1 {
-		t.Fatalf("configured option count = %d, want 1", configured)
+	if distances[tip] == nil || *distances[tip] != 0 {
+		t.Errorf("tip head distance = %v, want 0", distances[tip])
+	}
+	if distances[initial] == nil || *distances[initial] != 1 {
+		t.Errorf("initial head distance = %v, want 1", distances[initial])
 	}
 }
 
-func TestComparisonRefreshAdoptsNewTip(t *testing.T) {
-	t.Parallel()
-	viewer, _, _ := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
-	repository := viewer.comparison.configured.RepositoryRoot
-	writeTestFile(t, repository+"/main.go", "package refreshed\n")
-	runServerTestGit(t, repository, "add", "main.go")
-	runServerTestGit(t, repository, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "third")
-	newTip := revParse(t, repository, "HEAD")
-
-	before, _ := getComparisonState(t, viewer.Handler())
-	response := postComparison(t, viewer.Handler(), `{"action":"refresh"}`, before.Revision, nil)
-	if response.Code != http.StatusOK {
-		t.Fatalf("refresh status = %d, want 200; body: %s", response.Code, response.Body.String())
-	}
-	var view comparisonStateView
-	if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil {
-		t.Fatalf("decode error = %v", err)
-	}
-	if view.ActiveCommit != newTip || view.Explicit {
-		t.Fatalf("refresh active = %s explicit = %t, want moving tip %s", view.ActiveCommit, view.Explicit, newTip)
-	}
-	if view.Revision == before.Revision {
-		t.Fatal("refresh reused the previous revision")
-	}
-}
-
-func TestComparisonSelectPinsCommit(t *testing.T) {
+func TestComparisonSelectEndpointPinsCommit(t *testing.T) {
 	t.Parallel()
 	viewer, initial, _ := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
-	before, _ := getComparisonState(t, viewer.Handler())
 
-	response := postComparison(t, viewer.Handler(), `{"action":"select","commit":"`+initial+`"}`, before.Revision, nil)
+	response := postComparison(t, viewer.Handler(), `{"commit":"`+initial+`"}`, nil)
 	if response.Code != http.StatusOK {
 		t.Fatalf("select status = %d, want 200; body: %s", response.Code, response.Body.String())
 	}
@@ -157,46 +114,39 @@ func TestComparisonSelectPinsCommit(t *testing.T) {
 	if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil {
 		t.Fatalf("decode error = %v", err)
 	}
-	if view.ActiveCommit != initial || !view.Explicit {
-		t.Fatalf("select active = %s explicit = %t, want pinned %s", view.ActiveCommit, view.Explicit, initial)
+	if view.ActiveCommit != initial {
+		t.Fatalf("select active = %s, want pinned %s", view.ActiveCommit, initial)
+	}
+	// The change is server-wide: a fresh read reports the pinned base.
+	if getComparisonState(t, viewer.Handler()).ActiveCommit != initial {
+		t.Fatalf("state after select did not persist the pinned base")
 	}
 }
 
-func TestComparisonMutationRejections(t *testing.T) {
+func TestComparisonSelectRejections(t *testing.T) {
 	t.Parallel()
 	viewer, initial, _ := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
 	handler := viewer.Handler()
-	state, _ := getComparisonState(t, handler)
 
 	tests := []struct {
 		name     string
 		body     string
-		ifMatch  string
 		decorate func(*http.Request)
 		want     int
 	}{
-		{name: "wrong origin", body: `{"action":"refresh"}`, ifMatch: state.Revision, want: http.StatusForbidden, decorate: func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:1") }},
-		{name: "wrong token", body: `{"action":"refresh"}`, ifMatch: state.Revision, want: http.StatusForbidden, decorate: func(r *http.Request) { r.Header.Set(comparisonTokenHeader, "wrong") }},
-		{name: "wrong content type", body: `{"action":"refresh"}`, ifMatch: state.Revision, want: http.StatusUnsupportedMediaType, decorate: func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }},
-		{name: "missing if-match", body: `{"action":"refresh"}`, want: http.StatusPreconditionRequired},
-		{name: "stale if-match", body: `{"action":"refresh"}`, ifMatch: "0000", want: http.StatusConflict},
-		{name: "unknown action", body: `{"action":"rebase"}`, ifMatch: state.Revision, want: http.StatusBadRequest},
-		{name: "unknown field", body: `{"action":"refresh","extra":1}`, ifMatch: state.Revision, want: http.StatusBadRequest},
-		{name: "unknown commit", body: `{"action":"select","commit":"` + strings.Repeat("f", 40) + `"}`, ifMatch: state.Revision, want: http.StatusBadRequest},
-		{name: "malformed commit", body: `{"action":"select","commit":"` + initial[:8] + `"}`, ifMatch: state.Revision, want: http.StatusBadRequest},
+		{name: "wrong origin", body: `{"commit":"` + initial + `"}`, want: http.StatusForbidden, decorate: func(r *http.Request) { r.Header.Set("Origin", "http://127.0.0.1:1") }},
+		{name: "wrong token", body: `{"commit":"` + initial + `"}`, want: http.StatusForbidden, decorate: func(r *http.Request) { r.Header.Set(comparisonTokenHeader, "wrong") }},
+		{name: "wrong content type", body: `{"commit":"` + initial + `"}`, want: http.StatusUnsupportedMediaType, decorate: func(r *http.Request) { r.Header.Set("Content-Type", "text/plain") }},
+		{name: "unknown field", body: `{"commit":"` + initial + `","extra":1}`, want: http.StatusBadRequest},
+		{name: "unknown commit", body: `{"commit":"` + strings.Repeat("f", 40) + `"}`, want: http.StatusBadRequest},
+		{name: "malformed commit", body: `{"commit":"` + initial[:8] + `"}`, want: http.StatusBadRequest},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			response := postComparison(t, handler, test.body, test.ifMatch, test.decorate)
+			response := postComparison(t, handler, test.body, test.decorate)
 			if response.Code != test.want {
 				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.want, response.Body.String())
-			}
-			if test.want == http.StatusConflict {
-				var view comparisonStateView
-				if err := json.Unmarshal(response.Body.Bytes(), &view); err != nil || view.Revision == "" {
-					t.Fatalf("conflict body missing current state: %s", response.Body.String())
-				}
 			}
 		})
 	}
@@ -204,25 +154,16 @@ func TestComparisonMutationRejections(t *testing.T) {
 
 func TestComparisonReadOnlyWithoutControl(t *testing.T) {
 	t.Parallel()
-	viewer, _, _ := newComparisonAPIServer(t, "", "")
+	viewer, initial, _ := newComparisonAPIServer(t, "", "")
 	handler := viewer.Handler()
 
-	if _, etag := getComparisonState(t, handler); etag == "" {
-		t.Fatal("read-only GET should still return an ETag")
+	if getComparisonState(t, handler).ActiveCommit == "" {
+		t.Fatal("read-only GET should still report the active base")
 	}
-	// With no control token the mutation route is never registered, so the
+	// With no control token the selection route is never registered, so the
 	// shared GET pattern answers POST with 405 rather than exposing a handler.
-	response := postComparison(t, handler, `{"action":"refresh"}`, "any", nil)
+	response := postComparison(t, handler, `{"commit":"`+initial+`"}`, nil)
 	if response.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("mutation without control = %d, want 405", response.Code)
+		t.Fatalf("selection without control = %d, want 405", response.Code)
 	}
-}
-
-func hasOption(options []comparisonOptionView, commit string) bool {
-	for _, option := range options {
-		if option.Commit == commit {
-			return true
-		}
-	}
-	return false
 }

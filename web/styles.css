@@ -68,10 +68,8 @@ a { color: var(--accent); }
 .source-mode-tabs a[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
 .diff-comparison { min-width: 0; margin-left: auto; padding: .35rem .65rem; overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .diff-comparison-control { display: flex; align-items: center; gap: .4rem; min-width: 0; margin-left: auto; padding: .2rem .3rem; }
-.revision-selector { max-width: 22rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); color: var(--text); font: inherit; font-size: .72rem; }
-.refresh-git-diff { padding: .32rem .55rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); color: var(--text); font: inherit; font-size: .72rem; white-space: nowrap; cursor: pointer; }
-.refresh-git-diff:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
-.refresh-git-diff:disabled, .revision-selector:disabled { cursor: default; opacity: .7; }
+.revision-selector { max-width: 24rem; padding: .3rem .4rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--surface); color: var(--text); font: inherit; font-size: .72rem; }
+.revision-selector:disabled { cursor: default; opacity: .7; }
 .diff-comparison-status { min-width: 0; overflow: hidden; color: var(--muted); font-size: .68rem; text-overflow: ellipsis; white-space: nowrap; }
 .diff-comparison-status.error { color: #b42318; }
 .markdown-body h1, .markdown-body h2 { padding-bottom: .35em; border-bottom: 1px solid var(--border); line-height: 1.25; }

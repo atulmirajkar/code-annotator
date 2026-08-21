@@ -11,8 +11,8 @@ import (
 	"atulm/md-viewer/internal/gitdiff"
 )
 
-// newComparisonRepository freezes a two-commit worktree at HEAD and returns a
-// controller plus the initial and tip commit IDs used by selection assertions.
+// newComparisonRepository freezes a two-commit worktree with the base pinned at
+// the tip and returns a controller plus the initial and tip commit IDs.
 func newComparisonRepository(t *testing.T) (*comparisonController, string, string) {
 	t.Helper()
 	requireComparisonGit(t)
@@ -31,7 +31,7 @@ func newComparisonRepository(t *testing.T) (*comparisonController, string, strin
 	if err != nil {
 		t.Fatalf("gitdiff.Open() error = %v", err)
 	}
-	controller, err := newComparisonController(configuration, nil, "", "")
+	controller, err := newComparisonController(configuration, "", "")
 	if err != nil {
 		t.Fatalf("newComparisonController() error = %v", err)
 	}
@@ -55,119 +55,62 @@ func requireComparisonGit(t *testing.T) {
 	}
 }
 
-func TestComparisonRefreshAdoptsMovingTip(t *testing.T) {
+func TestComparisonStartsPinnedToConfiguredCommit(t *testing.T) {
 	t.Parallel()
 	controller, _, tip := newComparisonRepository(t)
-
-	// The startup snapshot froze HEAD; advancing HEAD and refreshing must adopt
-	// the new tip because the moving configured revision is active.
-	repository := controller.configured.RepositoryRoot
-	writeTestFile(t, repository+"/main.go", "package refreshed\n")
-	runServerTestGit(t, repository, "add", "main.go")
-	runServerTestGit(t, repository, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "third")
-	newTip := revParse(t, repository, "HEAD")
-
-	before := controller.snapshot()
-	refreshed, err := controller.refresh(context.Background(), before.revision)
-	if err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
-	if refreshed.explicit {
-		t.Fatal("refresh() explicit = true, want moving base")
-	}
-	if refreshed.config.BaseCommit != newTip {
-		t.Fatalf("refresh() base = %s, want %s", refreshed.config.BaseCommit, newTip)
-	}
-	if refreshed.revision == before.revision {
-		t.Fatal("refresh() reused the previous state revision")
-	}
-	if !containsCommit(refreshed.options, tip) {
-		t.Fatalf("refresh() options = %#v, want to include prior tip %s", refreshed.options, tip)
+	if active := controller.active(); active.BaseCommit != tip {
+		t.Fatalf("active base = %s, want configured tip %s", active.BaseCommit, tip)
 	}
 }
 
-func TestComparisonSelectPinsCommitAndRefreshRetainsIt(t *testing.T) {
+func TestComparisonOptionsReportHeadDistances(t *testing.T) {
+	t.Parallel()
+	controller, initial, tip := newComparisonRepository(t)
+	options, distances, err := controller.options(context.Background())
+	if err != nil {
+		t.Fatalf("options() error = %v", err)
+	}
+	if !containsCommit(options, initial) || !containsCommit(options, tip) {
+		t.Fatalf("options missing initial or tip: %#v", options)
+	}
+	if distances[tip] != 0 {
+		t.Errorf("tip distance = %d, want 0", distances[tip])
+	}
+	if distances[initial] != 1 {
+		t.Errorf("initial distance = %d, want 1", distances[initial])
+	}
+}
+
+func TestComparisonSelectPinsCommit(t *testing.T) {
 	t.Parallel()
 	controller, initial, _ := newComparisonRepository(t)
-
-	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
-	if err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
-	selected, err := controller.selectCommit(context.Background(), seeded.revision, initial)
+	base, err := controller.selectCommit(context.Background(), initial)
 	if err != nil {
 		t.Fatalf("selectCommit() error = %v", err)
 	}
-	if !selected.explicit {
-		t.Fatal("selectCommit() explicit = false, want pinned base")
+	if base.BaseCommit != initial || base.RequestedBase != abbreviatedCommit(initial) {
+		t.Fatalf("selectCommit() base = %+v, want pinned %s", base, initial)
 	}
-	if selected.config.BaseCommit != initial {
-		t.Fatalf("selectCommit() base = %s, want %s", selected.config.BaseCommit, initial)
-	}
-	if selected.config.RequestedBase != abbreviatedCommit(initial) {
-		t.Fatalf("selectCommit() requested base = %s, want %s", selected.config.RequestedBase, abbreviatedCommit(initial))
-	}
-
-	// A refresh must retain the pinned commit while still updating options.
-	refreshed, err := controller.refresh(context.Background(), selected.revision)
-	if err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
-	if !refreshed.explicit || refreshed.config.BaseCommit != initial {
-		t.Fatalf("refresh() after pin = %+v, want retained pinned commit %s", refreshed, initial)
+	if controller.active().BaseCommit != initial {
+		t.Fatalf("active base = %s, want %s", controller.active().BaseCommit, initial)
 	}
 }
 
-func TestComparisonSelectConfiguredCommitReturnsToMoving(t *testing.T) {
+func TestComparisonSelectRejectsUnknownCommit(t *testing.T) {
+	t.Parallel()
+	controller, _, tip := newComparisonRepository(t)
+	if _, err := controller.selectCommit(context.Background(), strings.Repeat("f", 40)); !errors.Is(err, errUnknownCommit) {
+		t.Fatalf("selectCommit() error = %v, want errUnknownCommit", err)
+	}
+	// A rejected selection leaves the previous base untouched.
+	if controller.active().BaseCommit != tip {
+		t.Fatalf("active base = %s, want unchanged tip %s", controller.active().BaseCommit, tip)
+	}
+}
+
+func TestComparisonConcurrentSelectionsStaySafe(t *testing.T) {
 	t.Parallel()
 	controller, initial, tip := newComparisonRepository(t)
-
-	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
-	if err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
-	pinned, err := controller.selectCommit(context.Background(), seeded.revision, initial)
-	if err != nil {
-		t.Fatalf("selectCommit(initial) error = %v", err)
-	}
-	// Selecting the configured revision's current commit reverts to moving mode.
-	moving, err := controller.selectCommit(context.Background(), pinned.revision, tip)
-	if err != nil {
-		t.Fatalf("selectCommit(tip) error = %v", err)
-	}
-	if moving.explicit {
-		t.Fatal("selectCommit(tip) explicit = true, want moving base")
-	}
-	if moving.config.RequestedBase != controller.configured.RequestedBase {
-		t.Fatalf("selectCommit(tip) requested base = %s, want %s", moving.config.RequestedBase, controller.configured.RequestedBase)
-	}
-}
-
-func TestComparisonSelectRejectsStaleAndUnknown(t *testing.T) {
-	t.Parallel()
-	controller, initial, _ := newComparisonRepository(t)
-	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
-	if err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
-
-	if _, err := controller.refresh(context.Background(), "stale-revision"); !errors.Is(err, errStaleComparison) {
-		t.Fatalf("refresh() stale error = %v, want errStaleComparison", err)
-	}
-	if _, err := controller.selectCommit(context.Background(), "stale-revision", initial); !errors.Is(err, errStaleComparison) {
-		t.Fatalf("selectCommit() stale error = %v, want errStaleComparison", err)
-	}
-	if _, err := controller.selectCommit(context.Background(), seeded.revision, strings.Repeat("f", 40)); !errors.Is(err, errUnknownCommit) {
-		t.Fatalf("selectCommit() unknown error = %v, want errUnknownCommit", err)
-	}
-}
-
-func TestComparisonConcurrentMutationsStaySafe(t *testing.T) {
-	t.Parallel()
-	controller, initial, tip := newComparisonRepository(t)
-	if _, err := controller.refresh(context.Background(), controller.snapshot().revision); err != nil {
-		t.Fatalf("refresh() error = %v", err)
-	}
 
 	var group sync.WaitGroup
 	for worker := 0; worker < 8; worker++ {
@@ -175,22 +118,18 @@ func TestComparisonConcurrentMutationsStaySafe(t *testing.T) {
 		go func(worker int) {
 			defer group.Done()
 			for iteration := 0; iteration < 12; iteration++ {
-				current := controller.snapshot()
-				switch worker % 3 {
-				case 0:
-					_, _ = controller.refresh(context.Background(), current.revision)
-				case 1:
-					_, _ = controller.selectCommit(context.Background(), current.revision, initial)
-				default:
-					_, _ = controller.selectCommit(context.Background(), current.revision, tip)
+				commit := tip
+				if worker%2 == 0 {
+					commit = initial
 				}
+				_, _ = controller.selectCommit(context.Background(), commit)
+				_ = controller.active()
 			}
 		}(worker)
 	}
 	group.Wait()
 
-	final := controller.snapshot()
-	if final.revision == "" || final.config.BaseCommit == "" {
-		t.Fatalf("final snapshot is inconsistent: %+v", final)
+	if base := controller.active().BaseCommit; base != initial && base != tip {
+		t.Fatalf("final base = %s, want initial or tip", base)
 	}
 }

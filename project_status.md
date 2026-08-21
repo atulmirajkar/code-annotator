@@ -137,13 +137,14 @@ release verification is reviewed.
   File/Changes controls, with the full commit available as hover text.
 - [ ] Complete diff-specific browser coverage for narrow layouts and light/dark
   themes.
-- [x] Design a bounded revision selector and explicit Git comparison refresh
-  with atomic server-wide state and optimistic concurrency.
-- [x] Implement bounded recent-commit discovery and comparison snapshots.
-- [x] Implement authenticated comparison state/select/refresh API routes.
-- [x] Add the revision selector, truncated subject, and Refresh Git diff UI.
+- [x] Design a bounded revision selector that re-pins an always-explicit
+  server-wide comparison base validated against a live commit listing.
+- [x] Implement bounded recent-commit discovery and HEAD-distance labeling.
+- [x] Implement the authenticated comparison state and select API routes.
+- [x] Add the revision selector with abbreviated commit, truncated subject, and
+  HEAD~N distance labels.
 - [x] Add unit, handler, concurrency, and browser coverage for selection,
-  refresh, stale tabs, failures, and clean-worktree behavior.
+  rejection, cross-tab base changes, and failure behavior.
 - [ ] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.
 

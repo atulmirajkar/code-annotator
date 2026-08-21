@@ -202,7 +202,7 @@ func TestGitComparisonMetadata(t *testing.T) {
 			if err != nil {
 				t.Fatalf("content.Open() error = %v", err)
 			}
-			viewer, err := New(root, mdrender.New(), WithGitComparison(test.comparison, nil, "", ""))
+			viewer, err := New(root, mdrender.New(), WithGitComparison(test.comparison, "", ""))
 			if test.wantErr != "" {
 				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
 					t.Fatalf("New() error = %v, want containing %q", err, test.wantErr)
@@ -321,7 +321,7 @@ func TestCodeDiffRoute(t *testing.T) {
 			}
 			serverOptions := []Option{WithIndexOptions(indexOptions)}
 			if test.configure != nil {
-				serverOptions = append(serverOptions, WithGitComparison(*test.configure(t, rootPath), nil, "", ""))
+				serverOptions = append(serverOptions, WithGitComparison(*test.configure(t, rootPath), "", ""))
 			}
 			viewer, err := New(root, mdrender.New(), serverOptions...)
 			if err != nil {
@@ -378,7 +378,7 @@ func TestChangedCatalogMetadata(t *testing.T) {
 			if err != nil {
 				t.Fatalf("content.NewIndexOptions() error = %v", err)
 			}
-			viewer, err := New(root, mdrender.New(), WithIndexOptions(options), WithGitComparison(comparison, nil, "", ""))
+			viewer, err := New(root, mdrender.New(), WithIndexOptions(options), WithGitComparison(comparison, "", ""))
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
 			}

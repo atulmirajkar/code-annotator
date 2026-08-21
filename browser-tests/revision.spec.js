@@ -5,7 +5,7 @@ const changesURL = (viewerURL) => `${viewerURL}view/diff-layout.go?mode=diff`;
 // waitForEnhancedSelector waits until the client has replaced the server's
 // single fallback option with the full bounded list fetched from the API.
 async function waitForEnhancedSelector(page) {
-  await expect(page.locator(".refresh-git-diff")).toBeEnabled();
+  await expect(page.locator(".revision-selector")).toBeEnabled();
   await expect
     .poll(async () => page.locator(".revision-selector option").count())
     .toBeGreaterThan(1);
@@ -34,65 +34,57 @@ async function optionList(page) {
 }
 
 test.describe("revision selector", () => {
-  test("lists bounded options and refreshes without error", async ({ page, viewerURL }) => {
+  test("lists bounded options labeled by distance from HEAD", async ({ page, viewerURL }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
 
     const options = await optionList(page);
     expect(options.length).toBeGreaterThan(1);
-    expect(options.filter((option) => option.text.startsWith("HEAD:"))).toHaveLength(1);
-    const active = await page.locator(".revision-selector").inputValue();
-
-    await reloadAfter(page, () => page.locator(".refresh-git-diff").click());
-    await waitForEnhancedSelector(page);
-
-    // Refreshing the moving base against a clean worktree keeps HEAD active and
-    // never surfaces an error.
-    await expect(page.locator(".revision-selector")).toHaveValue(active);
-    await expect(page.locator(".diff-comparison-status")).toHaveText("");
-    await expect(page.locator(".revision-selector option:checked")).toHaveText(/^HEAD:/);
+    // The tip is labeled (HEAD) and the previous first-parent commit (HEAD~1).
+    expect(options.filter((option) => /\(HEAD\)$/.test(option.text))).toHaveLength(1);
+    expect(options.some((option) => /\(HEAD~1\)$/.test(option.text))).toBe(true);
+    // The active base starts at the tip commit.
+    expect(options.find((option) => option.selected).text).toMatch(/\(HEAD\)$/);
   });
 
-  test("pins a selected commit and returns to the moving base", async ({ page, viewerURL }) => {
+  test("pins a selected commit and can return to the tip", async ({ page, viewerURL }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
 
-    const options = await optionList(page);
-    const pinned = options.find((option) => !option.text.startsWith("HEAD:"));
+    const pinned = (await optionList(page)).find((option) => /\(HEAD~1\)$/.test(option.text));
     expect(pinned).toBeTruthy();
 
     await reloadAfter(page, () => page.locator(".revision-selector").selectOption(pinned.value));
     await waitForEnhancedSelector(page);
     await expect(page.locator(".revision-selector")).toHaveValue(pinned.value);
-    await expect(page.locator(".revision-selector option:checked")).not.toHaveText(/^HEAD:/);
+    await expect(page.locator(".revision-selector option:checked")).toHaveText(/\(HEAD~1\)$/);
 
-    // Selecting the configured HEAD option restores server-wide moving state so
-    // later shared-server tests still compare against HEAD.
-    const headValue = options.find((option) => option.text.startsWith("HEAD:")).value;
-    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(headValue));
+    // Selecting the tip restores server-wide state so later shared-server tests
+    // still compare against HEAD.
+    const tip = (await optionList(page)).find((option) => /\(HEAD\)$/.test(option.text));
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(tip.value));
     await waitForEnhancedSelector(page);
-    await expect(page.locator(".revision-selector option:checked")).toHaveText(/^HEAD:/);
+    await expect(page.locator(".revision-selector option:checked")).toHaveText(/\(HEAD\)$/);
   });
 
-  test("reports a conflict when another tab already changed the base", async ({ page, viewerURL, context }) => {
+  test("changing the base in one tab is visible to another after reload", async ({ page, viewerURL, context }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
+    const pinned = (await optionList(page)).find((option) => /\(HEAD~1\)$/.test(option.text));
 
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(pinned.value));
+    await waitForEnhancedSelector(page);
+
+    // A second tab loads the server-wide base that the first tab just pinned.
     const second = await context.newPage();
     await second.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(second);
-
-    // The second tab refreshes first, advancing the server state revision.
-    await reloadAfter(second, () => second.locator(".refresh-git-diff").click());
-    await waitForEnhancedSelector(second);
-
-    // The first tab still holds the stale revision; its refresh must be rejected
-    // in place with a conflict message rather than reloading.
-    await page.evaluate(() => { window.__beforeReload = true; });
-    await page.locator(".refresh-git-diff").click();
-    await expect(page.locator(".diff-comparison-status.error")).toContainText("another tab");
-    expect(await page.evaluate(() => window.__beforeReload === true)).toBe(true);
-
+    await expect(second.locator(".revision-selector")).toHaveValue(pinned.value);
     await second.close();
+
+    // Restore the tip base for later shared-server tests.
+    const tip = (await optionList(page)).find((option) => /\(HEAD\)$/.test(option.text));
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(tip.value));
+    await waitForEnhancedSelector(page);
   });
 });

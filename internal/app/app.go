@@ -86,14 +86,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	}
 	serverOptions = append(serverOptions, server.WithIndexOptions(indexOptions))
 	if comparison != nil {
-		// Seed the selector best-effort; a failed lookup still serves the frozen
-		// base and the browser recovers the option list with an explicit refresh.
-		options, _ := comparison.RecentCommits(ctx)
 		comparisonToken, err := newControlToken()
 		if err != nil {
 			return err
 		}
-		serverOptions = append(serverOptions, server.WithGitComparison(*comparison, options, viewerURL, comparisonToken))
+		serverOptions = append(serverOptions, server.WithGitComparison(*comparison, viewerURL, comparisonToken))
 	}
 	if annotations != nil {
 		token, err := newControlToken()

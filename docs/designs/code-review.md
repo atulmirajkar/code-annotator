@@ -344,11 +344,12 @@ At startup the package:
 3. Rejects a revision beginning with `-` or containing NUL/newline characters.
 4. Resolves the requested base with `git rev-parse --verify --end-of-options
    <revision>^{commit}`.
-5. Stores the resulting full commit SHA for the server lifetime.
+5. Stores the resulting full commit SHA as the initial comparison base.
 
-Freezing the base commit prevents a moving branch or remote-tracking name from
-silently changing the review comparison while the server is running. Restarting
-the viewer intentionally refreshes that base.
+Pinning the base to a specific commit prevents a moving branch or
+remote-tracking name from silently changing the review comparison while the
+server runs. The base changes only when the reviewer selects another commit
+through the revision selector, or when the viewer restarts.
 
 For each Changes request, the package obtains a zero-context patch equivalent
 to:
@@ -629,10 +630,9 @@ The existing routes remain stable:
 | annotation APIs | Accept only paths in the reviewable catalog. |
 | agent queue | Traverse Markdown and code sidecars in catalog order. |
 
-No endpoint accepts an arbitrary Git revision string. The comparison API may
-select only a full commit ID from a server-issued bounded option list, or
-re-resolve the single revision supplied by `--diff-base`. This avoids turning
-the browser into a general Git command surface.
+No endpoint accepts an arbitrary Git revision string. The comparison API selects
+only a full commit ID present in a freshly listed, server-issued bounded option
+set. This avoids turning the browser into a general Git command surface.
 
 The File/Changes links preserve the selected path. Annotation mutations retain
 the existing origin token, review token, content type, body limit, document
@@ -645,81 +645,72 @@ mode. Collapsed document and annotation panels are stored independently in the
 same tab-scoped storage and restored after navigation. Markdown links never
 receive `mode=diff`.
 
-The source toolbar visibly identifies the active comparison. Reloading the
-browser alone does not re-resolve a moving name such as `HEAD`; only the
-explicit Git refresh action below can change the active base.
+The source toolbar's revision selector visibly identifies the active
+comparison. Reloading the browser re-lists the bounded options but never changes
+the base; only selecting a commit changes it, as described below.
 
-## Revision selector and Git refresh
+## Revision selector
 
 ### User experience
 
 When Git comparison is configured, the source toolbar contains a revision
-selector, the active 12-character commit ID and truncated subject, and a
-`Refresh Git diff` button. Hover text exposes the complete commit ID and
-subject.
+selector showing the active comparison base. Hover text on each option exposes
+the complete commit ID and subject.
 
-The selector contains two kinds of server-issued options:
+The comparison base is always one explicit commit. Startup pins the configured
+`--diff-base` revision, and the selector re-pins the base to any other locally
+available commit. The base never moves on its own, so an agent that commits to a
+clean worktree still shows its change: the base stays where it was pinned while
+the current file follows the new worktree contents.
 
-1. The configured revision, such as `HEAD` or `origin/main`, which may move.
-2. At most 50 recent local repository commits, identified by full object ID and
-   labeled with an abbreviated ID plus a subject truncated to 72 characters.
-
+The selector lists at most 50 recent local repository commits, each labeled with
+an abbreviated ID, a subject truncated to 72 characters, and its first-parent
+distance from `HEAD` as `(HEAD)`, `(HEAD~1)`, `(HEAD~2)` for orientation.
 Subjects are display-only untrusted text and remain HTML-escaped. Selecting a
 listed commit changes the server-wide comparison base and reloads the current
 page in its existing File/Changes mode. Markdown links remain unaffected.
 
-`Refresh Git diff` performs a fresh bounded option lookup. If the configured
-moving revision is active, it also re-resolves that revision and atomically
-adopts its new commit. If an explicit commit is active, refresh retains that
-exact commit and only refreshes the option list.
-
-This distinction is intentional: refreshing active `HEAD` after an agent has
-committed a clean worktree makes the diff empty, because the new base and
-current file are identical. Selecting the previous commit displays the agent's
-committed change again.
+The option list is fetched fresh on every page load, so newly created commits
+appear after a reload. There is no separate refresh action: because selecting a
+commit reloads the page, the list stays current through ordinary use.
 
 ### Comparison state and concurrency
 
-The server owns concurrency-safe comparison state rather than mutating a shared
-`gitdiff.Config` pointer. Every changed-path or file-diff request takes one
-immutable snapshot and uses it for the complete operation. A refresh or
-selection builds and validates a replacement before acquiring the write lock,
-then swaps it atomically. Failure leaves the previous snapshot usable.
-
-Each snapshot has an opaque state revision. The selection endpoint accepts only
-a full commit ID present in that snapshot's option list. A stale `If-Match`
-revision returns `409`, preventing one browser tab from silently overwriting
-another tab's selection.
+The server owns the comparison base rather than mutating a shared
+`gitdiff.Config` pointer. Every changed-path or file-diff request reads one
+value copy of the active base under a read lock, so a concurrent selection
+cannot alter the base mid-request. A selection validates its commit against a
+freshly listed bounded option set and then swaps the base under the write lock.
+Concurrent selections resolve last-write-wins server-wide; a browser tab that
+holds a stale view simply reloads to observe the current base.
 
 ### HTTP contract and security
 
 | Route | Behavior |
 | --- | --- |
-| `GET /api/git-comparison` | Return active identity, state revision, and bounded selector options. |
-| `POST /api/git-comparison` with `{"action":"refresh"}` | Refresh options and re-resolve the configured revision when active. |
-| `POST /api/git-comparison` with `{"action":"select","commit":"<full SHA>"}` | Select a commit from the current option snapshot. |
+| `GET /api/git-comparison` | Return the active base identity and the freshly listed bounded selector options with per-commit HEAD distance. |
+| `POST /api/git-comparison` with `{"commit":"<full SHA>"}` | Pin the base to a commit present in the current bounded option listing. |
 
-Mutations require JSON, exact loopback `Origin`, a per-process comparison
-control token, and quoted `If-Match` state revision. The token is distinct from
-the agent annotation token and is exposed only to the browser page when Git
-comparison is enabled. These controls work with or without annotation mode.
+Mutations require JSON, exact loopback `Origin`, and a per-process comparison
+control token. The token is distinct from the agent annotation token and is
+exposed only to the browser page when Git comparison is enabled. These controls
+work with or without annotation mode.
 
 Selector options use a no-shell, no-prompt, bounded `git log --all --date-order
 --max-count=50` invocation. NUL-framed object IDs and subjects make embedded
-newlines unambiguous. Output remains bounded to 64 KiB and execution to three
-seconds. Refresh resolves only the startup-configured revision using the
-existing `--end-of-options` validation and never contacts a remote.
+newlines unambiguous. HEAD distances use a bounded `git rev-list --first-parent
+--max-count=1000 HEAD` walk. Output remains bounded to 64 KiB and execution to
+three seconds, and Git never contacts a remote.
 
 ### Failure behavior
 
-- Lookup or configured-ref resolution failure retains the old snapshot and
-  shows a non-sensitive inline error.
-- A commit absent from the current option snapshot returns `400`.
-- An `If-Match` conflict returns `409` and reloads current state.
+- An option-listing failure still reports the active base with an empty option
+  set and a non-sensitive inline error; a page reload retries.
+- A commit absent from the current bounded option listing returns `400`.
+- A Git failure during selection retains the previous base and returns a
+  non-sensitive error.
 - An unreadable selected commit makes that file's Changes view unavailable
   without breaking File view.
-- Browser refresh remains a page reload; only the explicit button runs Git
-  refresh behavior.
 
 ## Browser selection and highlighting
 

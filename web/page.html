@@ -60,7 +60,6 @@
           <select class="revision-selector" aria-label="Comparison base" disabled>
             <option value="{{.DiffCommit}}" selected>{{.DiffBase}} ({{.DiffCommitShort}})</option>
           </select>
-          <button type="button" class="refresh-git-diff" disabled>Refresh Git diff</button>
           <span class="diff-comparison-status" role="status" aria-live="polite"></span>
         </div>{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
       </nav>{{end}}

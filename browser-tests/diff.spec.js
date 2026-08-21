@@ -54,9 +54,9 @@ test.describe("side-by-side diff", () => {
     await expect(currentPane).toBeVisible();
     const fullCommit = await page.locator('meta[name="md-viewer-diff-commit"]').getAttribute("content");
     const selector = page.locator(".revision-selector");
-    await expect(page.locator(".refresh-git-diff")).toBeEnabled();
+    await expect(selector).toBeEnabled();
     await expect(selector).toHaveValue(fullCommit);
-    await expect(selector.locator("option:checked")).toHaveText(/^HEAD:/);
+    await expect(selector.locator("option:checked")).toHaveText(/\(HEAD\)$/);
 
     const geometry = await page.locator(".diff-panes").evaluate((panes) => {
       const base = panes.querySelector(".diff-base-pane");

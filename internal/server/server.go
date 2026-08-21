@@ -142,11 +142,11 @@ func WithIndexOptions(options content.IndexOptions) Option {
 	}
 }
 
-// WithGitComparison exposes one startup-resolved comparison identity and seeds
-// the bounded selector options shown on first load. A non-empty loopback origin
-// and control token enable authenticated refresh and selection mutations; both
-// empty leaves the comparison read-only.
-func WithGitComparison(configuration gitdiff.Config, options []gitdiff.RevisionOption, origin, token string) Option {
+// WithGitComparison exposes one startup-resolved comparison base that the
+// browser may re-pin to another local commit. A non-empty loopback origin and
+// control token enable authenticated selection mutations; both empty leaves the
+// comparison read-only.
+func WithGitComparison(configuration gitdiff.Config, origin, token string) Option {
 	return func(server *Server) error {
 		normalizedOrigin := ""
 		if origin != "" || token != "" {
@@ -159,7 +159,7 @@ func WithGitComparison(configuration gitdiff.Config, options []gitdiff.RevisionO
 			}
 			normalizedOrigin = validated
 		}
-		controller, err := newComparisonController(configuration, options, normalizedOrigin, token)
+		controller, err := newComparisonController(configuration, normalizedOrigin, token)
 		if err != nil {
 			return err
 		}
@@ -168,15 +168,15 @@ func WithGitComparison(configuration gitdiff.Config, options []gitdiff.RevisionO
 	}
 }
 
-// comparisonSnapshot captures one immutable comparison state for the lifetime
-// of a single request, so changed-path and file-diff work share a base that a
-// concurrent refresh or selection cannot alter mid-request.
-func (s *Server) comparisonSnapshot() *comparisonSnapshot {
+// activeComparison captures the current comparison base for the lifetime of a
+// single request, so changed-path and file-diff work share a base that a
+// concurrent selection cannot alter mid-request.
+func (s *Server) activeComparison() *gitdiff.Config {
 	if s.comparison == nil {
 		return nil
 	}
-	snapshot := s.comparison.snapshot()
-	return &snapshot
+	active := s.comparison.active()
+	return &active
 }
 
 // validateReviewOrigin accepts only an HTTP origin with a loopback IP host and
@@ -318,7 +318,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		mux.HandleFunc("GET /api/git-comparison", server.handleComparisonState)
 	}
 	if server.comparisonControlEnabled() {
-		mux.Handle("POST /api/git-comparison", server.protectComparisonMutation(http.HandlerFunc(server.handleComparisonMutate)))
+		mux.Handle("POST /api/git-comparison", server.protectComparisonMutation(http.HandlerFunc(server.handleComparisonSelect)))
 	}
 	server.handler = securityHeaders(mux)
 
@@ -382,7 +382,7 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(request.Context(), response, index, "", nil, "", false, s.comparisonSnapshot())
+		s.renderPage(request.Context(), response, index, "", nil, "", false, s.activeComparison())
 		return
 	}
 
@@ -438,7 +438,7 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 }
 
 func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string, diffMode bool) {
-	snapshot := s.comparisonSnapshot()
+	active := s.activeComparison()
 	document, ok := findDocument(index, documentPath)
 	if !ok {
 		http.Error(response, "document not found", http.StatusNotFound)
@@ -450,14 +450,14 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		return
 	}
 
-	if diffMode && (document.Kind != content.KindCode || snapshot == nil) {
+	if diffMode && (document.Kind != content.KindCode || active == nil) {
 		http.Error(response, "Changes view is unavailable", http.StatusNotFound)
 		return
 	}
 
 	var fragment []byte
 	if diffMode {
-		diff, diffErr := snapshot.config.BuildFileDiff(ctx, documentPath, source)
+		diff, diffErr := active.BuildFileDiff(ctx, documentPath, source)
 		if diffErr != nil {
 			// File view remains usable when a per-file Git operation fails. Avoid
 			// exposing command output or repository details in the browser.
@@ -484,15 +484,15 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 	if s.review != nil {
 		digest = annotation.DocumentSHA256(source)
 	}
-	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode, snapshot)
+	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode, active)
 }
 
-func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool, snapshot *comparisonSnapshot) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool, active *gitdiff.Config) {
 	changed := make(map[string]struct{})
 	changedReady := false
 	changedError := false
-	if snapshot != nil {
-		paths, err := snapshot.config.ChangedPaths(ctx)
+	if active != nil {
+		paths, err := active.ChangedPaths(ctx)
 		if err != nil {
 			changedError = true
 		} else {
@@ -538,14 +538,14 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		ChangedReady:   changedReady,
 		ChangedError:   changedError,
 		DiffMode:       diffMode,
-		DiffAvailable:  isCode && snapshot != nil,
+		DiffAvailable:  isCode && active != nil,
 		FileURL:        routeURL("/view/", selected),
 		ChangesURL:     routeURL("/view/", selected) + "?mode=diff",
 	}
-	if snapshot != nil {
-		data.DiffBase = snapshot.config.RequestedBase
-		data.DiffCommit = snapshot.config.BaseCommit
-		data.DiffCommitShort = abbreviatedCommit(snapshot.config.BaseCommit)
+	if active != nil {
+		data.DiffBase = active.RequestedBase
+		data.DiffCommit = active.BaseCommit
+		data.DiffCommitShort = abbreviatedCommit(active.BaseCommit)
 	}
 	if s.comparisonControlEnabled() {
 		data.ComparisonToken = s.comparison.token

@@ -124,24 +124,17 @@
   }
 
   // bindComparisonControl turns the static base label into a bounded revision
-  // selector and Refresh Git diff button backed by the server comparison API.
-  // Selection and refresh reload the page in its existing File/Changes mode so
-  // the server recomputes the diff against the newly adopted base.
+  // selector backed by the server comparison API. The base is always one
+  // explicit commit; selecting another re-pins it server-wide and reloads the
+  // page in its existing File/Changes mode so the diff recomputes.
   function bindComparisonControl() {
     const control = document.querySelector(".diff-comparison-control");
     const token = document.querySelector('meta[name="md-viewer-comparison-token"]')?.content || "";
     if (!control || !token) return;
     const selector = control.querySelector(".revision-selector");
-    const refreshButton = control.querySelector(".refresh-git-diff");
     const status = control.querySelector(".diff-comparison-status");
-    let currentRevision = "";
 
-    selector.addEventListener("change", () => {
-      mutate({ action: "select", commit: selector.value }, "Updating comparison base…");
-    });
-    refreshButton.addEventListener("click", () => {
-      mutate({ action: "refresh" }, "Refreshing Git diff…");
-    });
+    selector.addEventListener("change", () => selectBase(selector.value));
     load();
 
     async function load() {
@@ -158,15 +151,13 @@
     // no longer among the options, such as a pinned commit dropped from the
     // bounded list, is preserved as a leading selected entry.
     function render(state) {
-      currentRevision = state.revision;
       const options = Array.isArray(state.options) ? state.options : [];
       selector.replaceChildren();
       if (!options.some((option) => option.commit === state.activeCommit)) {
-        selector.append(buildOption({ commit: state.activeCommit, commitShort: state.activeShort, name: state.requestedBase, configured: !state.explicit }, state.activeCommit));
+        selector.append(buildOption({ commit: state.activeCommit, commitShort: state.activeShort }, state.activeCommit));
       }
       options.forEach((option) => selector.append(buildOption(option, state.activeCommit)));
       selector.disabled = false;
-      refreshButton.disabled = false;
       setStatus("");
     }
 
@@ -180,38 +171,36 @@
     }
 
     function optionLabel(option) {
-      const name = option.configured && option.name ? `${option.name}: ` : "";
       const subject = option.subject ? ` ${truncate(option.subject, 72)}` : "";
-      return `${name}${option.commitShort || ""}${subject}`;
+      return `${option.commitShort || ""}${subject}${headMarker(option)}`;
     }
 
-    async function mutate(payload, pending) {
+    // headMarker orients the reviewer with each commit's position relative to
+    // HEAD: the tip is (HEAD), older first-parent commits are (HEAD~N).
+    function headMarker(option) {
+      if (typeof option.headDistance !== "number") return "";
+      return option.headDistance === 0 ? " (HEAD)" : ` (HEAD~${option.headDistance})`;
+    }
+
+    async function selectBase(commit) {
       selector.disabled = true;
-      refreshButton.disabled = true;
-      setStatus(pending);
+      setStatus("Updating comparison base…");
       try {
         const response = await fetch("/api/git-comparison", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "If-Match": JSON.stringify(currentRevision),
             "X-MD-Viewer-Comparison-Token": token,
           },
-          body: JSON.stringify(payload),
+          body: JSON.stringify({ commit }),
         });
-        if (response.status === 409) {
-          render(await response.json());
-          setStatus("The comparison base changed in another tab. Try again.", true);
-          return;
-        }
         if (!response.ok) throw new Error();
-        // The server adopted the new base; reload keeps the current mode and URL
+        // The server re-pinned the base; reload keeps the current mode and URL
         // so diffs, highlights, and the changed-only filter recompute together.
         window.location.reload();
       } catch (_) {
         setStatus("The Git comparison could not be updated.", true);
         selector.disabled = false;
-        refreshButton.disabled = false;
       }
     }
 
