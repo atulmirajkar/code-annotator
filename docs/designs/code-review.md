@@ -131,11 +131,14 @@ shows a clear message instead of an empty navigation region. The active file
 remains visible until the reviewer opens another result; filtering the list
 must not unexpectedly navigate away from the document being reviewed.
 
-Before the reviewer has explicitly set the toggle in the current tab, landing
-directly on a Changes view with a configured base defaults it on: that is
-exactly the moment a reviewer wants the sidebar scoped to changed files. Any
-explicit choice, in either direction, is remembered for the rest of the tab and
-overrides this default on later navigation.
+Before the reviewer has explicitly set the toggle in the current tab, a
+configured base with at least one changed document defaults it on, independent
+of which document happens to be open first: that is exactly the moment a
+reviewer wants the sidebar scoped to changed files. A clean worktree with
+nothing changed leaves the default off, since an always-on default would
+otherwise open to an empty filtered list. Any explicit choice, in either
+direction, is remembered for the rest of the tab and overrides this default on
+later navigation.
 
 ## Command-line contract
 

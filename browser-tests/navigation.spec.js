@@ -32,6 +32,9 @@ test.describe("viewer navigation", () => {
 
   test("filters paths case-insensitively and opens the first result", async ({ page, viewerURL }) => {
     await page.goto(viewerURL);
+    // A configured base with a changed fixture file defaults this on; uncheck
+    // it since this test exercises path lookup across the full catalog.
+    await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
     const search = page.getByRole("searchbox", { name: "Find document" });
     await search.fill("LIFECYCLE");
 
@@ -43,6 +46,11 @@ test.describe("viewer navigation", () => {
 
   test("supports lookup focus, empty results, clearing, and result focus", async ({ page, viewerURL }) => {
     await page.goto(viewerURL);
+    // A configured base with a changed fixture file defaults this on; uncheck
+    // it since this test exercises path lookup across the full catalog. Move
+    // focus off the checkbox afterward so the "/" shortcut below still fires.
+    await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
+    await page.locator("#documents-sidebar h2").click();
     const search = page.getByRole("searchbox", { name: "Find document" });
     const initialDocumentCount = await page.locator(".documents li:not([hidden])").count();
     await page.keyboard.press("/");

@@ -275,25 +275,24 @@
 
   // Session storage keeps an explicit reviewer choice across document
   // navigation in one tab without turning it into a server-wide preference.
-  // Before any explicit choice, landing directly on a Changes view with a
-  // configured Git base defaults the filter on, since that is exactly the
-  // moment a reviewer wants the document list scoped to changed files.
+  // Before any explicit choice, a configured Git base with at least one
+  // changed document defaults the filter on: that is exactly the moment a
+  // reviewer wants the sidebar scoped to changed files, independent of which
+  // document happens to be open first (often a Markdown file with no diff).
+  // A clean worktree with nothing changed leaves the default off, since an
+  // always-on default would otherwise open to an empty filtered list.
   function readChangedOnlyPreference() {
     const stored = readPreference(changedOnlyStorageKey);
     if (stored !== null) return stored === "true";
-    return hasComparisonBase() && isDiffModeActive();
+    return hasChangedDocuments();
   }
 
   function writeChangedOnlyPreference(enabled) {
     writeBooleanPreference(changedOnlyStorageKey, enabled);
   }
 
-  function hasComparisonBase() {
-    return Boolean(document.querySelector('meta[name="md-viewer-diff-commit"]'));
-  }
-
-  function isDiffModeActive() {
-    return new URLSearchParams(window.location.search).get("mode") === "diff";
+  function hasChangedDocuments() {
+    return document.querySelector('.documents li[data-changed="true"]') !== null;
   }
 
   // readPanelCollapsedPreference falls back to defaultCollapsed only when the
