@@ -313,39 +313,40 @@ revision check and before the rename.
 
 ### Optimistic-concurrency interaction
 
-```mermaid
-sequenceDiagram
-    participant Reviewer as Reviewer browser
-    participant API as Review API
-    participant Store as Sidecar store
-    participant Agent as AI agent
-
-    Reviewer->>API: GET annotations
-    API->>Store: Load(document)
-    Store-->>API: sidecar + revision R1
-    API-->>Reviewer: annotations + ETag R1
-
-    Agent->>API: Load and update annotation
-    API->>Store: Save(updated, expected R1)
-    Store->>Store: Read current revision R1
-    Store->>Store: Atomic write
-    Store-->>API: revision R2
-    API-->>Agent: saved with R2
-
-    Reviewer->>API: Save reviewer edit with R1
-    API->>Store: Save(updated, expected R1)
-    Store->>Store: Read current revision R2
-    Store-->>API: ErrConflict + current R2
-    API-->>Reviewer: 409 Conflict + ETag R2
-
-    Reviewer->>API: Reload annotations
-    API->>Store: Load(document)
-    Store-->>API: agent changes + revision R2
-    API-->>Reviewer: reconcile against R2
-    Reviewer->>API: Save reconciled edit with R2
-    API->>Store: Save(updated, expected R2)
-    Store-->>API: revision R3
-    API-->>Reviewer: saved with ETag R3
+```text
+Reviewer browser       Review API          Sidecar store          AI agent
+       |                    |                    |                    |
+       |-- GET annotations->|                    |                    |
+       |                    |-- Load(document) ->|                    |
+       |                    |<- sidecar + R1 ----|                    |
+       |<- data + ETag R1 --|                    |                    |
+       |                    |                    |                    |
+       |                    |<---------- GET annotations -------------|
+       |                    |-- Load(document) ->|                    |
+       |                    |<- sidecar + R1 ----|                    |
+       |                    |----------- data + ETag R1 ------------>|
+       |                    |<---------- Save update with R1 ---------|
+       |                    |-- Save(expected R1)->                   |
+       |                    |                    | read current R1    |
+       |                    |                    | atomic write       |
+       |                    |<- revision R2 -----|                    |
+       |                    |---------------- saved with R2 --------->|
+       |                    |                    |                    |
+       |-- Save with R1 --->|                    |                    |
+       |                    |-- Save(expected R1)->                   |
+       |                    |                    | read current R2    |
+       |                    |<- ErrConflict + R2-|                    |
+       |<- 409 + ETag R2 ---|                    |                    |
+       |                    |                    |                    |
+       |-- Reload --------->|-- Load(document) ->|                    |
+       |                    |<- agent data + R2 -|                    |
+       |<- data + ETag R2 --|                    |                    |
+       |                    |                    |                    |
+       |-- Save reconciled ->|                    |                    |
+       |                    |-- Save(expected R2)->                   |
+       |                    |                    | atomic write       |
+       |                    |<- revision R3 -----|                    |
+       |<- saved + ETag R3 -|                    |                    |
 ```
 
 A client must never retry the same stale payload automatically because doing so
