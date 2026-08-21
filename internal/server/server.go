@@ -44,7 +44,7 @@ type Server struct {
 	annotations *annotationstore.Store
 	review      *reviewSession
 	page        *template.Template
-	styles      template.CSS
+	styles      []byte
 	reviewJS    []byte
 	mermaidJS   []byte
 	mermaidTiny []byte
@@ -98,7 +98,6 @@ type pageData struct {
 	Selected       string
 	Documents      []documentView
 	Content        template.HTML
-	Styles         template.CSS
 	Empty          bool
 	ReviewToken    string
 	DocumentSHA256 string
@@ -199,7 +198,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		root:        root,
 		renderer:    renderer,
 		page:        page,
-		styles:      template.CSS(styles), // Embedded, application-owned CSS.
+		styles:      styles,
 		reviewJS:    reviewJS,
 		mermaidJS:   mermaidJS,
 		mermaidTiny: mermaidTiny,
@@ -218,6 +217,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
+	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
 	if server.annotations != nil {
@@ -239,6 +239,13 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.reviewJS)
+}
+
+// handleStyles serves the embedded viewer stylesheet from the same origin so
+// pages do not require CSP permission for inline styles.
+func (s *Server) handleStyles(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/css; charset=utf-8")
+	_, _ = response.Write(s.styles)
 }
 
 // handleMermaidScript serves the application-owned diagram integration.
@@ -374,7 +381,6 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		Selected:       selected,
 		Documents:      documents,
 		Content:        template.HTML(fragment), // goldmark output with safe defaults.
-		Styles:         s.styles,
 		Empty:          len(index.Documents) == 0,
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     bytes.Contains(fragment, []byte(`class="mermaid-diagram"`)),
@@ -425,7 +431,7 @@ func escapedRoutePath(request *http.Request, prefix string) string {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Cache-Control", "no-store")
-		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 		response.Header().Set("Referrer-Policy", "no-referrer")
 		response.Header().Set("X-Content-Type-Options", "nosniff")
 		response.Header().Set("X-Frame-Options", "DENY")

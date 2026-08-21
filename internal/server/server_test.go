@@ -1119,6 +1119,9 @@ func TestReviewPageEmbedding(t *testing.T) {
 				t.Fatalf("New() error = %v", err)
 			}
 			response := getResponse(t, viewer.Handler(), "/")
+			if body := response.Body.String(); !strings.Contains(body, `<link rel="stylesheet" href="/static/styles.css">`) || strings.Contains(body, "<style>") {
+				t.Fatalf("page does not use only the external viewer stylesheet:\n%s", body)
+			}
 			hasToken := strings.Contains(response.Body.String(), `name="md-viewer-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
@@ -1140,7 +1143,7 @@ func TestReviewPageEmbedding(t *testing.T) {
 	}
 }
 
-func TestStaticScripts(t *testing.T) {
+func TestStaticAssets(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -1152,6 +1155,7 @@ func TestStaticScripts(t *testing.T) {
 		wantContents []string
 	}{
 		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle"}},
+		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},
 		{name: "reject post", path: "/static/review.js", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
@@ -1173,7 +1177,7 @@ func TestStaticScripts(t *testing.T) {
 			}
 			for _, wantContent := range test.wantContents {
 				if !strings.Contains(response.Body.String(), wantContent) {
-					t.Errorf("script does not contain %q", wantContent)
+					t.Errorf("asset does not contain %q", wantContent)
 				}
 			}
 		})
@@ -1348,7 +1352,7 @@ func TestSecurityHeaders(t *testing.T) {
 				t.Errorf("GET %q %s = %q, want %q", requestPath, name, got, want)
 			}
 		}
-		if got := response.Header().Get("Content-Security-Policy"); !strings.Contains(got, "default-src 'none'") {
+		if got := response.Header().Get("Content-Security-Policy"); got != "default-src 'none'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" {
 			t.Errorf("GET %q Content-Security-Policy = %q", requestPath, got)
 		}
 	}
