@@ -71,10 +71,12 @@ in the default browser. If the browser cannot be opened, the URL will remain
 available in the terminal.
 
 The document and annotation sidebars can be collapsed independently to give the
-rendered document more room. Use the document sidebar's **Find document** field
-to filter by any case-insensitive portion of a relative path. Press `/` from the
-document view to focus lookup, Enter to open the first match, or Escape to clear
-the filter.
+rendered document more room. The document sidebar starts visible and the
+annotation sidebar starts collapsed; either default is overridden for the rest
+of the browser tab once toggled. Use the document sidebar's **Find document**
+field to filter by any case-insensitive portion of a relative path. Press `/`
+from the document view to focus lookup, Enter to open the first match, or
+Escape to clear the filter.
 
 Available flags:
 
@@ -86,22 +88,35 @@ Available flags:
 --include-code              Include the default supported source extensions
 --code-extensions <csv>     Replace the source extension set; implies --include-code
 --exclude-dirs <csv>        Add directory base names to exclude from discovery
---diff-base <revision>      Freeze a locally available Git commit for comparison
+--diff-base <revision>      Start Git comparison at a locally available commit; the
+                             browser can re-pin it to another commit afterward
 ```
 
 For example, `--include-code` adds escaped, line-numbered Go, C#, JavaScript,
 TypeScript, JSON, and `.csproj` files. With `--review`, these source files use
 the same selection, annotation, thread, lifecycle, and agent handoff workflows
-as Markdown. Side-by-side Git diff presentation remains pending milestone work.
+as Markdown.
 
 `--diff-base` accepts a locally resolvable commit, branch, tag, or
 remote-tracking ref such as `HEAD~1` or `origin/main`. It never fetches. The
 revision is resolved to an immutable full commit at startup, and startup fails
 if the content root is outside its Git worktree or the revision is unavailable.
-When comparison is configured, the document sidebar offers **Changed only**.
-It includes supported tracked changes against the frozen base and untracked,
-non-ignored files, and composes with **Find document**. Refresh the browser to
-evaluate a new worktree snapshot.
+Cataloged source files then offer a **File** and **Changes** toggle. Changes
+renders the base and current text side by side in independently scrollable
+panes with a draggable, keyboard-resizable divider, and the toolbar stays
+visible while scrolling a long file. A revision selector next to the toggle
+re-pins the comparison base to any other locally available commit; selecting
+one reloads the page against the new base. The base is always one explicit
+commit and never moves on its own, so it keeps showing an agent's committed
+change until a reviewer chooses a different base.
+
+When comparison is configured, the document sidebar also offers **Changed
+only**. It includes supported tracked changes against the active base and
+untracked, non-ignored files, and composes with **Find document**. Before a
+reviewer makes an explicit choice in the tab, it defaults on whenever a
+changed document exists. Refresh the browser to evaluate a new worktree
+snapshot; re-pinning the base picks up new commits without restarting the
+server.
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,
@@ -224,8 +239,9 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 ## Development status
 
-The manual-refresh MVP, annotation review workflow, agent handoff, and embedded
-Mermaid rendering are implemented and browser-tested. Saving a Markdown file
-and refreshing the browser reads and renders the latest contents from disk. See
+The manual-refresh MVP, annotation review workflow, agent handoff, embedded
+Mermaid rendering, and code review with side-by-side Git diff comparison are
+implemented and browser-tested. Saving a Markdown file and refreshing the
+browser reads and renders the latest contents from disk. See
 [`project_status.md`](project_status.md) for release readiness and the planned
 live-reload milestone.

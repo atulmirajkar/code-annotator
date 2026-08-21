@@ -55,11 +55,14 @@ Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
 
-`internal/gitdiff` also owns the concurrency-safe active comparison snapshot.
-HTTP handlers consume one immutable snapshot per changed-path or file-diff
-operation. Browser selection and refresh requests can replace that snapshot
-only with the configured revision re-resolution or a commit from the bounded
-server-issued option list; handlers never pass browser strings to Git.
+`internal/server` owns the concurrency-safe active Git comparison base: a
+single explicit commit behind a mutex, seeded at startup from the resolved
+`--diff-base` commit. It never moves on its own. A browser selection request
+validates its commit against a freshly listed bounded `internal/gitdiff`
+option set, then swaps the base server-wide; handlers never pass browser
+strings to Git. Every changed-path or file-diff operation reads one value copy
+of the active base under the read lock, so a concurrent selection cannot alter
+a base mid-request.
 
 The `annotations` command family is dispatched before server flag parsing and
 never binds a listener or launches a browser. `annotations list` walks the
@@ -103,13 +106,18 @@ routes are not registered until their handlers use this guard.
 
 When `--diff-base` is configured, startup asks `internal/gitdiff` to discover
 the containing worktree and resolve the requested local revision to a full
-commit ID. The server receives that immutable configuration and exposes the
-requested name and resolved commit as read-only page metadata. Per-file patch
-generation cannot replace or reinterpret the base during the server lifetime.
-Each page render obtains one bounded changed-path snapshot from that base,
-intersects it with the current safe content catalog, and marks matching sidebar
-entries. The browser's Changed-only and path filters compose over this snapshot.
-Discovery failure leaves the full catalog usable and is presented as
+commit ID, and the server pins that commit as the initial active comparison
+base. The revision selector in the source toolbar lets a reviewer re-pin the
+base to another locally available commit through `POST /api/git-comparison`,
+guarded by the exact loopback `Origin`, a distinct comparison control token in
+`X-MD-Viewer-Comparison-Token`, and `application/json`; the endpoint accepts
+only a commit present in a freshly listed bounded option set, never an
+arbitrary revision string. Each page render obtains one value copy of the
+active base, uses it for changed-path and file-diff operations, and exposes
+the active name and commit as read-only page metadata. The document sidebar's
+Changed-only filter composes with the path lookup and, before the reviewer
+makes an explicit choice in the tab, defaults on when a changed document
+exists. Discovery failure leaves the full catalog usable and is presented as
 unavailable rather than as an empty changed set.
 
 ## HTTP routes
@@ -118,6 +126,7 @@ unavailable rather than as an empty changed set.
 | --- | --- |
 | `GET /` | Display the recursive, sorted reviewable document catalog. |
 | `GET /view/{path}` | Safely load and render a cataloged Markdown or source file. |
+| `GET /view/{path}?mode=diff` | Render a cataloged source file's side-by-side Changes view against the active comparison base. |
 | `GET /asset/{path}` | Serve a document-relative local asset. |
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
 | `GET /api/annotations?status={states}` | Return the cross-document agent queue with a revision per sidecar. |
@@ -126,6 +135,8 @@ unavailable rather than as an empty changed set.
 | `PATCH /api/annotations/{id}` | Atomically transition lifecycle state and append its structured activity. |
 | `POST /api/annotations/{id}/replies` | Append an ordinary discussion reply without changing lifecycle state. |
 | `POST /api/annotations/{id}/reattach` | Replace a stale text anchor with a server-verified current selection. |
+| `GET /api/git-comparison` | When Git comparison is configured, return the active base identity and freshly listed bounded selector options. |
+| `POST /api/git-comparison` | Re-pin the active base to a commit from the current bounded option listing. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
@@ -260,10 +271,19 @@ sidebar and a readable document pane; on desktop, the sidebar remains visible
 and scrolls independently from the document.
 
 Both sidebars are independently collapsible, and the CSS grid assigns their
-released width to the document rather than retaining empty columns. Document
-lookup filters the server-rendered relative paths in the browser, so it adds no
-filesystem or HTTP search surface. Matching is case-insensitive; keyboard
-controls focus lookup, move to results, clear a query, and open the first match.
+released width to the document rather than retaining empty columns. The
+document sidebar starts visible and the annotation sidebar starts collapsed;
+either default is overridden for the rest of the tab once the reviewer
+explicitly toggles it. Document lookup filters the server-rendered relative
+paths in the browser, so it adds no filesystem or HTTP search surface.
+Matching is case-insensitive; keyboard controls focus lookup, move to results,
+clear a query, and open the first match.
+
+A cataloged source file's Changes view renders the base and current text in
+independently horizontally scrollable panes, with a draggable, keyboard-
+resizable divider between them; the chosen split is a tab-scoped preference.
+The File/Changes toolbar and revision selector are sticky beneath the topbar
+so they remain visible while scrolling a long file.
 
 Fenced `mermaid` blocks load the embedded Mermaid Tiny bundle only on pages that
 need it. Mermaid runs with strict security and a bounded input size, and no
@@ -289,7 +309,8 @@ external.
 
 ## Deferred capabilities
 
-Annotation review and AI handoff are designed as the next milestone. Live
-reload, syntax highlighting, search, table-of-contents generation, raw HTML, and
-non-loopback listening remain deferred. Any future network-sharing option must
-be explicit and should include a separate security review.
+Annotation review and AI handoff, Mermaid diagram rendering, and code review
+with Git diff comparison are implemented. Live reload, syntax highlighting,
+search, table-of-contents generation, raw HTML, and non-loopback listening
+remain deferred. Any future network-sharing option must be explicit and should
+include a separate security review.

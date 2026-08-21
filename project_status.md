@@ -4,13 +4,19 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Viewer navigation polish verified; review required before live reload.
+**Phase:** Code review and Git diff milestone documented and distributed;
+narrow-layout and light/dark theme browser coverage remains before live
+reload.
 
-The manual-refresh MVP and annotation review workflow are implemented, including
-selection mapping, highlights, secured browser mutations, live API agent handoff,
-and a repository-owned agent skill. Focused browser interaction coverage and
-embedded diagram rendering are complete. Live reload remains deferred until
-release verification is reviewed.
+The manual-refresh MVP, annotation review workflow, and code review with
+side-by-side Git diff comparison are implemented, including selection mapping,
+highlights, secured browser mutations, live API agent handoff, a
+repository-owned agent skill, a re-pinnable revision selector, and a
+draggable, keyboard-resizable diff divider. Focused browser interaction
+coverage and embedded diagram rendering are complete. User-facing
+documentation and distribution binaries are refreshed for the current feature
+set. Live reload remains deferred until the remaining diff browser coverage
+and release verification are reviewed.
 
 ## Milestones
 
@@ -144,7 +150,7 @@ release verification is reviewed.
 - [x] Add the revision selector with abbreviated commit and truncated subject.
 - [x] Add unit, handler, concurrency, and browser coverage for selection,
   rejection, cross-tab base changes, and failure behavior.
-- [ ] Update user-facing build/run documentation and refresh distributions
+- [x] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.
 
 ### 11. Live reload
@@ -194,8 +200,9 @@ release verification is reviewed.
 
 ## Next milestone
 
-Finish the remaining diff-specific browser scenarios listed under milestone 10.
-The side-by-side renderer, Git retrieval, route, File/Changes tabs, and
-independent pane scrolling are implemented. Then update user-facing docs and
-distribution binaries, stop for maintainer review, and only afterward begin
-the separately reviewed live-reload milestone.
+Finish the remaining diff-specific browser scenario listed under milestone 10:
+narrow-layout and light/dark theme coverage. The side-by-side renderer, Git
+retrieval, route, File/Changes tabs, independent pane scrolling, resizable
+divider, and re-pinnable revision selector are implemented, and user-facing
+docs and distribution binaries are refreshed. Stop for maintainer review, and
+only afterward begin the separately reviewed live-reload milestone.

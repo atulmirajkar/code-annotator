@@ -68,14 +68,15 @@ files as escaped, line-numbered documents:
 ./bin/md-viewer --include-code ./repository
 ```
 
-Freeze an optional local Git comparison base at startup:
+Start an optional local Git comparison base at startup:
 
 ```sh
 ./bin/md-viewer --include-code --diff-base origin/main ./repository
 ```
 
 The viewer does not fetch remotes; remote-tracking names must already exist in
-the local repository.
+the local repository. The revision is resolved to an immutable commit at
+startup and pinned as the initial comparison base.
 
 Replace that source extension set or add directory exclusions:
 
@@ -85,9 +86,22 @@ Replace that source extension set or add directory exclusions:
 ```
 
 `--code-extensions` implies `--include-code`. Source discovery excludes
-`node_modules`, `vendor`, `bin`, and `obj` by default. Code review annotations
-and Git comparison are later milestone slices; this stage provides safe plain
-source viewing only.
+`node_modules`, `vendor`, `bin`, and `obj` by default.
+
+With `--diff-base` configured, a cataloged source file offers **File** and
+**Changes** links in its toolbar. Changes renders the base and current text
+side by side in independently scrollable panes with a draggable,
+keyboard-resizable divider; the toolbar and revision selector stay visible
+while scrolling. The revision selector re-pins the comparison base to any
+other locally available commit through `POST /api/git-comparison`, which is
+guarded by the exact loopback origin, a distinct comparison control token, and
+a bounded, freshly listed set of selectable commits. The base is always one
+explicit commit and never moves on its own; a reviewer re-pins it explicitly
+to see an agent's next committed change against the same starting point. The
+document sidebar's **Changed only** filter defaults on when a changed document
+exists and no explicit choice has been made yet in the tab, and it composes
+with **Find document**. Code review annotations reuse the same selection,
+lifecycle, and agent-handoff workflow as Markdown, current-side only.
 
 Enable the annotation review storage boundary:
 
