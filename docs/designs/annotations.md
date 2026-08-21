@@ -709,6 +709,20 @@ reattachment, and lifecycle forms sit inside a nested collapsed `Actions`
 section. This keeps long threads and primarily agent-oriented operations out of
 the scanning path without removing access to them.
 
+An `applied` annotation is the exception to hiding lifecycle operations. Because
+`Close` is the reviewer's common acceptance action, a compact `Close` button
+appears beside the `Actions` toggle whenever `applied -> closed` is valid. It
+does not require expanding the actions section. The expanded form retains
+`Needs changes` and any contextual controls; it must not render a second Close
+button when the quick action is present.
+
+Quick Close uses the same reviewer transition endpoint, review token, current
+sidecar revision, status-change thread entry, and `409` reload behavior as the
+expanded lifecycle form. The button is disabled while its request is pending
+and its accessible name includes enough annotation context to distinguish it
+from other Close buttons. It is absent for every status where the transition is
+invalid, including annotations already closed or rejected.
+
 Closed and rejected annotations are complete or declined work, so the default
 document view excludes both their cards and their source highlights. The panel
 reports active and total counts and offers an explicit history toggle that

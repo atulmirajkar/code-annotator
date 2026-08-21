@@ -104,8 +104,9 @@ release verification is reviewed.
 - [ ] Scroll document-level annotations to the document heading or top.
 - [ ] Add keyboard activation, focus handling, and temporary target emphasis.
 - [ ] Keep nested card controls and text selection from triggering navigation.
+- [ ] Add a reviewer Quick Close button beside Actions for applied annotations.
 - [ ] Add browser coverage for resolved, stale, collapsed-panel, and
-  reduced-motion behavior.
+  reduced-motion behavior, plus Quick Close success and conflict handling.
 
 ### 10. Code review and Git diff
 
