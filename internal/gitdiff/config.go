@@ -125,12 +125,18 @@ func contentPrefix(repositoryRoot, contentRoot string) (string, error) {
 // runGit executes one bounded local Git command. The child inherits the normal
 // environment while prompts and opportunistic repository writes are disabled.
 func runGit(parent context.Context, directory string, arguments ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(parent, commandTimeout)
+	return runGitBounded(parent, directory, commandTimeout, maxCommandBytes, arguments...)
+}
+
+// runGitBounded applies operation-specific time and output limits while
+// retaining the shared no-shell, no-prompt execution boundary.
+func runGitBounded(parent context.Context, directory string, timeout time.Duration, outputLimit int, arguments ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	command := exec.CommandContext(ctx, "git", append([]string{"-C", directory}, arguments...)...)
 	command.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0")
-	var stdout boundedBuffer
-	var stderr boundedBuffer
+	stdout := boundedBuffer{limit: outputLimit}
+	stderr := boundedBuffer{limit: outputLimit}
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	err := command.Run()
@@ -151,10 +157,15 @@ func runGit(parent context.Context, directory string, arguments ...string) ([]by
 type boundedBuffer struct {
 	buffer bytes.Buffer
 	err    error
+	limit  int
 }
 
 func (b *boundedBuffer) Write(value []byte) (int, error) {
-	remaining := maxCommandBytes - b.buffer.Len()
+	limit := b.limit
+	if limit <= 0 {
+		limit = maxCommandBytes
+	}
+	remaining := limit - b.buffer.Len()
 	if len(value) > remaining {
 		if remaining > 0 {
 			_, _ = b.buffer.Write(value[:remaining])
