@@ -70,6 +70,7 @@ func TestRenderDiff(t *testing.T) {
 			contains: []string{
 				`class="diff-pane diff-base-pane"`,
 				`class="diff-pane diff-current-pane"`,
+				`class="diff-divider" role="separator" aria-orientation="vertical"`,
 				`class="diff-cell diff-base diff-unchanged"`,
 				`class="diff-cell diff-current diff-modified"`,
 				`class="diff-cell diff-base diff-deleted"`,

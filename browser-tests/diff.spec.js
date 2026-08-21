@@ -90,6 +90,37 @@ test.describe("side-by-side diff", () => {
     expect(highlight.cellRight).toBeGreaterThanOrEqual(highlight.textRight);
   });
 
+  test("resizes the base and current panes from the divider", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    const basePane = page.locator(".diff-base-pane");
+    const divider = page.locator(".diff-divider");
+    await expect(divider).toBeVisible();
+    const initialWidth = (await basePane.boundingBox()).width;
+
+    // Keyboard resize: Home collapses the base pane toward the minimum split.
+    await divider.focus();
+    await page.keyboard.press("Home");
+    await expect(divider).toHaveAttribute("aria-valuenow", "20");
+    const collapsedWidth = (await basePane.boundingBox()).width;
+    expect(collapsedWidth).toBeLessThan(initialWidth);
+
+    // Pointer drag: dragging toward the right edge widens the base pane again.
+    const viewBox = await page.locator(".diff-view").boundingBox();
+    const dividerBox = await divider.boundingBox();
+    await page.mouse.move(dividerBox.x + dividerBox.width / 2, dividerBox.y + dividerBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(viewBox.x + viewBox.width * 0.7, dividerBox.y + dividerBox.height / 2, { steps: 5 });
+    await page.mouse.up();
+    const draggedWidth = (await basePane.boundingBox()).width;
+    expect(draggedWidth).toBeGreaterThan(collapsedWidth);
+
+    // The split is a tab-scoped preference restored on the next code document,
+    // matching the other reviewer preferences on this page.
+    await page.goto(`${viewerURL}view/code-annotation.go?mode=diff`);
+    const persistedWidth = (await page.locator(".diff-base-pane").boundingBox()).width;
+    expect(Math.abs(persistedWidth - draggedWidth)).toBeLessThan(20);
+  });
+
   test("creates, restores, and navigates a current-side annotation", async ({ page, viewerURL }) => {
     const selectedText = "current-side replacement";
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);

@@ -3,7 +3,11 @@
 
   const changedOnlyStorageKey = "md-viewer.changed-only";
   const sourceModeStorageKey = "md-viewer.source-mode";
+  const diffSplitStorageKey = "md-viewer.diff-split";
   const panelStoragePrefix = "md-viewer.panel-collapsed.";
+  const diffSplitMin = 20;
+  const diffSplitMax = 80;
+  const diffSplitStep = 2;
   const layout = document.querySelector(".layout");
   if (!layout) return;
 
@@ -22,6 +26,7 @@
   bindSourceModePreference();
   bindDocumentSearch();
   bindComparisonControl();
+  bindDiffDivider();
 
   // bindPanelToggle keeps the visual state, accessible state, and grid layout
   // synchronized for one optional viewer panel.
@@ -212,6 +217,65 @@
     function truncate(value, limit) {
       return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
     }
+  }
+
+  // bindDiffDivider lets the reviewer drag or use the keyboard to resize the
+  // base and current diff panes. The column headings share the same CSS grid
+  // template as the panes, so setting one custom property keeps both aligned.
+  // The chosen split is a tab-scoped preference restored across navigation,
+  // matching the other reviewer preferences on this page.
+  function bindDiffDivider() {
+    const view = document.querySelector(".diff-view");
+    const divider = view?.querySelector(".diff-divider");
+    if (!view || !divider) return;
+    let percent = clampDiffSplit(readDiffSplitPreference());
+    applyDiffSplit(view, divider, percent);
+
+    divider.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") setSplit(percent - diffSplitStep);
+      else if (event.key === "ArrowRight") setSplit(percent + diffSplitStep);
+      else if (event.key === "Home") setSplit(diffSplitMin);
+      else if (event.key === "End") setSplit(diffSplitMax);
+      else return;
+      event.preventDefault();
+    });
+
+    divider.addEventListener("pointerdown", (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      const rect = view.getBoundingClientRect();
+      const onMove = (moveEvent) => setSplit(((moveEvent.clientX - rect.left) / rect.width) * 100);
+      const onUp = () => {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+      };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    });
+
+    function setSplit(value) {
+      percent = clampDiffSplit(value);
+      applyDiffSplit(view, divider, percent);
+      writeDiffSplitPreference(percent);
+    }
+  }
+
+  function applyDiffSplit(view, divider, percent) {
+    view.style.setProperty("--diff-split", `${percent}%`);
+    divider.setAttribute("aria-valuenow", String(percent));
+  }
+
+  function clampDiffSplit(value) {
+    return Math.min(diffSplitMax, Math.max(diffSplitMin, Math.round(value)));
+  }
+
+  function readDiffSplitPreference() {
+    const stored = Number.parseFloat(readPreference(diffSplitStorageKey));
+    return Number.isFinite(stored) ? stored : 50;
+  }
+
+  function writeDiffSplitPreference(percent) {
+    writePreference(diffSplitStorageKey, String(percent));
   }
 
   // Session storage keeps an explicit reviewer choice across document

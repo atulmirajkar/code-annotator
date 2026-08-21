@@ -322,9 +322,9 @@ func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool
 	}
 
 	var output strings.Builder
-	output.WriteString(`<div class="diff-view"><div class="diff-column-headings" aria-hidden="true"><span>Base</span><span>Current</span></div><div class="diff-panes"><div class="diff-pane diff-base-pane">`)
+	output.WriteString(`<div class="diff-view"><div class="diff-column-headings" aria-hidden="true"><span>Base</span><span aria-hidden="true"></span><span>Current</span></div><div class="diff-panes"><div class="diff-pane diff-base-pane">`)
 	output.WriteString(basePane.String())
-	output.WriteString(`</div><div class="diff-pane diff-current-pane">`)
+	output.WriteString(`</div><div class="diff-divider" role="separator" aria-orientation="vertical" aria-label="Resize base and current panes" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0"></div><div class="diff-pane diff-current-pane">`)
 	output.WriteString(currentPane.String())
 	output.WriteString(`</div></div></div>`)
 	return []byte(output.String()), nil
