@@ -1,5 +1,30 @@
 const { test, expect } = require("./viewer");
 
+// selectCurrentText creates a native range inside the source-backed current
+// pane, matching mouse or keyboard selection without relying on coordinates.
+async function selectCurrentText(page, text) {
+  await page.locator(".diff-current-pane .source-text", { hasText: text }).evaluate((span, selectedText) => {
+    const start = span.textContent.indexOf(selectedText);
+    if (start < 0 || !span.firstChild) throw new Error(`text not found: ${selectedText}`);
+    const range = document.createRange();
+    range.setStart(span.firstChild, start);
+    range.setEnd(span.firstChild, start + selectedText.length);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+  }, text);
+}
+
+// hasAnnotationHighlight inspects Chromium's native highlight registry after
+// annotations are loaded or restored.
+async function hasAnnotationHighlight(page, text) {
+  return page.evaluate((selectedText) => {
+    const highlight = globalThis.CSS?.highlights?.get("md-viewer-annotations");
+    return highlight ? Array.from(highlight).some((range) => range.toString() === selectedText) : false;
+  }, text);
+}
+
 test.describe("side-by-side diff", () => {
   test("keeps long lines inside independently scrollable panes", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
@@ -39,5 +64,28 @@ test.describe("side-by-side diff", () => {
     });
     expect(highlight.color).not.toBe("rgba(0, 0, 0, 0)");
     expect(highlight.cellRight).toBeGreaterThanOrEqual(highlight.textRight);
+  });
+
+  test("creates, restores, and navigates a current-side annotation", async ({ page, viewerURL }) => {
+    const selectedText = "current-side replacement";
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await selectCurrentText(page, selectedText);
+    await expect(page.locator(".selection-preview")).toContainText(selectedText);
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Review the replacement in Changes view.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card", { hasText: "Review the replacement in Changes view." });
+    await expect(card).toHaveCount(1);
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-source")).toContainText(selectedText);
+    await expect.poll(() => hasAnnotationHighlight(page, selectedText)).toBe(true);
+
+    await page.reload();
+    const restoredCard = page.locator(".annotation-card", { hasText: "Review the replacement in Changes view." });
+    await expect(restoredCard).toHaveCount(1);
+    await expect.poll(() => hasAnnotationHighlight(page, selectedText)).toBe(true);
+    await restoredCard.locator(".annotation-summary").click();
+    await expect(page.locator(".diff-current-pane .annotation-navigation-target")).toContainText(selectedText);
+    await expect(restoredCard.locator(".annotation-navigation-status")).toBeEmpty();
   });
 });

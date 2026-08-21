@@ -803,15 +803,14 @@ Status as of 2026-08-21:
 - `GET /view/{path}?mode=diff`, File/Changes tabs, base-left/current-right
   rendering, failure fallback, light/dark change colors, and independent
   horizontal pane scrolling are complete.
-- A browser regression fixture verifies that long lines stay inside their pane,
-  both panes scroll independently, and the current-side highlight covers its
-  complete line. The focused browser test passes.
+- Browser regressions verify that long lines stay inside their pane, both panes
+  scroll independently, and the current-side change background covers its
+  complete line. They also verify current-side annotation creation, restored
+  highlights after reload, and annotation-to-source navigation.
 
 The next session should continue with small commits in this order:
 
-1. Add browser tests for current-side multi-line selection, annotation creation,
-   reload/highlight restoration, and annotation-to-source navigation in Changes
-   view.
+1. Add browser coverage for current-side multi-line selection.
 2. Add browser tests proving base-side and cross-pane selections are rejected.
 3. Cover File/Changes navigation, narrow viewport behavior, and both color
    schemes; fix only defects exposed by those tests.

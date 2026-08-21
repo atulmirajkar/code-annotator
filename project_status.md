@@ -121,9 +121,11 @@ release verification is reviewed.
 - [x] Extend agent handoff and browser coverage to code review.
 - [x] Keep base and current code in independent horizontal scroll panes so long
   lines cannot cross the divider or obscure change highlighting.
-- [ ] Complete diff-specific browser coverage for current-side annotation
-  creation, restored highlights, forbidden base/cross-pane selection, tab
-  navigation, narrow layouts, and light/dark themes.
+- [x] Cover current-side diff annotation creation, restored highlights, and
+  annotation-to-source navigation in the browser.
+- [ ] Complete diff-specific browser coverage for multi-line selection,
+  forbidden base/cross-pane selection, tab navigation, narrow layouts, and
+  light/dark themes.
 - [ ] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.
 
