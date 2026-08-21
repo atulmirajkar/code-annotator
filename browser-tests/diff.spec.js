@@ -1,4 +1,4 @@
-const { test, expect } = require("./viewer");
+const { test, expect, openAnnotations } = require("./viewer");
 
 // selectCurrentText creates a native range inside the source-backed current
 // pane, matching mouse or keyboard selection without relying on coordinates.
@@ -56,7 +56,6 @@ test.describe("side-by-side diff", () => {
     const selector = page.locator(".revision-selector");
     await expect(selector).toBeEnabled();
     await expect(selector).toHaveValue(fullCommit);
-    await expect(selector.locator("option:checked")).toHaveText(/\(HEAD\)$/);
 
     const geometry = await page.locator(".diff-panes").evaluate((panes) => {
       const base = panes.querySelector(".diff-base-pane");
@@ -124,6 +123,7 @@ test.describe("side-by-side diff", () => {
   test("creates, restores, and navigates a current-side annotation", async ({ page, viewerURL }) => {
     const selectedText = "current-side replacement";
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await openAnnotations(page);
     await selectCurrentText(page, selectedText);
     await expect(page.locator(".selection-preview")).toContainText(selectedText);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review the replacement in Changes view.");
@@ -146,6 +146,7 @@ test.describe("side-by-side diff", () => {
 
   test("creates an annotation across multiple current rows", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await openAnnotations(page);
     await selectBetween(
       page,
       ".diff-current-pane .source-text",
@@ -171,6 +172,7 @@ test.describe("side-by-side diff", () => {
 
   test("maps a selection ending on an empty current line", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await openAnnotations(page);
     await page.evaluate(() => {
       const startSpan = Array.from(document.querySelectorAll(".diff-current-pane .source-text"))
         .find((span) => span.textContent.includes("current-side replacement"));
@@ -199,6 +201,7 @@ test.describe("side-by-side diff", () => {
 
   test("rejects base-side and cross-pane selections", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await openAnnotations(page);
     const preview = page.locator(".selection-preview");
     const selectionScope = page.locator('input[name="scope"][value="selection"]');
     const cases = [

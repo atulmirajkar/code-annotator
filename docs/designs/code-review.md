@@ -131,6 +131,12 @@ shows a clear message instead of an empty navigation region. The active file
 remains visible until the reviewer opens another result; filtering the list
 must not unexpectedly navigate away from the document being reviewed.
 
+Before the reviewer has explicitly set the toggle in the current tab, landing
+directly on a Changes view with a configured base defaults it on: that is
+exactly the moment a reviewer wants the sidebar scoped to changed files. Any
+explicit choice, in either direction, is remembered for the rest of the tab and
+overrides this default on later navigation.
+
 ## Command-line contract
 
 Code discovery is opt-in so the existing Markdown-only behavior remains the
@@ -664,8 +670,7 @@ clean worktree still shows its change: the base stays where it was pinned while
 the current file follows the new worktree contents.
 
 The selector lists at most 50 recent local repository commits, each labeled with
-an abbreviated ID, a subject truncated to 72 characters, and its first-parent
-distance from `HEAD` as `(HEAD)`, `(HEAD~1)`, `(HEAD~2)` for orientation.
+an abbreviated ID and a subject truncated to 72 characters.
 Subjects are display-only untrusted text and remain HTML-escaped. Selecting a
 listed commit changes the server-wide comparison base and reloads the current
 page in its existing File/Changes mode. Markdown links remain unaffected.
@@ -688,7 +693,7 @@ holds a stale view simply reloads to observe the current base.
 
 | Route | Behavior |
 | --- | --- |
-| `GET /api/git-comparison` | Return the active base identity and the freshly listed bounded selector options with per-commit HEAD distance. |
+| `GET /api/git-comparison` | Return the active base identity and the freshly listed bounded selector options. |
 | `POST /api/git-comparison` with `{"commit":"<full SHA>"}` | Pin the base to a commit present in the current bounded option listing. |
 
 Mutations require JSON, exact loopback `Origin`, and a per-process comparison
@@ -698,9 +703,8 @@ work with or without annotation mode.
 
 Selector options use a no-shell, no-prompt, bounded `git log --all --date-order
 --max-count=50` invocation. NUL-framed object IDs and subjects make embedded
-newlines unambiguous. HEAD distances use a bounded `git rev-list --first-parent
---max-count=1000 HEAD` walk. Output remains bounded to 64 KiB and execution to
-three seconds, and Git never contacts a remote.
+newlines unambiguous. Output remains bounded to 64 KiB and execution to three
+seconds, and Git never contacts a remote.
 
 ### Failure behavior
 

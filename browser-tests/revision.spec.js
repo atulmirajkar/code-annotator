@@ -34,57 +34,56 @@ async function optionList(page) {
 }
 
 test.describe("revision selector", () => {
-  test("lists bounded options labeled by distance from HEAD", async ({ page, viewerURL }) => {
+  test("lists bounded options with abbreviated commit and subject", async ({ page, viewerURL }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
 
     const options = await optionList(page);
     expect(options.length).toBeGreaterThan(1);
-    // The tip is labeled (HEAD) and the previous first-parent commit (HEAD~1).
-    expect(options.filter((option) => /\(HEAD\)$/.test(option.text))).toHaveLength(1);
-    expect(options.some((option) => /\(HEAD~1\)$/.test(option.text))).toBe(true);
-    // The active base starts at the tip commit.
-    expect(options.find((option) => option.selected).text).toMatch(/\(HEAD\)$/);
+    // The active base starts as the tip commit shown on the diff toolbar.
+    const fullCommit = await page.locator('meta[name="md-viewer-diff-commit"]').getAttribute("content");
+    const active = options.find((option) => option.selected);
+    expect(active.value).toBe(fullCommit);
+    expect(active.text).toContain(fullCommit.slice(0, 12));
   });
 
-  test("pins a selected commit and can return to the tip", async ({ page, viewerURL }) => {
+  test("pins a selected commit and can return to the original base", async ({ page, viewerURL }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
 
-    const pinned = (await optionList(page)).find((option) => /\(HEAD~1\)$/.test(option.text));
-    expect(pinned).toBeTruthy();
+    const initial = (await optionList(page)).find((option) => option.selected);
+    const other = (await optionList(page)).find((option) => !option.selected);
+    expect(other).toBeTruthy();
 
-    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(pinned.value));
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(other.value));
     await waitForEnhancedSelector(page);
-    await expect(page.locator(".revision-selector")).toHaveValue(pinned.value);
-    await expect(page.locator(".revision-selector option:checked")).toHaveText(/\(HEAD~1\)$/);
+    await expect(page.locator(".revision-selector")).toHaveValue(other.value);
 
-    // Selecting the tip restores server-wide state so later shared-server tests
-    // still compare against HEAD.
-    const tip = (await optionList(page)).find((option) => /\(HEAD\)$/.test(option.text));
-    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(tip.value));
+    // Selecting the original base restores server-wide state so later
+    // shared-server tests still compare against the same commit.
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(initial.value));
     await waitForEnhancedSelector(page);
-    await expect(page.locator(".revision-selector option:checked")).toHaveText(/\(HEAD\)$/);
+    await expect(page.locator(".revision-selector")).toHaveValue(initial.value);
   });
 
   test("changing the base in one tab is visible to another after reload", async ({ page, viewerURL, context }) => {
     await page.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(page);
-    const pinned = (await optionList(page)).find((option) => /\(HEAD~1\)$/.test(option.text));
+    const initial = (await optionList(page)).find((option) => option.selected);
+    const other = (await optionList(page)).find((option) => !option.selected);
 
-    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(pinned.value));
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(other.value));
     await waitForEnhancedSelector(page);
 
     // A second tab loads the server-wide base that the first tab just pinned.
     const second = await context.newPage();
     await second.goto(changesURL(viewerURL));
     await waitForEnhancedSelector(second);
-    await expect(second.locator(".revision-selector")).toHaveValue(pinned.value);
+    await expect(second.locator(".revision-selector")).toHaveValue(other.value);
     await second.close();
 
-    // Restore the tip base for later shared-server tests.
-    const tip = (await optionList(page)).find((option) => /\(HEAD\)$/.test(option.text));
-    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(tip.value));
+    // Restore the original base for later shared-server tests.
+    await reloadAfter(page, () => page.locator(".revision-selector").selectOption(initial.value));
     await waitForEnhancedSelector(page);
   });
 });

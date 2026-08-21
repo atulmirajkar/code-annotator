@@ -22,6 +22,7 @@
     panel: document.querySelector("#annotation-sidebar"),
     collapsedClass: "review-collapsed",
     name: "annotations",
+    defaultCollapsed: true,
   });
   bindSourceModePreference();
   bindDocumentSearch();
@@ -29,10 +30,11 @@
   bindDiffDivider();
 
   // bindPanelToggle keeps the visual state, accessible state, and grid layout
-  // synchronized for one optional viewer panel.
-  function bindPanelToggle({ button, panel, collapsedClass, name }) {
+  // synchronized for one optional viewer panel. defaultCollapsed applies only
+  // on the panel's first use in a tab; an explicit prior choice always wins.
+  function bindPanelToggle({ button, panel, collapsedClass, name, defaultCollapsed = false }) {
     if (!button || !panel) return;
-    setPanelCollapsed(readBooleanPreference(`${panelStoragePrefix}${name}`));
+    setPanelCollapsed(readPanelCollapsedPreference(name, defaultCollapsed));
     button.addEventListener("click", () => {
       const collapsed = !panel.hidden;
       setPanelCollapsed(collapsed);
@@ -177,14 +179,7 @@
 
     function optionLabel(option) {
       const subject = option.subject ? ` ${truncate(option.subject, 72)}` : "";
-      return `${option.commitShort || ""}${subject}${headMarker(option)}`;
-    }
-
-    // headMarker orients the reviewer with each commit's position relative to
-    // HEAD: the tip is (HEAD), older first-parent commits are (HEAD~N).
-    function headMarker(option) {
-      if (typeof option.headDistance !== "number") return "";
-      return option.headDistance === 0 ? " (HEAD)" : ` (HEAD~${option.headDistance})`;
+      return `${option.commitShort || ""}${subject}`;
     }
 
     async function selectBase(commit) {
@@ -280,12 +275,33 @@
 
   // Session storage keeps an explicit reviewer choice across document
   // navigation in one tab without turning it into a server-wide preference.
+  // Before any explicit choice, landing directly on a Changes view with a
+  // configured Git base defaults the filter on, since that is exactly the
+  // moment a reviewer wants the document list scoped to changed files.
   function readChangedOnlyPreference() {
-    return readBooleanPreference(changedOnlyStorageKey);
+    const stored = readPreference(changedOnlyStorageKey);
+    if (stored !== null) return stored === "true";
+    return hasComparisonBase() && isDiffModeActive();
   }
 
   function writeChangedOnlyPreference(enabled) {
     writeBooleanPreference(changedOnlyStorageKey, enabled);
+  }
+
+  function hasComparisonBase() {
+    return Boolean(document.querySelector('meta[name="md-viewer-diff-commit"]'));
+  }
+
+  function isDiffModeActive() {
+    return new URLSearchParams(window.location.search).get("mode") === "diff";
+  }
+
+  // readPanelCollapsedPreference falls back to defaultCollapsed only when the
+  // panel has never been toggled in this tab, so an explicit "false" (shown)
+  // choice is never overridden by a panel's own default.
+  function readPanelCollapsedPreference(name, defaultCollapsed) {
+    const stored = readPreference(`${panelStoragePrefix}${name}`);
+    return stored === null ? defaultCollapsed : stored === "true";
   }
 
   function readBooleanPreference(key) {

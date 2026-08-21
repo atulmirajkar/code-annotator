@@ -41,27 +41,16 @@ func (c *comparisonController) active() gitdiff.Config {
 	return c.base
 }
 
-// options lists the bounded selectable commits together with each commit's
-// first-parent distance from HEAD. The distance map is best-effort orientation
-// and never fails the listing, so options remain selectable even when ancestry
-// cannot be computed.
-func (c *comparisonController) options(ctx context.Context) ([]gitdiff.RevisionOption, map[string]int, error) {
-	options, err := c.configured.RecentCommits(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-	distances, err := c.configured.HeadDistances(ctx)
-	if err != nil {
-		distances = nil
-	}
-	return options, distances, nil
+// options lists the bounded selectable commits.
+func (c *comparisonController) options(ctx context.Context) ([]gitdiff.RevisionOption, error) {
+	return c.configured.RecentCommits(ctx)
 }
 
 // selectCommit pins the comparison base to a commit present in a freshly listed
 // bounded option set. Validating against a live listing keeps the endpoint from
 // accepting an arbitrary revision without caching a server-side option list.
 func (c *comparisonController) selectCommit(ctx context.Context, commit string) (gitdiff.Config, error) {
-	options, _, err := c.options(ctx)
+	options, err := c.options(ctx)
 	if err != nil {
 		return gitdiff.Config{}, err
 	}

@@ -1,4 +1,4 @@
-const { test, expect } = require("./viewer");
+const { test, expect, openAnnotations } = require("./viewer");
 
 function captureBrowserSignals(page) {
   const consoleErrors = [];
@@ -41,6 +41,7 @@ test.describe("Mermaid rendering", () => {
 
   test("selects the complete diagram by mouse and survives delayed selection changes", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/valid.md`);
+    await openAnnotations(page);
     await page.locator(".mermaid-output svg text").first().click();
     await page.waitForTimeout(500);
     await page.evaluate(() => document.dispatchEvent(new Event("selectionchange")));
@@ -53,6 +54,7 @@ test.describe("Mermaid rendering", () => {
 
   test("selects the complete diagram from the keyboard", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/valid.md`);
+    await openAnnotations(page);
     const output = page.locator(".mermaid-output");
     await output.focus();
     await output.press("Enter");
@@ -63,6 +65,7 @@ test.describe("Mermaid rendering", () => {
 
   test("creates and highlights a whole-diagram annotation", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/valid.md`);
+    await openAnnotations(page);
     await page.locator(".mermaid-output svg text").first().click();
     await page.locator('.annotation-form textarea[name="comment"]').fill("Update this interaction.");
     await page.locator('.annotation-form button[type="submit"]').click();

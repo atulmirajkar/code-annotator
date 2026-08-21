@@ -91,64 +91,6 @@ func TestRecentCommits(t *testing.T) {
 	}
 }
 
-func TestParseHeadDistances(t *testing.T) {
-	t.Parallel()
-	first := strings.Repeat("a", 40)
-	second := strings.Repeat("b", 40)
-	tests := []struct {
-		name    string
-		input   []byte
-		want    map[string]int
-		wantErr bool
-	}{
-		{name: "empty", want: map[string]int{}},
-		{name: "ordered ancestry", input: []byte(first + "\x00" + second + "\x00"), want: map[string]int{first: 0, second: 1}},
-		{name: "missing terminator", input: []byte(first + "\x00" + second), wantErr: true},
-		{name: "invalid commit", input: []byte("nothex\x00"), wantErr: true},
-	}
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			t.Parallel()
-			got, err := parseHeadDistances(test.input)
-			if test.wantErr {
-				if !errors.Is(err, ErrInvalidRevisionList) {
-					t.Fatalf("parseHeadDistances() error = %v, want ErrInvalidRevisionList", err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("parseHeadDistances() error = %v", err)
-			}
-			if !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("parseHeadDistances() = %#v, want %#v", got, test.want)
-			}
-		})
-	}
-}
-
-func TestHeadDistances(t *testing.T) {
-	t.Parallel()
-	requireGit(t)
-	repository := newRepository(t)
-	initial := strings.ToLower(strings.TrimSpace(runRepositoryGit(t, repository, "rev-parse", "HEAD")))
-	writeRepositoryFile(t, repository, "README.md", "second")
-	runRepositoryGit(t, repository, "add", "README.md")
-	runRepositoryGit(t, repository, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "second")
-	tip := strings.ToLower(strings.TrimSpace(runRepositoryGit(t, repository, "rev-parse", "HEAD")))
-
-	configuration, err := Open(context.Background(), repository, "HEAD")
-	if err != nil {
-		t.Fatalf("Open() error = %v", err)
-	}
-	distances, err := configuration.HeadDistances(context.Background())
-	if err != nil {
-		t.Fatalf("HeadDistances() error = %v", err)
-	}
-	if distances[tip] != 0 || distances[initial] != 1 {
-		t.Fatalf("HeadDistances() = %#v, want tip 0 and initial 1", distances)
-	}
-}
-
 func TestReresolveAdoptsMovingTip(t *testing.T) {
 	t.Parallel()
 	requireGit(t)

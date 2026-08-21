@@ -63,7 +63,7 @@ a { color: var(--accent); }
 .markdown-body { max-width: 54rem; margin: 0 auto; line-height: 1.7; }
 .code-document { padding: .5rem; }
 .code-document .markdown-body { max-width: none; }
-.source-mode-tabs { display: flex; gap: .3rem; margin-bottom: .5rem; border-bottom: 1px solid var(--border); }
+.source-mode-tabs { position: sticky; top: 3.5rem; z-index: 1; display: flex; align-items: center; gap: .3rem; margin-bottom: .5rem; padding-top: .3rem; background: var(--background); border-bottom: 1px solid var(--border); }
 .source-mode-tabs a { padding: .35rem .65rem; border-bottom: .15rem solid transparent; color: var(--muted); font-size: .8rem; font-weight: 700; text-decoration: none; }
 .source-mode-tabs a[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
 .diff-comparison { min-width: 0; margin-left: auto; padding: .35rem .65rem; overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }

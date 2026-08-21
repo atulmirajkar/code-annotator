@@ -139,10 +139,9 @@ release verification is reviewed.
   themes.
 - [x] Design a bounded revision selector that re-pins an always-explicit
   server-wide comparison base validated against a live commit listing.
-- [x] Implement bounded recent-commit discovery and HEAD-distance labeling.
+- [x] Implement bounded recent-commit discovery.
 - [x] Implement the authenticated comparison state and select API routes.
-- [x] Add the revision selector with abbreviated commit, truncated subject, and
-  HEAD~N distance labels.
+- [x] Add the revision selector with abbreviated commit and truncated subject.
 - [x] Add unit, handler, concurrency, and browser coverage for selection,
   rejection, cross-tab base changes, and failure behavior.
 - [ ] Update user-facing build/run documentation and refresh distributions

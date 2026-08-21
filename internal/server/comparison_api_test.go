@@ -82,7 +82,7 @@ func postComparison(t *testing.T, handler http.Handler, body string, decorate fu
 	return response
 }
 
-func TestComparisonStateReportsOptionsAndDistances(t *testing.T) {
+func TestComparisonStateReportsOptions(t *testing.T) {
 	t.Parallel()
 	viewer, initial, tip := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
 	view := getComparisonState(t, viewer.Handler())
@@ -90,15 +90,12 @@ func TestComparisonStateReportsOptionsAndDistances(t *testing.T) {
 	if view.ActiveCommit != tip {
 		t.Fatalf("state active = %s, want tip %s", view.ActiveCommit, tip)
 	}
-	distances := map[string]*int{}
+	commits := map[string]bool{}
 	for _, option := range view.Options {
-		distances[option.Commit] = option.HeadDistance
+		commits[option.Commit] = true
 	}
-	if distances[tip] == nil || *distances[tip] != 0 {
-		t.Errorf("tip head distance = %v, want 0", distances[tip])
-	}
-	if distances[initial] == nil || *distances[initial] != 1 {
-		t.Errorf("initial head distance = %v, want 1", distances[initial])
+	if !commits[tip] || !commits[initial] {
+		t.Fatalf("options missing initial or tip: %#v", view.Options)
 	}
 }
 

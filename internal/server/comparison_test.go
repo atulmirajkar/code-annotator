@@ -63,21 +63,15 @@ func TestComparisonStartsPinnedToConfiguredCommit(t *testing.T) {
 	}
 }
 
-func TestComparisonOptionsReportHeadDistances(t *testing.T) {
+func TestComparisonOptionsListsRecentCommits(t *testing.T) {
 	t.Parallel()
 	controller, initial, tip := newComparisonRepository(t)
-	options, distances, err := controller.options(context.Background())
+	options, err := controller.options(context.Background())
 	if err != nil {
 		t.Fatalf("options() error = %v", err)
 	}
 	if !containsCommit(options, initial) || !containsCommit(options, tip) {
 		t.Fatalf("options missing initial or tip: %#v", options)
-	}
-	if distances[tip] != 0 {
-		t.Errorf("tip distance = %d, want 0", distances[tip])
-	}
-	if distances[initial] != 1 {
-		t.Errorf("initial distance = %d, want 1", distances[initial])
 	}
 }
 

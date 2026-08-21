@@ -89,4 +89,10 @@ function waitForViewerURL(server, readDiagnostics) {
   });
 }
 
-module.exports = { test, expect };
+// openAnnotations reveals the annotation sidebar. It starts collapsed by
+// default, so tests that exercise it open it once after navigating.
+async function openAnnotations(page) {
+  await page.getByRole("button", { name: "Show annotations" }).click();
+}
+
+module.exports = { test, expect, openAnnotations };

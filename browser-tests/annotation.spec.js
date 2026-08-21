@@ -1,6 +1,6 @@
 const { writeFile } = require("node:fs/promises");
 const path = require("node:path");
-const { test, expect } = require("./viewer");
+const { test, expect, openAnnotations } = require("./viewer");
 
 // selectText asks the browser to create the same native range a reviewer would
 // make with pointer or keyboard selection.
@@ -39,6 +39,7 @@ async function hasAnnotationHighlight(page, text) {
 test.describe("annotation review interactions", () => {
   test("creates and restores an annotation on source code", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/code-annotation.go`);
+    await openAnnotations(page);
     await expect(page.locator(".source-view")).toBeVisible();
     await expect(page.locator("#annotation-sidebar")).toBeVisible();
     await expect.poll(() => page.locator(".source-view").evaluate((source) => {
@@ -69,6 +70,7 @@ test.describe("annotation review interactions", () => {
     await writeFile(documentPath, `# Navigation fixture\n\n${filler}\n\nReview this selected phrase before release.\n`);
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`${viewer.url}view/source-navigation.md`);
+    await openAnnotations(page);
     await createSelectionAnnotation(page, "Navigate to this text.");
 
     await page.evaluate(() => window.scrollTo(0, 0));
@@ -103,6 +105,7 @@ test.describe("annotation review interactions", () => {
 
   test("navigates a document annotation to the heading", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/document-navigation.md`);
+    await openAnnotations(page);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review the whole document.");
     await page.locator('.annotation-form button[type="submit"]').click();
 
@@ -114,6 +117,7 @@ test.describe("annotation review interactions", () => {
 
   test("creates, replies to, transitions, and filters an annotation", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/lifecycle.md`);
+    await openAnnotations(page);
     await createSelectionAnnotation(page, "Clarify this wording.");
 
     const card = page.locator(".annotation-card");
@@ -154,6 +158,7 @@ test.describe("annotation review interactions", () => {
     const documentPath = path.join(viewer.contentRoot, "stale.md");
     await writeFile(documentPath, "# Stale-anchor fixture\n\nReview this selected phrase before release.\n\nReplacement anchor lives here.\n");
     await page.goto(`${viewer.url}view/stale.md`);
+    await openAnnotations(page);
     await createSelectionAnnotation(page, "Track this anchor.");
 
     await writeFile(documentPath, "# Stale-anchor fixture\n\nOriginal wording was removed.\n\nReplacement anchor lives here.\n");
@@ -171,6 +176,7 @@ test.describe("annotation review interactions", () => {
 
   test("reloads authoritative annotations after a revision conflict", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/conflict.md`);
+    await openAnnotations(page);
     await createSelectionAnnotation(page, "Keep my draft visible.");
 
     const token = await page.locator('meta[name="md-viewer-review-token"]').getAttribute("content");
@@ -205,6 +211,7 @@ test.describe("annotation review interactions", () => {
 
   test("reloads authoritative status when Quick Close conflicts", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/quick-close.md`);
+    await openAnnotations(page);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Quick close conflict.");
     await page.locator('.annotation-form button[type="submit"]').click();
 

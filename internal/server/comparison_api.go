@@ -16,14 +16,11 @@ const (
 )
 
 // comparisonOptionView is one selectable base offered to the browser. Subject
-// is untrusted display text that the browser must escape. HeadDistance is the
-// commit's first-parent distance from HEAD (0 for HEAD, 1 for HEAD~1) and is
-// omitted for commits off the first-parent line, so labels stay orientation-only.
+// is untrusted display text that the browser must escape.
 type comparisonOptionView struct {
-	Commit       string `json:"commit"`
-	CommitShort  string `json:"commitShort"`
-	Subject      string `json:"subject,omitempty"`
-	HeadDistance *int   `json:"headDistance,omitempty"`
+	Commit      string `json:"commit"`
+	CommitShort string `json:"commitShort"`
+	Subject     string `json:"subject,omitempty"`
 }
 
 // comparisonStateView is the browser-facing comparison state: the active base
@@ -50,21 +47,17 @@ func (s *Server) comparisonState(ctx context.Context) comparisonStateView {
 		ActiveShort:   abbreviatedCommit(active.BaseCommit),
 		RequestedBase: active.RequestedBase,
 	}
-	options, distances, err := s.comparison.options(ctx)
+	options, err := s.comparison.options(ctx)
 	if err != nil {
 		return view
 	}
 	view.Options = make([]comparisonOptionView, 0, len(options))
 	for _, option := range options {
-		optionView := comparisonOptionView{
+		view.Options = append(view.Options, comparisonOptionView{
 			Commit:      option.Commit,
 			CommitShort: abbreviatedCommit(option.Commit),
 			Subject:     option.Subject,
-		}
-		if distance, ok := distances[option.Commit]; ok {
-			optionView.HeadDistance = &distance
-		}
-		view.Options = append(view.Options, optionView)
+		})
 	}
 	return view
 }
