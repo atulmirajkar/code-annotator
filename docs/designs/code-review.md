@@ -15,12 +15,11 @@ Annotations continue to bind to the selected file's SHA-256 digest, exact quote,
 UTF-8 byte range, and line range. Existing sidecar persistence, concurrency,
 lifecycle, discussion, agent queue, and stale-anchor resolution remain shared.
 
-The first diff view is a **current-file overlay** rather than a fully symmetric
-two-revision editor. The complete current file remains the selectable source of
-truth. Git adds old/new line-number gutters, change styling, and deleted rows as
-read-only context. This permits annotations on current text with the existing
-anchor model. Direct annotations on deleted text are deferred because deleted
-bytes do not exist in the current file.
+The first diff view is **side by side**, with the immutable Git base on the left
+and the complete current file on the right. The current file remains the only
+selectable source of truth. This permits annotations on current text with the
+existing anchor model. Direct annotations on base-only text are deferred
+because those bytes do not exist in the current file.
 
 ## Goals
 
@@ -68,40 +67,48 @@ the server-verified source quote and byte range.
 
 ### Changes view
 
-The first Changes view uses a **unified layout**, not two side-by-side panes.
-Deleted base rows and current rows are interleaved in one vertical stream with
-old and new line-number gutters. This fits the existing single document column,
-remains usable when either sidebar is open, and gives current-side annotations
-one unambiguous rendered surface.
+The Changes view uses a **side-by-side layout**. The immutable base is always on
+the left and the complete current worktree file is always on the right. Each
+display row aligns corresponding base and current lines; a missing side renders
+an empty, non-selectable cell. The right pane is the only annotation surface.
 
-A side-by-side layout is deferred. It would require synchronized scrolling,
-responsive pane behavior, duplication or mapping of unchanged regions, and a
-clear selection policy for the read-only base pane. Adding it later would be a
-presentation option over the same parsed `FileDiff`; it would not change the
-initial unified diff or current-side anchor model.
+Both panes share one vertical scroll container, so aligned rows cannot drift.
+They use separate horizontal overflow within a common diff canvas. On narrow
+screens the canvas retains two minimum-width panes and scrolls horizontally
+instead of stacking or swapping their order. Collapsing either application
+sidebar gives the diff canvas more room without changing base-left/current-right
+semantics.
 
 The Changes view renders the complete current file, not only Git hunks. Current
 lines retain their exact source ranges and receive one of these visual states:
 
-| State | Meaning | Selectable |
-| --- | --- | --- |
-| unchanged | Current line is unchanged from the base | Yes |
-| added | Current line has no corresponding base line | Yes |
-| modified | Current line replaces nearby base content | Yes |
-| deleted context | Base text was removed before this current position | No |
+| State | Left/base cell | Right/current cell | Selectable |
+| --- | --- | --- | --- |
+| unchanged | Base line | Matching current line | Right only |
+| added | Empty | Added current line | Right only |
+| modified | Replaced base line | Replacement current line | Right only |
+| deleted | Deleted base line | Empty | No |
 
-Deleted rows have an old line number, no new line number, and a clear read-only
-appearance. A selection that touches a deleted row is rejected with a concise
-message. Reviewers can instead annotate a neighboring current line or create a
-file-level annotation.
+The complete current file is therefore visible down the right. The left side
+shows the corresponding complete base file for tracked paths. Base text, both
+gutters, and empty cells are read-only and use `user-select: none`. A selection
+that begins in or crosses the left pane is rejected. Reviewers can annotate a
+replacement or neighboring current line, or create a file-level annotation.
 
 ```text
- old  new
-  18   18    unchanged current line
-  19    -  - deleted base-side text       (read-only)
-   -   19  + replacement current text     (selectable)
-  20   20    unchanged current line
+ BASE (left, read-only)             CURRENT (right, selectable)
+ 18  unchanged line                18  unchanged line
+ 19  old implementation            19  replacement implementation
+ 20  deleted line                   --  [empty]
+ --  [empty]                        20  added line
+ 21  next unchanged line            21  next unchanged line
 ```
+
+Within one replacement hunk, base deletions and current additions are paired in
+order as `modified` rows. If their counts differ, remaining base lines become
+`deleted` rows and remaining current lines become `added` rows. This is a
+deterministic line alignment, not a claim that paired lines are semantically
+equivalent. More sophisticated intra-line matching is deferred.
 
 Annotations created in Changes view appear in File view because both views
 anchor to the same current bytes. Existing annotations also appear in Changes
@@ -244,11 +251,13 @@ Markdown continues through goldmark. The initial code renderer:
 1. Rejects invalid UTF-8 and NUL-containing input.
 2. Splits source into logical lines without normalizing the original bytes.
 3. HTML-escapes every source character.
-4. Emits one row per current line.
+4. Emits one row per file line in File view and one aligned two-cell row per
+   `FileDiff` row in Changes view.
 5. Wraps only the visible line content in `.source-text` with exact byte
    offsets; line terminators remain source gaps between spans.
-6. Adds non-selectable old/new line-number gutters and diff markers.
-7. Inserts escaped deleted rows without `.source-text` metadata.
+6. Adds non-selectable base/current line-number gutters and diff markers.
+7. Emits escaped base text only in the left cell, without `.source-text`
+   metadata; only right/current text receives source offsets.
 
 Keeping CRLF or LF terminators outside source spans prevents browser newline
 normalization from corrupting byte calculations. A multi-line selection may
@@ -298,8 +307,7 @@ type FileDiff struct {
     // BaseCommit identifies the exact snapshot used by this comparison.
     BaseCommit string
 
-    // Rows is the complete display sequence, including unchanged current
-    // lines and inserted read-only deleted context.
+    // Rows is the complete aligned display sequence for both panes.
     Rows []Row
 }
 
@@ -310,17 +318,18 @@ type Row struct {
     // OldLine is the one-based base line, or zero when no base line exists.
     OldLine int
 
-    // NewLine is the one-based current line, or zero for deleted context.
+    // NewLine is the one-based current line, or zero when the right cell is
+    // empty for a deletion.
     NewLine int
 
     // CurrentStart and CurrentEnd are byte offsets into current source. Both
-    // are zero for a deleted-context row.
+    // are zero when the right/current cell is empty.
     CurrentStart int
     CurrentEnd   int
 
-    // DeletedText contains base text only for deleted context. Rendering must
-    // escape it before inserting it into HTML.
-    DeletedText string
+    // BaseText contains the left-pane base line when OldLine is nonzero.
+    // Rendering must escape it before inserting it into HTML.
+    BaseText string
 }
 ```
 
@@ -454,8 +463,8 @@ digest, and `If-Match` sidecar revision requirements.
 Current code lines use the existing `.source-text` contract. The browser needs
 three contained changes:
 
-- permit a selection whose endpoints are current lines in the same code view;
-- reject a range whose cloned contents contain `.diff-deleted`;
+- permit a selection whose endpoints are right-pane current lines;
+- reject endpoints or cloned contents from the left/base pane;
 - map highlights across multiple line spans and source terminator gaps.
 
 The selection preview labels diff-created ranges as “current file against
@@ -561,8 +570,8 @@ All Go cases remain table-driven.
   empty-result behavior.
 - Existing annotation creation, highlighting, replies, lifecycle, and filtering
   on code files.
-- Added/modified/deleted styling and line-number mapping.
-- Deleted-row selection rejection.
+- Added/modified/deleted row alignment, styling, and line-number mapping.
+- Left-pane and cross-pane selection rejection.
 - Diff annotation context sent and rendered correctly.
 - File/Changes navigation, narrow layouts, sidebars, and dark mode.
 - No external requests or CSP violations.
@@ -577,8 +586,9 @@ Each slice should be independently reviewable:
 4. Extend queue, CLI export, and agent skill for code documents.
 5. Add bounded Git repository discovery, immutable base resolution, and the
    changed-file catalog filter.
-6. Parse Git patches into validated current/deleted row metadata.
-7. Add File/Changes UI with current-side annotation selection.
+6. Parse Git patches into validated aligned base/current row metadata.
+7. Add the side-by-side File/Changes UI with base left, current right, and
+   current-side annotation selection.
 8. Persist and expose optional immutable diff review context.
 9. Add Go and browser integration coverage.
 10. Update documentation, run release verification, and refresh distributions.
@@ -586,13 +596,14 @@ Each slice should be independently reviewable:
 
 ## Decisions requested before implementation
 
-1. Approve current-side annotations only; deleted rows are read-only context.
+1. Approve current-side annotations only; the left/base pane is read-only.
 2. Approve comparison of one startup base commit to the current worktree only.
 3. Approve opt-in code discovery with the proposed default extensions.
 4. Approve default exclusions for `node_modules`, `vendor`, `bin`, and `obj`.
 5. Approve plain escaped source first and defer syntax highlighting.
 6. Approve optional immutable Git review context without a schema-version bump.
 7. Approve a changed-only sidebar toggle when Git comparison is configured.
+8. Approve side-by-side Changes view with base always left and current right.
 
 These boundaries produce a useful code-review system while preserving the
 existing annotation model and keeping Git exposure narrow.
