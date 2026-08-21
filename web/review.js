@@ -498,6 +498,7 @@
       body.append(thread);
     }
 
+    const actionBar = element("div", "annotation-action-bar");
     const actions = element("details", "annotation-actions");
     const actionsSummary = document.createElement("summary");
     actionsSummary.textContent = "Actions";
@@ -508,9 +509,32 @@
     actions.append(createReplyForm(annotation));
     const lifecycle = createLifecycleForm(annotation);
     if (lifecycle) actions.append(lifecycle);
-    body.append(actions);
+    actionBar.append(actions);
+    if (annotation.status === "applied") {
+      actionBar.append(createQuickClose(annotation));
+    }
+    body.append(actionBar);
     card.append(body);
     return card;
+  }
+
+  // Closing is the common reviewer response to an applied annotation, so keep
+  // it available without requiring the less-frequent Actions panel to open.
+  function createQuickClose(annotation) {
+    const button = element("button", "annotation-quick-close");
+    button.type = "button";
+    button.textContent = "Close";
+    button.setAttribute("aria-label", `Close annotation: ${annotation.comment || annotation.id}`);
+    button.addEventListener("click", async () => {
+      const author = form.elements.author.value || "reviewer";
+      await updateLifecycle(annotation.id, {
+        document: documentPath,
+        status: "closed",
+        actorRole: "reviewer",
+        author,
+      }, button, null);
+    });
+    return button;
   }
 
   // Annotation cards navigate to resolved source when possible. Stale anchors
@@ -750,7 +774,10 @@
   // state. Actor roles and required activity are derived from that action so
   // the browser cannot accidentally submit an invalid transition shape.
   function createLifecycleForm(annotation) {
-    const options = transitionOptions(annotation.status);
+    // Applied annotations expose Close as a quick action beside this panel.
+    // Keep only Needs changes here so the same transition is not duplicated.
+    const options = transitionOptions(annotation.status)
+      .filter((option) => !(annotation.status === "applied" && option.status === "closed"));
     if (options.length === 0) return null;
 
     const lifecycle = element("form", "annotation-lifecycle");
@@ -858,8 +885,16 @@
       if (commit) payload.commit = commit;
     }
 
-    status.textContent = "Saving…";
-    status.classList.remove("error");
+    await updateLifecycle(annotationID, payload, button, status);
+  }
+
+  // Both the expanded lifecycle form and Quick Close use this mutation path so
+  // token, revision-conflict, reload, and error behavior cannot drift apart.
+  async function updateLifecycle(annotationID, payload, button, status) {
+    if (status) {
+      status.textContent = "Saving…";
+      status.classList.remove("error");
+    }
     button.disabled = true;
     try {
       const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}`, {
@@ -881,8 +916,12 @@
       }
       await loadAnnotations();
     } catch (error) {
-      status.textContent = error.message || "Could not update annotation.";
-      status.classList.add("error");
+      if (status) {
+        status.textContent = error.message || "Could not update annotation.";
+        status.classList.add("error");
+      } else {
+        setFormStatus(error.message || "Could not close annotation.", true);
+      }
       button.disabled = false;
     }
   }

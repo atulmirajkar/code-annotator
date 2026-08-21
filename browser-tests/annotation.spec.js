@@ -32,19 +32,30 @@ test.describe("annotation review interactions", () => {
     const documentPath = path.join(viewer.contentRoot, "source-navigation.md");
     const filler = Array.from({ length: 45 }, (_, index) => `Paragraph ${index + 1} keeps the target below the fold.`).join("\n\n");
     await writeFile(documentPath, `# Navigation fixture\n\n${filler}\n\nReview this selected phrase before release.\n`);
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(`${viewer.url}view/source-navigation.md`);
     await createSelectionAnnotation(page, "Navigate to this text.");
 
     await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByRole("button", { name: "Hide annotations" }).click();
+    await page.getByRole("button", { name: "Show annotations" }).click();
     const card = page.locator(".annotation-card");
     await card.locator(".annotation-summary").press("Enter");
     const exactTarget = page.locator(".source-text", { hasText: "selected phrase" });
     await expect(exactTarget).toHaveClass(/annotation-navigation-target/);
+    await expect(exactTarget).toHaveCSS("animation-name", "none");
     await expect.poll(() => exactTarget.evaluate((target) => {
       const bounds = target.getBoundingClientRect();
       return bounds.top >= 0 && bounds.bottom <= window.innerHeight;
     })).toBe(true);
     await expect(card.locator(".annotation-navigation-status")).toBeEmpty();
+
+    await writeFile(documentPath, `# Navigation fixture\n\nInserted before the original content.\n\n${filler}\n\nReview this selected phrase before release.\n`);
+    await page.reload();
+    const movedCard = page.locator(".annotation-card");
+    await movedCard.locator(".annotation-summary").click();
+    await expect(page.locator(".source-text", { hasText: "selected phrase" })).toHaveClass(/annotation-navigation-target/);
+    await expect(movedCard.locator(".annotation-navigation-status")).toBeEmpty();
 
     await writeFile(documentPath, `# Navigation fixture\n\n${filler}\n\nThe reviewed wording was removed.\n`);
     await page.reload();
@@ -94,8 +105,10 @@ test.describe("annotation review interactions", () => {
 
     await card.locator(".annotation-summary").click();
     await card.locator(".annotation-actions > summary").click();
-    await card.locator('.annotation-lifecycle select[name="status"]').selectOption("closed");
-    await card.locator('.annotation-lifecycle button[type="submit"]').click();
+    await expect(card.locator('.annotation-lifecycle option[value="closed"]')).toHaveCount(0);
+    await expect(card.locator('.annotation-lifecycle option[value="needs_changes"]')).toHaveCount(1);
+    await expect(card.locator(".annotation-quick-close")).toBeVisible();
+    await card.locator(".annotation-quick-close").click();
     await expect(page.locator(".annotation-card")).toHaveCount(0);
     await page.locator(".show-inactive-annotations").check();
     await expect(page.locator(".annotation-card")).toHaveCount(1);
@@ -153,5 +166,51 @@ test.describe("annotation review interactions", () => {
     await expect(page.locator(".annotation-form-status")).toContainText("Annotations changed");
     await expect(page.locator(".annotation-card")).toHaveCount(2);
     await expect(page.locator(".annotation-list")).toContainText("Concurrent annotation");
+  });
+
+  test("reloads authoritative status when Quick Close conflicts", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/quick-close.md`);
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Quick close conflict.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card", { hasText: "Quick close conflict." });
+    await card.locator(".annotation-summary").click();
+    await card.locator(".annotation-actions > summary").click();
+    await card.locator('.annotation-lifecycle select[name="status"]').selectOption("acknowledged");
+    await card.locator('.annotation-lifecycle button[type="submit"]').click();
+
+    await card.locator(".annotation-summary").click();
+    await card.locator(".annotation-actions > summary").click();
+    await card.locator('.annotation-lifecycle select[name="status"]').selectOption("applied");
+    await card.locator('.annotation-lifecycle textarea[name="activity"]').fill("Applied for conflict coverage.");
+    await card.locator('.annotation-lifecycle button[type="submit"]').click();
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-quick-close")).toBeVisible();
+
+    const token = await page.locator('meta[name="md-viewer-review-token"]').getAttribute("content");
+    const current = await page.request.get(`${viewerURL}api/annotations?document=quick-close.md`);
+    const payload = await current.json();
+    const external = await page.request.post(`${viewerURL}api/annotations`, {
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": JSON.stringify(payload.revision),
+        "Origin": new URL(viewerURL).origin,
+        "X-MD-Viewer-Token": token,
+      },
+      data: {
+        document: "quick-close.md",
+        intent: "question",
+        comment: "Concurrent quick-close annotation",
+        author: "agent",
+      },
+    });
+    expect(external.ok()).toBeTruthy();
+
+    await card.locator(".annotation-quick-close").click();
+    await expect(page.locator(".annotation-form-status")).toContainText("Annotations changed");
+    await expect(page.locator(".annotation-card")).toHaveCount(2);
+    await expect(card.locator(".annotation-badge")).toContainText(["change request", "applied"]);
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-quick-close")).toBeVisible();
   });
 });
