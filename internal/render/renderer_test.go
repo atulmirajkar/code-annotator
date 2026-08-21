@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"atulm/md-viewer/internal/gitdiff"
 )
 
 func TestRenderCode(t *testing.T) {
@@ -37,6 +39,91 @@ func TestRenderCode(t *testing.T) {
 			for _, want := range test.contains {
 				if !strings.Contains(string(output), want) {
 					t.Errorf("RenderCode() output missing %q:\n%s", want, output)
+				}
+			}
+		})
+	}
+}
+
+func TestRenderDiff(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		current  []byte
+		diff     gitdiff.FileDiff
+		review   bool
+		contains []string
+		excludes []string
+		wantErr  error
+	}{
+		{
+			name:    "renders aligned rows with current annotation metadata",
+			current: []byte("same\nnew <value>\nadded & more\n"),
+			review:  true,
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 4, BaseText: "same"},
+				{Kind: gitdiff.RowModified, OldLine: 2, NewLine: 2, CurrentStart: 5, CurrentEnd: 16, BaseText: "old <value>"},
+				{Kind: gitdiff.RowDeleted, OldLine: 3, BaseText: "removed & gone"},
+				{Kind: gitdiff.RowAdded, NewLine: 3, CurrentStart: 17, CurrentEnd: 29},
+			}},
+			contains: []string{
+				`class="diff-row diff-unchanged"`,
+				`class="diff-row diff-modified"`,
+				`class="diff-row diff-deleted"`,
+				`class="diff-row diff-added"`,
+				`data-source-start="5" data-source-end="16">new &lt;value&gt;</span>`,
+				`removed &amp; gone`,
+				`data-source-start="17" data-source-end="29">added &amp; more</span>`,
+			},
+			excludes: []string{`data-source-start="0" data-source-end="0"`, `>old &lt;value&gt;</span>`},
+		},
+		{
+			name:    "omits annotation metadata outside review mode",
+			current: []byte("new"),
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowModified, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 3, BaseText: "old"},
+			}},
+			contains: []string{`<span class="diff-marker" aria-hidden="true">-</span>`, `<span class="diff-marker" aria-hidden="true">+</span>`, `<code>new</code>`},
+			excludes: []string{`class="source-text"`},
+		},
+		{
+			name:    "accepts CRLF ranges",
+			current: []byte("a\r\n\r\n"),
+			review:  true,
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 1, BaseText: "a"},
+				{Kind: gitdiff.RowAdded, NewLine: 2, CurrentStart: 3, CurrentEnd: 3},
+			}},
+			contains: []string{`data-source-start="0" data-source-end="1">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code></code>`},
+		},
+		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-rows"></div>`}},
+		{name: "invalid UTF-8", current: []byte{0xff}, wantErr: ErrUnsupportedText},
+		{name: "invalid row kind", current: []byte("a"), diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: "mystery", OldLine: 1, NewLine: 1, CurrentEnd: 1}}}, wantErr: ErrInvalidDiff},
+		{name: "invalid current offset", current: []byte("a\nb"), diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 2, BaseText: "a"}}}, wantErr: ErrInvalidDiff},
+		{name: "missing current row", current: []byte("a\nb"), diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 1, BaseText: "a"}}}, wantErr: ErrInvalidDiff},
+		{name: "deleted row has current metadata", diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: gitdiff.RowDeleted, OldLine: 1, NewLine: 1}}}, wantErr: ErrInvalidDiff},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			output, err := New().RenderDiff(test.current, test.diff, test.review)
+			if test.wantErr != nil {
+				if !errors.Is(err, test.wantErr) {
+					t.Fatalf("RenderDiff() error = %v, want %v", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("RenderDiff() error = %v", err)
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(string(output), want) {
+					t.Errorf("RenderDiff() output missing %q:\n%s", want, output)
+				}
+			}
+			for _, unwanted := range test.excludes {
+				if strings.Contains(string(output), unwanted) {
+					t.Errorf("RenderDiff() output unexpectedly contains %q:\n%s", unwanted, output)
 				}
 			}
 		})

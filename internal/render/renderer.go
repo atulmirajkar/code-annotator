@@ -12,6 +12,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"atulm/md-viewer/internal/gitdiff"
+
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
 	"github.com/yuin/goldmark/extension"
@@ -23,7 +25,10 @@ import (
 
 const blockedDestination = "#invalid-local-path"
 
-var ErrUnsupportedText = errors.New("source is not valid UTF-8 text")
+var (
+	ErrUnsupportedText = errors.New("source is not valid UTF-8 text")
+	ErrInvalidDiff     = errors.New("file diff is inconsistent with current source")
+)
 
 // Renderer converts GitHub Flavored Markdown to HTML. It retains goldmark's
 // safe defaults, including omission of raw HTML and dangerous URLs.
@@ -293,6 +298,128 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 	}
 	output.WriteString(`</ol></div>`)
 	return []byte(output.String()), nil
+}
+
+// RenderDiff converts aligned Git rows into a side-by-side view with the base
+// on the left and current source on the right. Only current-side text receives
+// source offsets because annotations always target the editable current file.
+func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool) ([]byte, error) {
+	if !utf8.Valid(current) || bytes.IndexByte(current, 0) >= 0 {
+		return nil, ErrUnsupportedText
+	}
+	if err := validateDiffRows(current, diff.Rows); err != nil {
+		return nil, err
+	}
+
+	var output strings.Builder
+	output.WriteString(`<div class="diff-view"><div class="diff-column-headings" aria-hidden="true"><span>Base</span><span>Current</span></div><div class="diff-rows">`)
+	for _, row := range diff.Rows {
+		fmt.Fprintf(&output, `<div class="diff-row diff-%s">`, row.Kind)
+		renderDiffCell(&output, "base", diffMarker(row.Kind, false), row.OldLine, row.BaseText, 0, 0, false)
+		currentText := ""
+		if row.NewLine > 0 {
+			currentText = string(current[row.CurrentStart:row.CurrentEnd])
+		}
+		renderDiffCell(&output, "current", diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review)
+		output.WriteString(`</div>`)
+	}
+	output.WriteString(`</div></div>`)
+	return []byte(output.String()), nil
+}
+
+// validateDiffRows ensures renderer metadata cannot point outside or at the
+// wrong line of current source, even if a caller constructs FileDiff directly.
+func validateDiffRows(current []byte, rows []gitdiff.Row) error {
+	currentLines := sourceRanges(current)
+	oldLine, newLine := 1, 1
+	for _, row := range rows {
+		hasOld := row.Kind != gitdiff.RowAdded
+		hasNew := row.Kind != gitdiff.RowDeleted
+		if row.Kind != gitdiff.RowUnchanged && row.Kind != gitdiff.RowAdded && row.Kind != gitdiff.RowModified && row.Kind != gitdiff.RowDeleted {
+			return ErrInvalidDiff
+		}
+		if hasOld {
+			if row.OldLine != oldLine {
+				return ErrInvalidDiff
+			}
+			oldLine++
+		} else if row.OldLine != 0 || row.BaseText != "" {
+			return ErrInvalidDiff
+		}
+		if !hasNew {
+			if row.NewLine != 0 || row.CurrentStart != 0 || row.CurrentEnd != 0 {
+				return ErrInvalidDiff
+			}
+			continue
+		}
+		if row.NewLine != newLine || newLine > len(currentLines) {
+			return ErrInvalidDiff
+		}
+		rangeValue := currentLines[newLine-1]
+		if row.CurrentStart != rangeValue[0] || row.CurrentEnd != rangeValue[1] {
+			return ErrInvalidDiff
+		}
+		newLine++
+	}
+	if newLine != len(currentLines)+1 {
+		return ErrInvalidDiff
+	}
+	return nil
+}
+
+// sourceRanges returns byte ranges for visible line content, excluding CRLF or
+// LF terminators. An empty source has no diff rows, unlike the plain code view.
+func sourceRanges(source []byte) [][2]int {
+	ranges := make([][2]int, 0)
+	for start := 0; start < len(source); {
+		end := bytes.IndexByte(source[start:], '\n')
+		if end < 0 {
+			end = len(source)
+		} else {
+			end += start
+		}
+		contentEnd := end
+		if contentEnd > start && source[contentEnd-1] == '\r' {
+			contentEnd--
+		}
+		ranges = append(ranges, [2]int{start, contentEnd})
+		if end == len(source) {
+			break
+		}
+		start = end + 1
+	}
+	return ranges
+}
+
+// renderDiffCell writes one escaped diff cell. A zero line number represents
+// the intentionally empty half of an added or deleted row.
+func renderDiffCell(output *strings.Builder, side, marker string, line int, content string, start, end int, review bool) {
+	fmt.Fprintf(output, `<div class="diff-cell diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, marker)
+	if line > 0 {
+		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
+		if review && side == "current" && end > start {
+			fmt.Fprintf(output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, end)
+		}
+		output.WriteString(html.EscapeString(content))
+		if review && side == "current" && end > start {
+			output.WriteString(`</span>`)
+		}
+		output.WriteString(`</code>`)
+	} else {
+		output.WriteString(`<span class="diff-line-number" aria-hidden="true"></span><code></code>`)
+	}
+	output.WriteString(`</div>`)
+}
+
+// diffMarker returns conventional patch markers for changed cells.
+func diffMarker(kind gitdiff.RowKind, current bool) string {
+	if current && (kind == gitdiff.RowAdded || kind == gitdiff.RowModified) {
+		return "+"
+	}
+	if !current && (kind == gitdiff.RowDeleted || kind == gitdiff.RowModified) {
+		return "-"
+	}
+	return ""
 }
 
 func (r *Renderer) render(markdown goldmark.Markdown, source []byte, documentPath string) ([]byte, error) {
