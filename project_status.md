@@ -4,7 +4,7 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Viewer navigation polish browser-verified; artifact refresh pending.
+**Phase:** Viewer navigation polish verified; review required before live reload.
 
 The manual-refresh MVP and annotation review workflow are implemented, including
 selection mapping, highlights, secured browser mutations, live API agent handoff,
@@ -134,5 +134,6 @@ release verification is reviewed.
 
 ## Next milestone
 
-Complete viewer navigation polish, then stop for review before beginning live
-reload design or implementation.
+Review the collapsible panels, document lookup, browser coverage, and refreshed
+distribution artifacts. Begin live-reload design or implementation only after
+maintainer approval.
