@@ -1,15 +1,16 @@
 const { test: base, expect } = require("@playwright/test");
 const { spawn } = require("node:child_process");
-const { mkdtemp, rm } = require("node:fs/promises");
+const { cp, mkdtemp, rm } = require("node:fs/promises");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
 
 // viewerURL owns one isolated review server per Playwright worker. Content is
 // read from immutable fixtures while annotation writes go to a temporary root.
 const test = base.extend({
-  viewerURL: [async ({}, use) => {
+  viewer: [async ({}, use) => {
     const annotationRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-annotations-"));
-    const contentRoot = path.join(__dirname, "fixtures");
+    const contentRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-content-"));
+    await cp(path.join(__dirname, "fixtures"), contentRoot, { recursive: true });
     const server = spawn("go", [
       "run", "./cmd/md-viewer",
       "-review",
@@ -26,7 +27,7 @@ const test = base.extend({
     server.stderr.on("data", (chunk) => { diagnostics += chunk.toString(); });
     try {
       const viewerURL = await waitForViewerURL(server, () => diagnostics);
-      await use(viewerURL);
+      await use({ url: viewerURL, contentRoot, annotationRoot });
     } finally {
       server.kill("SIGINT");
       await Promise.race([
@@ -35,8 +36,10 @@ const test = base.extend({
       ]);
       if (server.exitCode === null) server.kill("SIGKILL");
       await rm(annotationRoot, { recursive: true, force: true });
+      await rm(contentRoot, { recursive: true, force: true });
     }
   }, { scope: "worker" }],
+  viewerURL: [async ({ viewer }, use) => use(viewer.url), { scope: "worker" }],
 });
 
 // waitForViewerURL resolves startup output while retaining stderr for useful

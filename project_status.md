@@ -4,12 +4,13 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Annotation review verification; release tag pending.
+**Phase:** Browser verification complete; release verification pending.
 
 The manual-refresh MVP and annotation review workflow are implemented, including
 selection mapping, highlights, secured browser mutations, live API agent handoff,
-and a repository-owned agent skill. Browser interaction coverage remains.
-Embedded diagram rendering and live reload follow annotation review.
+and a repository-owned agent skill. Focused browser interaction coverage and
+embedded diagram rendering are complete. Live reload remains deferred until
+release verification is reviewed.
 
 ## Milestones
 
@@ -71,7 +72,7 @@ Embedded diagram rendering and live reload follow annotation review.
 - [x] Add browser controls for reattaching stale text anchors.
 - [x] Collapse annotation details and infrequent actions by default.
 - [x] Add storage, API, security, and agent-handoff tests.
-- [ ] Add focused browser UI interaction tests.
+- [x] Add focused browser UI interaction tests.
 
 ### 7. Mermaid and sequence diagrams
 
@@ -86,7 +87,7 @@ Embedded diagram rendering and live reload follow annotation review.
 - [x] Add responsive diagram styling and viewer-theme integration.
 - [x] Treat a rendered diagram as one source-backed annotation region rather
   than mapping individual SVG labels to Markdown offsets.
-- [ ] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
+- [x] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
   integration tests.
 
 ### 8. Live reload
@@ -127,5 +128,5 @@ Embedded diagram rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Complete focused browser interaction coverage for annotation mutation controls
-as the next independently reviewable commit.
+Run release verification, refresh distribution artifacts, and stop for review
+before beginning live reload.

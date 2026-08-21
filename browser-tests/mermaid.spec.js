@@ -61,6 +61,19 @@ test.describe("Mermaid rendering", () => {
     await expect(page.locator(".selection-preview")).toContainText("complete diagram");
   });
 
+  test("creates and highlights a whole-diagram annotation", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/valid.md`);
+    await page.locator(".mermaid-output svg text").first().click();
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Update this interaction.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    await expect(page.locator(".annotation-form-status")).toHaveText("Annotation added.");
+    await expect(page.locator(".annotation-card")).toHaveCount(1);
+    await expect(page.locator(".mermaid-diagram")).toHaveClass(/annotation-highlight-region/);
+    await page.locator(".annotation-card .annotation-summary").click();
+    await expect(page.locator(".annotation-source")).toContainText("sequenceDiagram");
+  });
+
   test("keeps fenced text diagrams monospace and horizontally scrollable", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/valid.md`);
     const code = page.locator("pre code.language-text");
