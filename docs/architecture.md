@@ -76,6 +76,7 @@ routes are not registered until their handlers use this guard.
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
 | `GET /api/annotations?document={path}` | In review mode, return annotations, current anchor state, and revision. |
 | `POST /api/annotations` | In a secured review session, create a verified text or document annotation. |
+| `PATCH /api/annotations/{id}` | Atomically transition lifecycle state and append its structured activity. |
 | `POST /api/annotations/{id}/replies` | Append an ordinary discussion reply without changing lifecycle state. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
@@ -93,6 +94,12 @@ The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
 preserves existing entries. Structured lifecycle activity is reserved for the
 transition route so discussion cannot bypass status validation.
+
+Lifecycle transitions are actor-controlled by the annotation domain model. The
+handler creates any required acknowledgement, resolution, review, or rejection
+activity and then a `status_change` entry before one atomic save. In particular,
+returning applied work to `needs_changes` cannot change status without retaining
+the reviewer's required message.
 
 ## Key dependencies
 

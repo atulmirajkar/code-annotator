@@ -394,6 +394,25 @@ thread entry. Clients cannot use this route to manufacture `resolution`,
 `review`, or `status_change` events; lifecycle endpoints create those events
 atomically with their corresponding validated transition.
 
+The transition route accepts `document`, target `status`, `actorRole`, `author`,
+and transition-specific activity. It validates the actor and current state,
+then appends the activity event followed by a `status_change` event in the same
+optimistic sidecar save:
+
+| Target status | Required activity |
+| --- | --- |
+| `acknowledged` | Server-owned `acknowledgement`; no message or summary. |
+| `applied` | `resolution` with required `summary` and optional `commit`. |
+| `needs_changes` | `review` with required reviewer `message`. |
+| `rejected` | `reply` with a required rejection reason in `message`. |
+| `closed` or reopened `open` | Status-change event only. |
+
+This makes `applied -> needs_changes` atomic: the annotation remains active, the
+reviewer's unsatisfied feedback stays inline, and an agent sees the complete
+prior attempt on the next acknowledgement. Invalid actors, skipped states, and
+activity fields that do not belong to the target status are rejected without a
+write. Like other mutations, the request requires the current strong ETag.
+
 ## Local write security
 
 Loopback does not by itself make mutation endpoints safe: a malicious website

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 )
+
+var errTransitionIdentifier = errors.New("generate transition identifier")
 
 // annotationView extends one persisted annotation with its location derived
 // from the current Markdown source. Document-level annotations have no anchor.
@@ -66,6 +69,25 @@ type replyAnnotationRequest struct {
 
 // replyAnnotationResponse returns the updated annotation and sidecar revision.
 type replyAnnotationResponse struct {
+	Annotation annotationView `json:"annotation"`
+	Revision   string         `json:"revision"`
+}
+
+// transitionAnnotationRequest describes one lifecycle transition and any
+// activity content required for that transition.
+type transitionAnnotationRequest struct {
+	Document  string               `json:"document"`
+	Status    annotation.Status    `json:"status"`
+	ActorRole annotation.ActorRole `json:"actorRole"`
+	Author    string               `json:"author"`
+	Message   string               `json:"message,omitempty"`
+	Summary   string               `json:"summary,omitempty"`
+	Commit    string               `json:"commit,omitempty"`
+}
+
+// transitionAnnotationResponse returns the transitioned annotation and the new
+// sidecar revision.
+type transitionAnnotationResponse struct {
 	Annotation annotationView `json:"annotation"`
 	Revision   string         `json:"revision"`
 }
@@ -292,6 +314,163 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		Annotation: view,
 		Revision:   string(revision),
 	})
+}
+
+// handleTransitionAnnotation validates one actor-controlled lifecycle change
+// and records its activity and status events in the same atomic sidecar save.
+func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, request *http.Request) {
+	expected, status, err := parseIfMatch(request)
+	if err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+
+	var input transitionAnnotationRequest
+	if status, err := decodeMutationJSON(request, &input); err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
+		http.Error(response, "Markdown document not found", http.StatusNotFound)
+		return
+	}
+	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
+	if err != nil {
+		s.writeAnnotationReadError(response, err)
+		return
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		http.Error(response, "could not read annotations", http.StatusInternalServerError)
+		return
+	}
+
+	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
+	if annotationIndex < 0 {
+		http.Error(response, "annotation not found", http.StatusNotFound)
+		return
+	}
+	updated := &sidecar.Annotations[annotationIndex]
+	if err := annotation.ValidateTransition(updated.Status, input.Status, input.ActorRole); err != nil {
+		http.Error(response, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	now := time.Now().UTC()
+	if now.Before(updated.UpdatedAt) {
+		// Preserve chronological thread ordering if the system clock moves
+		// backwards or the sidecar came from a slightly faster clock.
+		now = updated.UpdatedAt
+	}
+	entries, err := transitionEntries(*updated, input, now)
+	if err != nil {
+		if errors.Is(err, errTransitionIdentifier) {
+			http.Error(response, "could not generate transition identifier", http.StatusInternalServerError)
+			return
+		}
+		http.Error(response, err.Error(), http.StatusBadRequest)
+		return
+	}
+	updated.Status = input.Status
+	updated.Thread = append(updated.Thread, entries...)
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		http.Error(response, "could not validate transitioned annotation", http.StatusInternalServerError)
+		return
+	}
+	view, err := resolveAnnotationView(document, *updated)
+	if err != nil {
+		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+		return
+	}
+	revision, err := s.annotations.Save(sidecar, expected)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			response.Header().Set("ETag", strconv.Quote(string(revision)))
+			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
+			return
+		}
+		http.Error(response, "could not save annotation transition", http.StatusInternalServerError)
+		return
+	}
+
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	_ = json.NewEncoder(response).Encode(transitionAnnotationResponse{
+		Annotation: view,
+		Revision:   string(revision),
+	})
+}
+
+// transitionEntries builds the immutable activity history required by one
+// already-validated status transition, followed by its status-change event.
+func transitionEntries(current annotation.Annotation, input transitionAnnotationRequest, now time.Time) ([]annotation.ThreadEntry, error) {
+	if strings.TrimSpace(input.Author) == "" {
+		return nil, errors.New("author is required")
+	}
+	entries := make([]annotation.ThreadEntry, 0, 2)
+	activity := annotation.ThreadEntry{Author: input.Author, CreatedAt: now}
+	switch input.Status {
+	case annotation.StatusAcknowledged:
+		if input.Message != "" || input.Summary != "" || input.Commit != "" {
+			return nil, errors.New("acknowledgement does not accept message, summary, or commit")
+		}
+		activity.Kind = annotation.ThreadAcknowledgement
+	case annotation.StatusApplied:
+		if input.Message != "" {
+			return nil, errors.New("applied transition does not accept message")
+		}
+		activity.Kind = annotation.ThreadResolution
+		activity.Summary = input.Summary
+		activity.Commit = input.Commit
+	case annotation.StatusNeedsChanges:
+		if input.Summary != "" || input.Commit != "" {
+			return nil, errors.New("needs_changes transition does not accept summary or commit")
+		}
+		activity.Kind = annotation.ThreadReview
+		activity.Message = input.Message
+	case annotation.StatusRejected:
+		if input.Summary != "" || input.Commit != "" {
+			return nil, errors.New("rejected transition does not accept summary or commit")
+		}
+		activity.Kind = annotation.ThreadReply
+		activity.Message = input.Message
+	case annotation.StatusClosed, annotation.StatusOpen:
+		if input.Message != "" || input.Summary != "" || input.Commit != "" {
+			return nil, errors.New("status transition does not accept message, summary, or commit")
+		}
+	default:
+		return nil, fmt.Errorf("unsupported transition target %q", input.Status)
+	}
+
+	if activity.Kind != "" {
+		identifier, err := annotation.NewThreadID(now)
+		if err != nil {
+			return nil, fmt.Errorf("%w: activity: %v", errTransitionIdentifier, err)
+		}
+		activity.ID = identifier
+		if err := activity.Validate(); err != nil {
+			return nil, err
+		}
+		entries = append(entries, activity)
+	}
+	statusIdentifier, err := annotation.NewThreadID(now)
+	if err != nil {
+		return nil, fmt.Errorf("%w: status change: %v", errTransitionIdentifier, err)
+	}
+	statusChange := annotation.ThreadEntry{
+		ID:         statusIdentifier,
+		Kind:       annotation.ThreadStatusChange,
+		Author:     input.Author,
+		ActorRole:  input.ActorRole,
+		FromStatus: current.Status,
+		ToStatus:   input.Status,
+		CreatedAt:  now,
+	}
+	if err := statusChange.Validate(); err != nil {
+		return nil, err
+	}
+	return append(entries, statusChange), nil
 }
 
 // findAnnotation returns the index of identifier or -1 when the sidecar does

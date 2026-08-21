@@ -75,8 +75,8 @@ Available flags:
 
 Review mode establishes the annotation storage boundary and enables the
 annotation read API plus secured annotation creation. The browser review
-interface and remaining lifecycle and reattachment routes are being delivered
-in subsequent milestone commits. Ordinary discussion replies are already
+interface and reattachment route are being delivered in subsequent milestone
+commits. Ordinary replies and actor-validated lifecycle transitions are already
 available through the secured API. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 

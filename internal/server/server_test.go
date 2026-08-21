@@ -488,6 +488,176 @@ func TestReplyAnnotationAPI(t *testing.T) {
 	}
 }
 
+func TestTransitionEntries(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	tests := []struct {
+		name      string
+		from      annotation.Status
+		input     transitionAnnotationRequest
+		wantKinds []annotation.ThreadKind
+		wantErr   string
+	}{
+		{name: "acknowledge open", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent"}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
+		{name: "acknowledge retry", from: annotation.StatusNeedsChanges, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent"}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
+		{name: "report applied", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, ActorRole: annotation.RoleAgent, Author: "agent", Summary: "Implemented", Commit: "abc1234"}, wantKinds: []annotation.ThreadKind{annotation.ThreadResolution, annotation.ThreadStatusChange}},
+		{name: "request changes", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, ActorRole: annotation.RoleReviewer, Author: "reviewer", Message: "Keep the default."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReview, annotation.ThreadStatusChange}},
+		{name: "reject request", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, ActorRole: annotation.RoleAgent, Author: "agent", Message: "Conflicts with policy."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReply, annotation.ThreadStatusChange}},
+		{name: "close applied", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusClosed, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
+		{name: "reopen closed", from: annotation.StatusClosed, input: transitionAnnotationRequest{Status: annotation.StatusOpen, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
+		{name: "missing resolution summary", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, ActorRole: annotation.RoleAgent, Author: "agent"}, wantErr: "summary"},
+		{name: "missing review message", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantErr: "message"},
+		{name: "missing rejection reason", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, ActorRole: annotation.RoleAgent, Author: "agent"}, wantErr: "message"},
+		{name: "metadata on acknowledgement", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent", Message: "unexpected"}, wantErr: "does not accept"},
+		{name: "blank author", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: " "}, wantErr: "author"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			current := annotation.Annotation{Status: test.from}
+			entries, err := transitionEntries(current, test.input, now)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("transitionEntries() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("transitionEntries() error = %v", err)
+			}
+			if len(entries) != len(test.wantKinds) {
+				t.Fatalf("entry count = %d, want %d: %#v", len(entries), len(test.wantKinds), entries)
+			}
+			for index, wantKind := range test.wantKinds {
+				if entries[index].Kind != wantKind || !strings.HasPrefix(entries[index].ID, "msg_") {
+					t.Errorf("entry %d = %#v, want kind %q and msg_ ID", index, entries[index], wantKind)
+				}
+			}
+			statusChange := entries[len(entries)-1]
+			if statusChange.FromStatus != test.from || statusChange.ToStatus != test.input.Status || statusChange.ActorRole != test.input.ActorRole {
+				t.Fatalf("status change = %#v", statusChange)
+			}
+		})
+	}
+}
+
+func TestTransitionAnnotationAPI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	validBody := `{"document":"README.md","status":"needs_changes","actorRole":"reviewer","author":"reviewer","message":"Keep the loopback default."}`
+	tests := []struct {
+		name         string
+		annotationID string
+		body         string
+		useCurrent   bool
+		omitIfMatch  bool
+		wantStatus   int
+		wantConflict bool
+	}{
+		{name: "request changes", annotationID: "ann_transition_test", body: validBody, useCurrent: true, wantStatus: http.StatusOK},
+		{name: "agent cannot request changes", annotationID: "ann_transition_test", body: strings.Replace(validBody, `"reviewer"`, `"agent"`, 1), useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "review message required", annotationID: "ann_transition_test", body: strings.Replace(validBody, "Keep the loopback default.", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "annotation missing", annotationID: "ann_missing", body: validBody, useCurrent: true, wantStatus: http.StatusNotFound},
+		{name: "missing revision", annotationID: "ann_transition_test", body: validBody, omitIfMatch: true, wantStatus: http.StatusPreconditionRequired},
+		{name: "stale revision", annotationID: "ann_transition_test", body: validBody, wantStatus: http.StatusConflict, wantConflict: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "# Review")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			currentRevision := saveTransitionAnnotation(t, store, annotation.StatusApplied)
+			viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			requestPath := "/api/annotations/" + test.annotationID
+			request := httptest.NewRequest(http.MethodPatch, requestPath, strings.NewReader(test.body))
+			request.Header.Set("Origin", origin)
+			request.Header.Set(reviewTokenHeader, token)
+			request.Header.Set("Content-Type", "application/json")
+			if !test.omitIfMatch {
+				revision := annotationstore.Revision("")
+				if test.useCurrent {
+					revision = currentRevision
+				}
+				request.Header.Set("If-Match", strconv.Quote(string(revision)))
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantConflict && response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
+				t.Fatalf("conflict ETag = %q, want current revision", response.Header().Get("ETag"))
+			}
+			if test.wantStatus != http.StatusOK {
+				return
+			}
+
+			var payload transitionAnnotationResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			thread := payload.Annotation.Thread
+			if payload.Annotation.Status != annotation.StatusNeedsChanges || len(thread) != 2 || thread[0].Kind != annotation.ThreadReview || thread[0].Message != "Keep the loopback default." || thread[1].Kind != annotation.ThreadStatusChange {
+				t.Fatalf("transitioned annotation = %#v", payload.Annotation)
+			}
+			stored, revision, err := store.Load("README.md")
+			if err != nil {
+				t.Fatalf("Store.Load() error = %v", err)
+			}
+			if stored.Annotations[0].Status != annotation.StatusNeedsChanges || string(revision) != payload.Revision {
+				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
+			}
+		})
+	}
+}
+
+// saveTransitionAnnotation persists one document annotation in the requested
+// lifecycle state for transition API tests.
+func saveTransitionAnnotation(t *testing.T, store *annotationstore.Store, status annotation.Status) annotationstore.Revision {
+	t.Helper()
+	created := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	sidecar := annotation.Sidecar{
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      "README.md",
+		Annotations: []annotation.Annotation{
+			{
+				ID:        "ann_transition_test",
+				Intent:    annotation.IntentChangeRequest,
+				Status:    status,
+				Comment:   "Keep the default.",
+				Author:    "reviewer",
+				CreatedAt: created,
+				UpdatedAt: created,
+				Thread:    []annotation.ThreadEntry{},
+			},
+		},
+	}
+	revision, err := store.Save(sidecar, "")
+	if err != nil {
+		t.Fatalf("Store.Save() error = %v", err)
+	}
+	return revision
+}
+
 func TestReviewSessionConfiguration(t *testing.T) {
 	t.Parallel()
 
