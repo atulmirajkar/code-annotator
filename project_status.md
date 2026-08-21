@@ -4,7 +4,7 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Release candidate verified; review required before live reload.
+**Phase:** Viewer navigation polish browser-verified; artifact refresh pending.
 
 The manual-refresh MVP and annotation review workflow are implemented, including
 selection mapping, highlights, secured browser mutations, live API agent handoff,
@@ -94,7 +94,7 @@ release verification is reviewed.
 
 - [x] Make the document and annotation sidebars independently collapsible.
 - [x] Add case-insensitive document-path lookup in the document sidebar.
-- [ ] Add browser coverage for panel collapse, lookup, and navigation.
+- [x] Add browser coverage for panel collapse, lookup, and navigation.
 
 ### 9. Live reload
 

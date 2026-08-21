@@ -69,6 +69,12 @@ The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
 available in the terminal.
 
+The document and annotation sidebars can be collapsed independently to give the
+rendered document more room. Use the document sidebar's **Find document** field
+to filter by any case-insensitive portion of a relative path. Press `/` from the
+document view to focus lookup, Enter to open the first match, or Escape to clear
+the filter.
+
 Available flags:
 
 ```text

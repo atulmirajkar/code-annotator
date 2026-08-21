@@ -236,6 +236,12 @@ files and directories are omitted. The page template provides a navigation
 sidebar and a readable document pane; on desktop, the sidebar remains visible
 and scrolls independently from the document.
 
+Both sidebars are independently collapsible, and the CSS grid assigns their
+released width to the document rather than retaining empty columns. Document
+lookup filters the server-rendered relative paths in the browser, so it adds no
+filesystem or HTTP search surface. Matching is case-insensitive; keyboard
+controls focus lookup, move to results, clear a query, and open the first match.
+
 Fenced `mermaid` blocks load the embedded Mermaid Tiny bundle only on pages that
 need it. Mermaid runs with strict security and a bounded input size, and no
 diagram asset is fetched at runtime. The default Content Security Policy allows
