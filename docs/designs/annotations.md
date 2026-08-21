@@ -375,7 +375,67 @@ history and Git traceability.
 ## Local write security
 
 Loopback does not by itself make mutation endpoints safe: a malicious website
-could attempt requests to a predictable local port. Review mode must add:
+open in the same browser could attempt requests to a predictable local port.
+The browser's same-origin policy generally prevents that site from reading the
+viewer response, but it does not make every cross-origin write attempt
+impossible. Review mode therefore uses two independent request checks.
+
+### Origin and review token
+
+There is no “origin token.” These are separate values with different purposes:
+
+- The **origin** is the viewer's exact scheme, host, and selected port, such as
+  `http://127.0.0.1:54321`. It is not secret. Browsers automatically attach it
+  to a cross-origin mutation request in the `Origin` header. The server accepts
+  only the origin captured after its loopback listener is bound.
+- The **review token** is a secret containing 256 random bits, generated anew
+  for every review-mode process. The server embeds its URL-safe representation
+  in a `<meta name="md-viewer-review-token">` element on viewer pages. Trusted
+  viewer JavaScript reads it and sends it in the `X-MD-Viewer-Token` header on
+  every mutation.
+
+The origin check rejects a request initiated by another website, even if that
+site guesses the loopback port. The token proves that the caller could read the
+viewer page; merely knowing the URL is insufficient. Requiring a custom header
+also makes a cross-origin browser request non-simple and triggers a CORS
+preflight. The viewer exposes neither permissive CORS headers nor mutation
+`OPTIONS` routes, so an unrelated origin cannot obtain permission to send it.
+
+The review token exists only in process memory and the generated page. It is
+never printed, written to a sidecar, placed in the viewer URL, or reused after a
+restart. Normal read-only mode creates no token and embeds no token metadata.
+The annotation `GET` API does not require the token; it performs no write, and
+the absence of CORS still prevents unrelated browser origins from reading it.
+
+### Mutation request flow
+
+```text
+md-viewer process        Viewer page JavaScript        Mutation guard
+        |                          |                          |
+        |-- bind loopback port ----|                          |
+        |-- generate review token  |                          |
+        |-- serve page + token --->|                          |
+        |                          |                          |
+        |                          |-- POST/PATCH ----------->|
+        |                          |   Origin: exact origin   |
+        |                          |   X-MD-Viewer-Token: ... |
+        |                          |   Content-Type: JSON     |
+        |                          |                          |
+        |                          |                    verify origin
+        |                          |                    compare token
+        |                          |                    enforce JSON
+        |                          |                    limit to 64 KiB
+        |                          |                          |
+        |                          |<-- handler or rejection -|
+```
+
+The token comparison is constant-time. A missing or incorrect origin or token
+returns `403 Forbidden`; a non-JSON content type returns `415 Unsupported Media
+Type`. Mutation handlers must report an oversized body as `413 Request Entity
+Too Large`. These checks happen before parsing annotation data or touching the
+writable store.
+
+The complete local-write boundary is:
 
 - A cryptographically random session token generated at startup.
 - The token embedded into the served review page and required in a custom header
@@ -387,7 +447,12 @@ could attempt requests to a predictable local port. Review mode must add:
 - HTML escaping for comments; annotation Markdown rendering is out of scope.
 - No permissive CORS headers.
 
-The token should not be printed in terminal output or stored in sidecars.
+Browser mutations use the guarded HTTP API. Offline CLI commands and local AI
+agents use the store directly under the invoking user's filesystem permissions,
+so they do not use a browser origin or review token. An agent integration that
+chooses to call the HTTP mutation API must instead be securely provisioned with
+the current process's origin and review token. The token cannot be obtained from
+logs because it is never logged.
 
 ## AI-agent handoff
 
