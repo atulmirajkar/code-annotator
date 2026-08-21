@@ -2,6 +2,7 @@
 package server
 
 import (
+	"bytes"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -45,6 +46,8 @@ type Server struct {
 	page        *template.Template
 	styles      template.CSS
 	reviewJS    []byte
+	mermaidJS   []byte
+	mermaidTiny []byte
 	handler     http.Handler
 }
 
@@ -99,6 +102,7 @@ type pageData struct {
 	Empty          bool
 	ReviewToken    string
 	DocumentSHA256 string
+	HasMermaid     bool
 }
 
 type documentView struct {
@@ -182,13 +186,23 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read review script: %w", err)
 	}
+	mermaidJS, err := fs.ReadFile(web.Files, "mermaid.js")
+	if err != nil {
+		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
+	}
+	mermaidTiny, err := fs.ReadFile(web.Files, "vendor/mermaid/mermaid.tiny.js")
+	if err != nil {
+		return nil, fmt.Errorf("read Mermaid library: %w", err)
+	}
 
 	server := &Server{
-		root:     root,
-		renderer: renderer,
-		page:     page,
-		styles:   template.CSS(styles), // Embedded, application-owned CSS.
-		reviewJS: reviewJS,
+		root:        root,
+		renderer:    renderer,
+		page:        page,
+		styles:      template.CSS(styles), // Embedded, application-owned CSS.
+		reviewJS:    reviewJS,
+		mermaidJS:   mermaidJS,
+		mermaidTiny: mermaidTiny,
 	}
 	for _, option := range options {
 		if option == nil {
@@ -204,6 +218,8 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
+	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
+	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
@@ -223,6 +239,18 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.reviewJS)
+}
+
+// handleMermaidScript serves the application-owned diagram integration.
+func (s *Server) handleMermaidScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.mermaidJS)
+}
+
+// handleMermaidLibrary serves the pinned, self-contained Mermaid Tiny bundle.
+func (s *Server) handleMermaidLibrary(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.mermaidTiny)
 }
 
 // Handler returns the complete HTTP handler for the viewer.
@@ -349,6 +377,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		Styles:         s.styles,
 		Empty:          len(index.Documents) == 0,
 		DocumentSHA256: documentSHA256,
+		HasMermaid:     bytes.Contains(fragment, []byte(`class="mermaid-diagram"`)),
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

@@ -49,6 +49,13 @@ a { color: var(--accent); }
 .markdown-body pre { overflow-x: auto; padding: 1rem; border: 1px solid var(--border); border-radius: .55rem; background: var(--code); }
 .markdown-body code { padding: .12em .32em; border-radius: .3rem; background: var(--code); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .9em; }
 .markdown-body pre code { padding: 0; background: transparent; }
+.mermaid-diagram { margin: 1.5rem 0; }
+.mermaid-source { margin-bottom: .75rem; color: var(--muted); font-size: .85rem; }
+.mermaid-source summary { cursor: pointer; }
+.mermaid-source pre { margin-top: .5rem; }
+.mermaid-output { max-width: 100%; overflow-x: auto; text-align: center; }
+.mermaid-output svg { display: inline-block; max-width: 100%; height: auto; }
+.mermaid-error { padding: .75rem; border: 1px solid #b42318; border-radius: .45rem; color: #b42318; }
 .markdown-body blockquote { margin-left: 0; padding-left: 1rem; border-left: .25rem solid var(--border); color: var(--muted); }
 .markdown-body mark.annotation-highlight-fallback { border-radius: .15em; background: rgba(255, 204, 0, .38); color: inherit; }
 ::highlight(md-viewer-annotations) { background: rgba(255, 204, 0, .38); color: inherit; }

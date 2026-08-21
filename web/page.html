@@ -86,6 +86,8 @@
     </aside>
     {{end}}
   </div>
+  {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
+  <script src="/static/mermaid.js" defer></script>{{end}}
   {{if .ReviewToken}}<script src="/static/review.js" defer></script>{{end}}
 </body>
 </html>

@@ -205,3 +205,80 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 		})
 	}
 }
+
+func TestRenderFencedCodeBlocks(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		source         string
+		review         bool
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name:   "Mermaid fence becomes diagram with source fallback",
+			source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n",
+			wantContains: []string{
+				`<div class="mermaid-diagram">`,
+				`<details class="mermaid-source">`,
+				`<div class="mermaid-output"`,
+				`sequenceDiagram`,
+			},
+			wantNotContain: []string{`class="source-text`},
+		},
+		{
+			name:   "Mermaid language is case insensitive",
+			source: "```MERMAID\ngraph TD\n  A-->B\n```\n",
+			wantContains: []string{
+				`<div class="mermaid-diagram">`,
+			},
+		},
+		{
+			name:   "review Mermaid source retains byte positions",
+			source: "```mermaid\ngraph TD\n  A-->B\n```\n",
+			review: true,
+			wantContains: []string{
+				`<div class="mermaid-diagram">`,
+				`class="source-text source-code-text" data-source-start="11"`,
+			},
+		},
+		{
+			name:   "ordinary fence remains code",
+			source: "```go\nfmt.Println()\n```\n",
+			wantContains: []string{
+				`<pre><code class="language-go">fmt.Println()`,
+			},
+			wantNotContain: []string{`mermaid-diagram`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			var (
+				output []byte
+				err    error
+			)
+			if test.review {
+				output, err = New().RenderWithSourcePositions([]byte(test.source), "README.md")
+			} else {
+				output, err = New().Render([]byte(test.source), "README.md")
+			}
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+			html := string(output)
+			for _, want := range test.wantContains {
+				if !strings.Contains(html, want) {
+					t.Errorf("Render() output missing %q:\n%s", want, html)
+				}
+			}
+			for _, unwanted := range test.wantNotContain {
+				if strings.Contains(html, unwanted) {
+					t.Errorf("Render() output contains %q:\n%s", unwanted, html)
+				}
+			}
+		})
+	}
+}

@@ -78,12 +78,12 @@ Embedded diagram rendering and live reload follow annotation review.
 - [x] Pin Mermaid Tiny and retain its license in the embedded web assets.
 - [x] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
   network dependency.
-- [ ] Recognize fenced `mermaid` blocks and render them as client-side SVG.
+- [x] Recognize fenced `mermaid` blocks and render them as client-side SVG.
 - [ ] Use strict Mermaid security, bounded diagram input, and a self-only script
   Content Security Policy without `unsafe-inline`.
-- [ ] Preserve the source code block and show a useful message when diagram
+- [x] Preserve the source code block and show a useful message when diagram
   parsing or rendering fails.
-- [ ] Add responsive diagram styling and viewer-theme integration.
+- [x] Add responsive diagram styling and viewer-theme integration.
 - [ ] Treat a rendered diagram as one source-backed annotation region rather
   than mapping individual SVG labels to Markdown offsets.
 - [ ] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation

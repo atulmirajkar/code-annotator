@@ -30,11 +30,17 @@ type Renderer struct {
 // New creates a Renderer configured with GitHub Flavored Markdown extensions.
 func New() *Renderer {
 	return &Renderer{
-		markdown: goldmark.New(goldmark.WithExtensions(extension.GFM)),
+		markdown: goldmark.New(
+			goldmark.WithExtensions(extension.GFM),
+			goldmark.WithRendererOptions(renderer.WithNodeRenderers(
+				util.Prioritized(newFencedCodeRenderer(false), 500),
+			)),
+		),
 		reviewMarkdown: goldmark.New(
 			goldmark.WithExtensions(extension.GFM),
 			goldmark.WithRendererOptions(renderer.WithNodeRenderers(
 				util.Prioritized(newSourceTextRenderer(), 500),
+				util.Prioritized(newFencedCodeRenderer(true), 500),
 			)),
 		),
 	}
@@ -56,7 +62,6 @@ func newSourceTextRenderer() *sourceTextRenderer {
 func (r *sourceTextRenderer) RegisterFuncs(register renderer.NodeRendererFuncRegisterer) {
 	register.Register(ast.KindText, r.renderText)
 	register.Register(ast.KindCodeSpan, r.renderCodeSpan)
-	register.Register(ast.KindFencedCodeBlock, r.renderFencedCodeBlock)
 }
 
 func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -136,15 +141,45 @@ func (r *sourceTextRenderer) renderCodeSpan(writer util.BufWriter, source []byte
 	return ast.WalkSkipChildren, nil
 }
 
-// renderFencedCodeBlock gives each code line its exact source byte range. The
-// opening fence, info string, and closing fence remain outside selectable spans.
-func (r *sourceTextRenderer) renderFencedCodeBlock(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+// fencedCodeRenderer recognizes Mermaid fences and optionally gives ordinary
+// code lines their exact source byte ranges in review mode.
+type fencedCodeRenderer struct {
+	writer          goldmarkhtml.Writer
+	sourcePositions bool
+}
+
+func newFencedCodeRenderer(sourcePositions bool) *fencedCodeRenderer {
+	return &fencedCodeRenderer{
+		writer:          goldmarkhtml.NewWriter(),
+		sourcePositions: sourcePositions,
+	}
+}
+
+// RegisterFuncs replaces the default fenced-code renderer in both normal and
+// review modes so Mermaid recognition is consistent.
+func (r *fencedCodeRenderer) RegisterFuncs(register renderer.NodeRendererFuncRegisterer) {
+	register.Register(ast.KindFencedCodeBlock, r.renderFencedCodeBlock)
+}
+
+func (r *fencedCodeRenderer) renderFencedCodeBlock(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	block := node.(*ast.FencedCodeBlock)
 	if !entering {
+		if isMermaidBlock(block, source) {
+			_, _ = writer.WriteString("</code></pre></details>\n")
+			_, _ = writer.WriteString(`<div class="mermaid-output" role="img" aria-label="Rendered Mermaid diagram"></div>`)
+			_, _ = writer.WriteString(`<p class="mermaid-error" role="alert" hidden></p></div>` + "\n")
+			return ast.WalkContinue, nil
+		}
 		_, _ = writer.WriteString("</code></pre>\n")
 		return ast.WalkContinue, nil
 	}
 
-	block := node.(*ast.FencedCodeBlock)
+	if isMermaidBlock(block, source) {
+		_, _ = writer.WriteString(`<div class="mermaid-diagram"><details class="mermaid-source"><summary>Diagram source</summary><pre><code class="language-mermaid">`)
+		r.renderLines(writer, source, block)
+		return ast.WalkContinue, nil
+	}
+
 	_, _ = writer.WriteString("<pre><code")
 	if language := block.Language(source); language != nil {
 		_, _ = writer.WriteString(` class="language-`)
@@ -152,17 +187,33 @@ func (r *sourceTextRenderer) renderFencedCodeBlock(writer util.BufWriter, source
 		_ = writer.WriteByte('"')
 	}
 	_ = writer.WriteByte('>')
+	r.renderLines(writer, source, block)
+	return ast.WalkContinue, nil
+}
+
+// renderLines escapes fenced content and adds selectable source ranges only
+// when the renderer is serving review mode.
+func (r *fencedCodeRenderer) renderLines(writer util.BufWriter, source []byte, block *ast.FencedCodeBlock) {
 	for index := 0; index < block.Lines().Len(); index++ {
 		line := block.Lines().At(index)
-		_, _ = writer.WriteString(`<span class="source-text source-code-text" data-source-start="`)
-		_, _ = writer.WriteString(strconv.Itoa(line.Start))
-		_, _ = writer.WriteString(`" data-source-end="`)
-		_, _ = writer.WriteString(strconv.Itoa(line.Stop))
-		_, _ = writer.WriteString(`">`)
+		if r.sourcePositions {
+			_, _ = writer.WriteString(`<span class="source-text source-code-text" data-source-start="`)
+			_, _ = writer.WriteString(strconv.Itoa(line.Start))
+			_, _ = writer.WriteString(`" data-source-end="`)
+			_, _ = writer.WriteString(strconv.Itoa(line.Stop))
+			_, _ = writer.WriteString(`">`)
+		}
 		r.writer.RawWrite(writer, line.Value(source))
-		_, _ = writer.WriteString("</span>")
+		if r.sourcePositions {
+			_, _ = writer.WriteString("</span>")
+		}
 	}
-	return ast.WalkContinue, nil
+}
+
+// isMermaidBlock matches the conventional fenced-code language label without
+// making Markdown authors depend on a particular capitalization.
+func isMermaidBlock(block *ast.FencedCodeBlock, source []byte) bool {
+	return strings.EqualFold(string(block.Language(source)), "mermaid")
 }
 
 // Render converts source into an HTML fragment. documentPath is the URL-style

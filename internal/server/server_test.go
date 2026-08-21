@@ -1140,25 +1140,28 @@ func TestReviewPageEmbedding(t *testing.T) {
 	}
 }
 
-func TestReviewScript(t *testing.T) {
+func TestStaticScripts(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
 		name         string
+		path         string
 		method       string
 		wantStatus   int
 		wantType     string
 		wantContents []string
 	}{
-		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle"}},
-		{name: "reject post", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
+		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle"}},
+		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
+		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},
+		{name: "reject post", path: "/static/review.js", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			handler := newTestHandler(t, nil)
-			request := httptest.NewRequest(test.method, "/static/review.js", nil)
+			request := httptest.NewRequest(test.method, test.path, nil)
 			response := httptest.NewRecorder()
 			handler.ServeHTTP(response, request)
 
@@ -1172,6 +1175,40 @@ func TestReviewScript(t *testing.T) {
 				if !strings.Contains(response.Body.String(), wantContent) {
 					t.Errorf("script does not contain %q", wantContent)
 				}
+			}
+		})
+	}
+}
+
+func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		source     string
+		wantAssets bool
+	}{
+		{name: "ordinary Markdown omits Mermaid assets", source: "# Home\n"},
+		{name: "Mermaid fence loads Mermaid assets", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", wantAssets: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), test.source)
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			viewer, err := New(root, mdrender.New())
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			body := getResponse(t, viewer.Handler(), "/").Body.String()
+			hasAssets := strings.Contains(body, `src="/static/mermaid.tiny.js"`) && strings.Contains(body, `src="/static/mermaid.js"`)
+			if hasAssets != test.wantAssets {
+				t.Fatalf("page contains Mermaid assets = %t, want %t", hasAssets, test.wantAssets)
 			}
 		})
 	}
