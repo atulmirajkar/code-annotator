@@ -20,6 +20,7 @@
   const documentPath = panel.dataset.document;
   let currentRevision = "";
   let pendingSelection = null;
+  let diagramSelectionActive = false;
   let preserveSelection = false;
   let annotationPayload = null;
   if (!documentPath) {
@@ -41,8 +42,17 @@
     // selectionchange covers mouse, touch, and keyboard expansion regardless
     // of which element owns focus or where a drag gesture ends.
     document.addEventListener("selectionchange", updateSelectionPreview);
+    markdown.addEventListener("pointerdown", clearDiagramSelectionOnPointerdown);
     markdown.addEventListener("click", captureDiagramClick);
     markdown.addEventListener("keydown", captureDiagramKeydown);
+  }
+
+  // Beginning a different interaction explicitly releases a synthetic diagram
+  // selection. Pointer events inside the diagram itself are handled on click.
+  function clearDiagramSelectionOnPointerdown(event) {
+    if (diagramSelectionActive && !event.target.closest?.(".mermaid-output")) {
+      forceClearSelectionPreview();
+    }
   }
 
   // A rendered diagram has no stable label-to-Markdown mapping. Treat a click
@@ -67,11 +77,11 @@
     const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
     if (!Number.isInteger(startByte) || !Number.isInteger(endByte) || endByte <= startByte || !documentSHA256 || !exact) return;
 
-    // Removing an old DOM range emits selectionchange. Preserve this synthetic
-    // region until that event has passed so it cannot clear the new selection.
-    preserveSelection = true;
+    // Diagram selection is synthetic: the SVG has no DOM text range that maps
+    // safely to Markdown. Keep it active across delayed collapsed
+    // selectionchange events until the reviewer starts another interaction.
+    diagramSelectionActive = true;
     window.getSelection()?.removeAllRanges();
-    window.setTimeout(() => { preserveSelection = false; }, 0);
     markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
     diagram.classList.add("annotation-selection");
     preview.dataset.startByte = String(startByte);
@@ -93,9 +103,12 @@
   function updateSelectionPreview() {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
+      if (diagramSelectionActive && pendingSelection) return;
       clearSelectionPreview();
       return;
     }
+    diagramSelectionActive = false;
+    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
     const range = selection.getRangeAt(0);
     const startSpan = sourceSpan(range.startContainer);
     const endSpan = sourceSpan(range.endContainer);
@@ -189,6 +202,7 @@
     previewQuote.textContent = "";
     previewRange.textContent = "";
     pendingSelection = null;
+    diagramSelectionActive = false;
     markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
     selectionScope.disabled = true;
     documentScope.checked = true;
@@ -257,6 +271,7 @@
 
   function forceClearSelectionPreview() {
     pendingSelection = null;
+    diagramSelectionActive = false;
     markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
     preview.hidden = true;
     previewQuote.textContent = "";
