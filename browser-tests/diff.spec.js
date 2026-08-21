@@ -122,6 +122,7 @@ test.describe("side-by-side diff", () => {
     await expect(preview).toBeVisible();
     await expect(preview).toContainText("fixtures");
     await expect(preview).toContainText("current-side replacement");
+    await expect(preview.locator(".selection-quote")).toHaveText('fixtures\n\nconst layoutMessage = "This current-side replacement');
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review this multi-line replacement context.");
     await page.locator('.annotation-form button[type="submit"]').click();
 

@@ -125,6 +125,8 @@ release verification is reviewed.
   annotation-to-source navigation in the browser.
 - [x] Cover current-side multi-line selection and reject base-side and
   cross-pane selections in the browser.
+- [x] Exclude line-number gutters and diff markers from multi-line selection
+  previews while preserving source blank lines.
 - [ ] Complete diff-specific browser coverage for File/Changes tab navigation,
   narrow layouts, and light/dark themes.
 - [ ] Update user-facing build/run documentation and refresh distributions

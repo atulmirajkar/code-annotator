@@ -124,7 +124,7 @@
     const documentSHA256 = markdown.dataset.documentSha256;
     const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
     const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
-    const exact = range.toString();
+    const exact = selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset);
     if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
       clearSelectionPreview();
       return;
@@ -152,6 +152,32 @@
   function sourceSpan(node) {
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
     return element ? element.closest(".source-text") : null;
+  }
+
+  // Browser Range text includes line-number and diff-marker siblings between
+  // endpoints. For line-oriented code, rebuild the preview from source spans
+  // only while preserving visually empty intervening rows as newlines.
+  function selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset) {
+    const startRow = startSpan.closest(".source-line, .diff-current");
+    const endRow = endSpan.closest(".source-line, .diff-current");
+    if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement) {
+      return range.toString();
+    }
+
+    const rows = Array.from(startRow.parentElement.children).filter((row) => row.matches(".source-line, .diff-current"));
+    const startIndex = rows.indexOf(startRow);
+    const endIndex = rows.indexOf(endRow);
+    if (startIndex < 0 || endIndex < startIndex) return "";
+    if (startIndex === endIndex) {
+      return (startSpan.textContent || "").slice(startOffset, endOffset);
+    }
+
+    return rows.slice(startIndex, endIndex + 1).map((row, index, selectedRows) => {
+      const text = row.querySelector(".source-text")?.textContent || "";
+      if (index === 0) return text.slice(startOffset);
+      if (index === selectedRows.length - 1) return text.slice(0, endOffset);
+      return text;
+    }).join("\n");
   }
 
   // Confirm that the selection endpoints occur in document source order.

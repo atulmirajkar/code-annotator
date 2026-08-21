@@ -649,6 +649,13 @@ The selection preview labels diff-created ranges as “current file against
 <requested base>.” The payload adds only the optional review context; byte
 positions and document digest remain unchanged.
 
+For line-oriented source, the browser constructs preview text exclusively from
+current-side `.source-text` spans and inserts newlines for intervening display
+rows. It must not use the raw DOM range text, because that includes line-number
+and diff-marker siblings between multi-line endpoints. The server remains
+authoritative and derives the stored quote from submitted current-file byte
+offsets.
+
 Deleted text, line numbers, diff markers, toolbar controls, and syntax chrome
 use `user-select: none`. Keyboard selection remains available within current
 source content.
