@@ -44,6 +44,7 @@ internal/content/           directory indexing and root-contained file lookup
 internal/annotation/        annotation schema, lifecycle, and anchor resolution
 internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
+internal/gitdiff/           bounded Git commands, aligned diffs, revision state
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
 internal/commands/          offline annotation tools and live HTTP agent client
@@ -53,6 +54,12 @@ web/                        embedded HTML, CSS, and review-panel JavaScript
 Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
+
+`internal/gitdiff` also owns the concurrency-safe active comparison snapshot.
+HTTP handlers consume one immutable snapshot per changed-path or file-diff
+operation. Browser selection and refresh requests can replace that snapshot
+only with the configured revision re-resolution or a commit from the bounded
+server-issued option list; handlers never pass browser strings to Git.
 
 The `annotations` command family is dispatched before server flag parsing and
 never binds a listener or launches a browser. `annotations list` walks the

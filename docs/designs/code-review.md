@@ -629,9 +629,10 @@ The existing routes remain stable:
 | annotation APIs | Accept only paths in the reviewable catalog. |
 | agent queue | Traverse Markdown and code sidecars in catalog order. |
 
-No endpoint accepts an arbitrary Git revision. The base revision is startup
-configuration, resolved once, and exposed read-only in page metadata. This
-avoids turning the browser into a general Git command surface.
+No endpoint accepts an arbitrary Git revision string. The comparison API may
+select only a full commit ID from a server-issued bounded option list, or
+re-resolve the single revision supplied by `--diff-base`. This avoids turning
+the browser into a general Git command surface.
 
 The File/Changes links preserve the selected path. Annotation mutations retain
 the existing origin token, review token, content type, body limit, document
@@ -644,12 +645,81 @@ mode. Collapsed document and annotation panels are stored independently in the
 same tab-scoped storage and restored after navigation. Markdown links never
 receive `mode=diff`.
 
-The source toolbar visibly identifies the comparison as `Base: <requested>
-(<12-character commit>)`; its title exposes the complete commit ID. The commit
-is frozen for the server lifetime. Reloading the browser does not re-resolve a
-moving name such as `HEAD`, which prevents an agent commit from silently
-changing review semantics. Re-resolving the configured base without restarting
-the server and selecting other commits are explicitly deferred future work.
+The source toolbar visibly identifies the active comparison. Reloading the
+browser alone does not re-resolve a moving name such as `HEAD`; only the
+explicit Git refresh action below can change the active base.
+
+## Revision selector and Git refresh
+
+### User experience
+
+When Git comparison is configured, the source toolbar contains a revision
+selector, the active 12-character commit ID and truncated subject, and a
+`Refresh Git diff` button. Hover text exposes the complete commit ID and
+subject.
+
+The selector contains two kinds of server-issued options:
+
+1. The configured revision, such as `HEAD` or `origin/main`, which may move.
+2. At most 50 recent local repository commits, identified by full object ID and
+   labeled with an abbreviated ID plus a subject truncated to 72 characters.
+
+Subjects are display-only untrusted text and remain HTML-escaped. Selecting a
+listed commit changes the server-wide comparison base and reloads the current
+page in its existing File/Changes mode. Markdown links remain unaffected.
+
+`Refresh Git diff` performs a fresh bounded option lookup. If the configured
+moving revision is active, it also re-resolves that revision and atomically
+adopts its new commit. If an explicit commit is active, refresh retains that
+exact commit and only refreshes the option list.
+
+This distinction is intentional: refreshing active `HEAD` after an agent has
+committed a clean worktree makes the diff empty, because the new base and
+current file are identical. Selecting the previous commit displays the agent's
+committed change again.
+
+### Comparison state and concurrency
+
+The server owns concurrency-safe comparison state rather than mutating a shared
+`gitdiff.Config` pointer. Every changed-path or file-diff request takes one
+immutable snapshot and uses it for the complete operation. A refresh or
+selection builds and validates a replacement before acquiring the write lock,
+then swaps it atomically. Failure leaves the previous snapshot usable.
+
+Each snapshot has an opaque state revision. The selection endpoint accepts only
+a full commit ID present in that snapshot's option list. A stale `If-Match`
+revision returns `409`, preventing one browser tab from silently overwriting
+another tab's selection.
+
+### HTTP contract and security
+
+| Route | Behavior |
+| --- | --- |
+| `GET /api/git-comparison` | Return active identity, state revision, and bounded selector options. |
+| `POST /api/git-comparison` with `{"action":"refresh"}` | Refresh options and re-resolve the configured revision when active. |
+| `POST /api/git-comparison` with `{"action":"select","commit":"<full SHA>"}` | Select a commit from the current option snapshot. |
+
+Mutations require JSON, exact loopback `Origin`, a per-process comparison
+control token, and quoted `If-Match` state revision. The token is distinct from
+the agent annotation token and is exposed only to the browser page when Git
+comparison is enabled. These controls work with or without annotation mode.
+
+Selector options use a no-shell, no-prompt, bounded `git log --all --date-order
+--max-count=50` invocation. NUL-framed object IDs and subjects make embedded
+newlines unambiguous. Output remains bounded to 64 KiB and execution to three
+seconds. Refresh resolves only the startup-configured revision using the
+existing `--end-of-options` validation and never contacts a remote.
+
+### Failure behavior
+
+- Lookup or configured-ref resolution failure retains the old snapshot and
+  shows a non-sensitive inline error.
+- A commit absent from the current option snapshot returns `400`.
+- An `If-Match` conflict returns `409` and reloads current state.
+- An unreadable selected commit makes that file's Changes view unavailable
+  without breaking File view.
+- Browser refresh remains a page reload; only the explicit button runs Git
+  refresh behavior.
 
 ## Browser selection and highlighting
 
@@ -800,11 +870,15 @@ Each slice should be independently reviewable:
 9. Add Go and browser integration coverage.
 10. Update documentation, run release verification, and refresh distributions.
 11. Stop for maintainer review before live reload.
+12. Add bounded revision discovery and atomic comparison snapshots.
+13. Add protected comparison state, selection, and refresh routes.
+14. Add the selector/refresh UI and browser coverage.
 
 ## Decisions requested before implementation
 
 1. Approve current-side annotations only; the left/base pane is read-only.
-2. Approve comparison of one startup base commit to the current worktree only.
+2. Approve one active server-wide base against the current worktree, selected
+   only from bounded server-issued commits or the configured revision.
 3. Approve opt-in code discovery with the proposed default extensions.
 4. Approve default exclusions for `node_modules`, `vendor`, `bin`, and `obj`.
 5. Approve plain escaped source first and defer syntax highlighting.
@@ -833,13 +907,15 @@ Status as of 2026-08-21:
   highlights after reload, annotation-to-source navigation, multi-line current
   selection, and rejection of base-side or cross-pane ranges.
 
-The next session should continue with small commits in this order:
+The next implementation should continue with small commits in this order:
 
-1. Cover narrow viewport behavior and both color schemes; fix only defects
-   exposed by those tests.
-2. Reconcile README, architecture, build instructions, and this milestone with
-   the implemented behavior; run release verification and rebuild `dist/`.
-3. Stop for maintainer review. Do not begin live reload until that review is
+1. Add bounded, table-tested recent-commit discovery.
+2. Add concurrency-tested comparison snapshots and atomic selection/refresh.
+3. Add protected state/select/refresh handlers with conflict coverage.
+4. Add the selector, subject display, refresh control, and browser coverage.
+5. Finish narrow viewport and color-scheme coverage, then reconcile user docs
+   and rebuild distributions.
+6. Stop for maintainer review. Do not begin live reload until that review is
    explicitly approved.
 
 The relevant implementation commits immediately preceding this handoff are
