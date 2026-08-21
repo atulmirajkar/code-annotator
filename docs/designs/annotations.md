@@ -649,6 +649,12 @@ comment, thread, and lifecycle status. Success clears the captured selection.
 A document or sidecar conflict reloads annotations and requires a fresh
 selection so an outdated range cannot be applied silently.
 
+Cards are collapsed by default to a status-and-comment summary and expand on
+click to show source context, authorship, and thread history. Reply,
+reattachment, and lifecycle forms sit inside a nested collapsed `Actions`
+section. This keeps long threads and primarily agent-oriented operations out of
+the scanning path without removing access to them.
+
 Closed and rejected annotations are complete or declined work, so the default
 document view excludes both their cards and their source highlights. The panel
 reports active and total counts and offers an explicit history toggle that

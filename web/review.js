@@ -365,15 +365,22 @@
   }
 
   function createCard(annotation) {
-    const card = element("article", "annotation-card");
+    const card = element("details", "annotation-card");
     card.dataset.annotationId = annotation.id || "";
 
-    const meta = element("div", "annotation-meta");
+    const summary = element("summary", "annotation-summary");
+
+    const meta = element("span", "annotation-meta");
     meta.append(badge(annotation.intent || "comment"), badge(annotation.status || "open"));
     if (annotation.anchor && annotation.anchor.state === "stale") {
       meta.append(badge("stale", "stale"));
     }
-    card.append(meta);
+    const summaryComment = element("span", "annotation-summary-comment");
+    summaryComment.textContent = annotation.comment || "Annotation";
+    summary.append(meta, summaryComment);
+    card.append(summary);
+
+    const body = element("div", "annotation-card-body");
 
     const source = element("div", "annotation-source");
     if (annotation.source && annotation.source.selector) {
@@ -389,15 +396,15 @@
       source.textContent = "Whole document";
       source.classList.add("document-level");
     }
-    card.append(source);
+    body.append(source);
 
     const comment = element("p", "annotation-comment");
     comment.textContent = annotation.comment || "";
-    card.append(comment);
+    body.append(comment);
 
     const author = element("p", "annotation-author");
     author.textContent = annotation.author ? `By ${annotation.author}` : "Unknown author";
-    card.append(author);
+    body.append(author);
 
     if (Array.isArray(annotation.thread) && annotation.thread.length > 0) {
       const thread = element("ol", "annotation-thread");
@@ -406,14 +413,21 @@
         item.textContent = `${entry.author || "Unknown"}: ${threadText(entry)}`;
         thread.append(item);
       });
-      card.append(thread);
+      body.append(thread);
     }
+
+    const actions = element("details", "annotation-actions");
+    const actionsSummary = document.createElement("summary");
+    actionsSummary.textContent = "Actions";
+    actions.append(actionsSummary);
     if (annotation.anchor && annotation.anchor.state === "stale") {
-      card.append(createReattachForm(annotation));
+      actions.append(createReattachForm(annotation));
     }
-    card.append(createReplyForm(annotation));
+    actions.append(createReplyForm(annotation));
     const lifecycle = createLifecycleForm(annotation);
-    if (lifecycle) card.append(lifecycle);
+    if (lifecycle) actions.append(lifecycle);
+    body.append(actions);
+    card.append(body);
     return card;
   }
 

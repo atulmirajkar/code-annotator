@@ -69,6 +69,7 @@ rendering and live reload follow annotation review.
 - [x] Hide closed and rejected cards and highlights behind a history toggle.
 - [x] Add ordinary inline discussion replies to annotation cards.
 - [x] Add browser controls for reattaching stale text anchors.
+- [x] Collapse annotation details and infrequent actions by default.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
 ### 7. Mermaid and sequence diagrams

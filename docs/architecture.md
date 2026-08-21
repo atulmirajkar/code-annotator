@@ -143,6 +143,12 @@ their cards before rendering and passes only active annotations to the highlight
 renderer. A history toggle rerenders the same authoritative payload with all
 annotations, preserving access to audit history and reopen transitions.
 
+Annotation cards use native disclosure controls: the default summary contains
+status badges and a two-line comment preview, while source context, discussion,
+and author details appear after expansion. Mutation forms live under a second
+collapsed `Actions` disclosure so infrequent agent and lifecycle operations do
+not dominate routine document review.
+
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
 preserves existing entries. Structured lifecycle activity is reserved for the
