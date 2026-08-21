@@ -546,6 +546,11 @@ index order, omits documents with no matching annotations, includes derived
 anchor state, and supports comma-separated status filtering. It is read-only:
 a missing annotation directory produces an empty list without creating storage.
 
+Markdown `export` reuses that collected model and adds stable IDs, original
+selector text and lines, derived anchor location or stale reason, comments, and
+the complete thread. Source and comment blocks choose a backtick fence longer
+than any run in their content, preserving arbitrary Markdown as data.
+
 An agent workflow is:
 
 1. List unresolved `question`, `suggestion`, and `change_request` annotations.

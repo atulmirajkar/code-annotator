@@ -85,11 +85,16 @@ List annotations without running the server:
 ```sh
 ./bin/md-viewer annotations list --root ./docs \
   --status open,needs_changes --format json
+
+./bin/md-viewer annotations export --root ./docs \
+  --status open,needs_changes --format markdown
 ```
 
 Use `--annotations-dir ./reviews` when review mode used an external sidecar
 root. A missing annotation directory returns an empty JSON document list and is
-not created by this read-only command.
+not created by these read-only commands.
+Both commands are read-only. Markdown export includes stable IDs, original
+source selections, current anchor state, reviewer comments, and thread history.
 
 ## Verify
 

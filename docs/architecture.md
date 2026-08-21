@@ -58,6 +58,10 @@ never binds a listener or launches a browser. `annotations list` walks the
 content index in stable order, loads matching sidecars directly, derives current
 anchor state, and writes deterministic JSON. It checks for storage before
 opening the store so a read against a missing annotation root creates nothing.
+`annotations export` uses the same collected model and status filtering, then
+formats it as deterministic Markdown. Arbitrary source and comment text is
+placed in dynamically sized code fences so embedded backticks cannot corrupt
+the handoff structure.
 
 Read-only mode never opens or creates annotation storage. With `--review`, the
 application opens a separate symlink-resolved writable root. The default is

@@ -121,5 +121,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add agent-friendly Markdown export on top of the offline annotation list model
-as the next independently reviewable commit.
+Add offline reply and lifecycle transition commands as the next independently
+reviewable commit.

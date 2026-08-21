@@ -130,6 +130,77 @@ func TestRunAnnotations(t *testing.T) {
 	}
 }
 
+func TestParseExportConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		args    []string
+		wantErr string
+	}{
+		{name: "defaults", args: []string{"--root", "./docs"}},
+		{name: "explicit markdown", args: []string{"--root", "./docs", "--format", "markdown"}},
+		{name: "missing root", wantErr: "--root is required"},
+		{name: "invalid format", args: []string{"--root", "./docs", "--format", "json"}, wantErr: "unsupported export format"},
+		{name: "invalid status", args: []string{"--root", "./docs", "--status", "pending"}, wantErr: "invalid annotation status"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := parseExportConfig(test.args, io.Discard)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("parseExportConfig() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseExportConfig() error = %v", err)
+			}
+		})
+	}
+}
+
+func TestRunAnnotationExport(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		status     string
+		contains   []string
+		notContain string
+	}{
+		{name: "agent handoff", status: "open", contains: []string{"# Annotation review", "## README.md", "### ann_readme", "- Anchor: `exact` at lines 1–1", "#### Selected Markdown", "selected", "````text\nUpdate ``` example\n````", "`reply` by reviewer", "First line second line"}},
+		{name: "no matches", status: "applied", contains: []string{"No matching annotations."}, notContain: "## README.md"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeCommandFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeCommandFile(t, filepath.Join(rootPath, "guide.md"), "Guide text")
+			annotationsDir := filepath.Join(t.TempDir(), "annotations")
+			seedCommandAnnotations(t, annotationsDir)
+
+			args := []string{"export", "--root", rootPath, "--annotations-dir", annotationsDir, "--status", test.status}
+			var output bytes.Buffer
+			if err := RunAnnotations(args, &output, io.Discard); err != nil {
+				t.Fatalf("RunAnnotations() error = %v", err)
+			}
+			for _, wanted := range test.contains {
+				if !strings.Contains(output.String(), wanted) {
+					t.Errorf("export missing %q:\n%s", wanted, output.String())
+				}
+			}
+			if test.notContain != "" && strings.Contains(output.String(), test.notContain) {
+				t.Errorf("export contains %q:\n%s", test.notContain, output.String())
+			}
+		})
+	}
+}
+
 // seedCommandAnnotations creates two valid sidecars in deliberately reversed
 // save order so the list test verifies content-index ordering.
 func seedCommandAnnotations(t *testing.T, directory string) {
@@ -145,7 +216,7 @@ func seedCommandAnnotations(t *testing.T, directory string) {
 	}
 	sidecars := []annotation.Sidecar{
 		{SchemaVersion: annotation.SchemaVersion, Document: "guide.md", Annotations: []annotation.Annotation{{ID: "ann_guide", Intent: annotation.IntentQuestion, Status: annotation.StatusNeedsChanges, Comment: "Clarify", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Thread: []annotation.ThreadEntry{}}}},
-		{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{{ID: "ann_readme", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Update", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &source, Thread: []annotation.ThreadEntry{}}}},
+		{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{{ID: "ann_readme", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Update ``` example", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &source, Thread: []annotation.ThreadEntry{{ID: "msg_reply", Kind: annotation.ThreadReply, Message: "First line\nsecond line", Author: "reviewer", CreatedAt: now}}}}},
 	}
 	for _, sidecar := range sidecars {
 		if _, err := store.Save(sidecar, ""); err != nil {
