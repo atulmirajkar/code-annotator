@@ -28,9 +28,10 @@ tree use an installed `md-viewer agent` command.
 
    Each document has its own `revision`. Retain the revision belonging to the
    annotation's document for the next mutation.
-2. Select only annotation IDs in scope. Read the original comment, selected
-   Markdown, anchor state, and complete thread. A stale anchor means the old
-   selection is no longer uniquely located; do not guess a replacement.
+2. Select only annotation IDs in scope. Use each document's `kind` and
+   `language` to interpret the selected source, anchor state, and complete
+   thread. A stale anchor means the old selection is no longer uniquely
+   located; do not guess a replacement.
 3. Before changing files, acknowledge an `open` or `needs_changes` annotation:
 
    ```sh
@@ -78,12 +79,17 @@ go run ./cmd/md-viewer annotations export \
   --root <content-root> --status open,needs_changes
 ```
 
+Add `--include-code` (or `--code-extensions <csv>`) when the stopped viewer's
+catalog included source files. Use the same `--exclude-dirs` value used to
+launch it so the offline queue matches the live catalog.
+
 Use `annotations resolve` and `annotations reply` with the same lifecycle rules
 as the live workflow. Supply `--root`, the stable annotation `--id`, and any
-explicit `--annotations-dir` used by the reviewer. The offline commands load a
-sidecar revision immediately before saving and reject concurrent changes. If a
-conflict occurs, export again and reconsider the action instead of retrying
-blindly.
+explicit `--annotations-dir` used by the reviewer. Repeat the same code-catalog
+flags on these mutation commands when processing a source file. The offline
+commands load a sidecar revision immediately before saving and reject concurrent
+changes. If a conflict occurs, export again and reconsider the action instead
+of retrying blindly.
 
 For example, acknowledge before editing and then report completed work:
 

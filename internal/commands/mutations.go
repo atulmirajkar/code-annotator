@@ -22,6 +22,7 @@ type replyConfig struct {
 	annotationID   string
 	author         string
 	message        string
+	indexOptions   content.IndexOptions
 }
 
 type resolveConfig struct {
@@ -29,6 +30,7 @@ type resolveConfig struct {
 	annotationsDir string
 	annotationID   string
 	input          annotation.TransitionInput
+	indexOptions   content.IndexOptions
 }
 
 type mutationTarget struct {
@@ -47,11 +49,14 @@ type mutationOutput struct {
 func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 	flags := flag.NewFlagSet("md-viewer annotations reply", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	root := flags.String("root", "", "Markdown content root")
+	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	identifier := flags.String("id", "", "annotation identifier")
 	author := flags.String("author", "", "reply author")
 	message := flags.String("message", "", "reply message")
+	includeCode := flags.Bool("include-code", false, "include supported source files")
+	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
+	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer annotations reply --root <directory> --id <annotation> --author <name> --message <text>")
 		flags.PrintDefaults()
@@ -80,13 +85,17 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 		flags.Usage()
 		return replyConfig{}, fmt.Errorf("%s is required", missing)
 	}
-	return replyConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, author: *author, message: *message}, nil
+	indexOptions, err := annotationCatalogOptions(*includeCode, *codeExtensions, *excludeDirs)
+	if err != nil {
+		return replyConfig{}, err
+	}
+	return replyConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, author: *author, message: *message, indexOptions: indexOptions}, nil
 }
 
 func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) {
 	flags := flag.NewFlagSet("md-viewer annotations resolve", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	root := flags.String("root", "", "Markdown content root")
+	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	identifier := flags.String("id", "", "annotation identifier")
 	status := flags.String("status", "", "target lifecycle status")
@@ -95,6 +104,9 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 	message := flags.String("message", "", "review or rejection message")
 	summary := flags.String("summary", "", "applied-work summary")
 	commit := flags.String("commit", "", "optional applied-work commit")
+	includeCode := flags.Bool("include-code", false, "include supported source files")
+	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
+	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer annotations resolve --root <directory> --id <annotation> --status <status> --role <role> --author <name> [options]")
 		flags.PrintDefaults()
@@ -126,7 +138,11 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 	if input.ActorRole != annotation.RoleAgent && input.ActorRole != annotation.RoleReviewer {
 		return resolveConfig{}, fmt.Errorf("invalid annotation actor role %q", input.ActorRole)
 	}
-	return resolveConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, input: input}, nil
+	indexOptions, err := annotationCatalogOptions(*includeCode, *codeExtensions, *excludeDirs)
+	if err != nil {
+		return resolveConfig{}, err
+	}
+	return resolveConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, input: input, indexOptions: indexOptions}, nil
 }
 
 // runReply appends one ordinary discussion entry and saves against the exact
@@ -136,7 +152,7 @@ func runReply(configuration replyConfig, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	target, err := findMutationTarget(root, store, configuration.annotationID)
+	target, err := findMutationTarget(root, store, configuration.annotationID, configuration.indexOptions)
 	if err != nil {
 		return err
 	}
@@ -176,7 +192,7 @@ func runResolve(configuration resolveConfig, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	target, err := findMutationTarget(root, store, configuration.annotationID)
+	target, err := findMutationTarget(root, store, configuration.annotationID, configuration.indexOptions)
 	if err != nil {
 		return err
 	}
@@ -211,7 +227,7 @@ func runResolve(configuration resolveConfig, output io.Writer) error {
 func openMutationRoots(rootPath, annotationsDir string) (*content.Root, *annotationstore.Store, error) {
 	root, err := content.Open(rootPath)
 	if err != nil {
-		return nil, nil, fmt.Errorf("open Markdown directory: %w", err)
+		return nil, nil, fmt.Errorf("open content directory: %w", err)
 	}
 	directory := annotationsDir
 	if directory == "" {
@@ -236,10 +252,10 @@ func openMutationRoots(rootPath, annotationsDir string) (*content.Root, *annotat
 
 // findMutationTarget locates a globally unique stable annotation ID among the
 // current content index and retains the sidecar revision for optimistic save.
-func findMutationTarget(root *content.Root, store *annotationstore.Store, identifier string) (mutationTarget, error) {
-	index, err := root.Index()
+func findMutationTarget(root *content.Root, store *annotationstore.Store, identifier string, options content.IndexOptions) (mutationTarget, error) {
+	index, err := root.IndexWithOptions(options)
 	if err != nil {
-		return mutationTarget{}, fmt.Errorf("index Markdown directory: %w", err)
+		return mutationTarget{}, fmt.Errorf("index content directory: %w", err)
 	}
 	var found *mutationTarget
 	for _, document := range index.Documents {

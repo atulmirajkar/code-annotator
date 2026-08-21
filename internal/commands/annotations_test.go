@@ -22,14 +22,18 @@ func TestParseListConfig(t *testing.T) {
 		args       []string
 		wantRoot   string
 		wantStatus annotation.Status
+		wantCode   bool
 		wantErr    string
 	}{
 		{name: "defaults", args: []string{"--root", "./docs"}, wantRoot: "./docs"},
 		{name: "status filter", args: []string{"--root", "./docs", "--status", "open,needs_changes"}, wantRoot: "./docs", wantStatus: annotation.StatusNeedsChanges},
+		{name: "include default code", args: []string{"--root", "./docs", "--include-code"}, wantRoot: "./docs", wantCode: true},
+		{name: "custom code implies inclusion", args: []string{"--root", "./docs", "--code-extensions", ".go,.cs"}, wantRoot: "./docs", wantCode: true},
 		{name: "missing root", wantErr: "--root is required"},
 		{name: "invalid status", args: []string{"--root", "./docs", "--status", "unknown"}, wantErr: "invalid annotation status"},
 		{name: "invalid format", args: []string{"--root", "./docs", "--format", "yaml"}, wantErr: "unsupported list format"},
 		{name: "positional argument", args: []string{"--root", "./docs", "extra"}, wantErr: "does not accept positional"},
+		{name: "invalid extension", args: []string{"--root", "./docs", "--code-extensions", "go"}, wantErr: "configure content catalog"},
 	}
 
 	for _, test := range tests {
@@ -53,7 +57,64 @@ func TestParseListConfig(t *testing.T) {
 					t.Errorf("statuses = %#v, want %q", configuration.statuses, test.wantStatus)
 				}
 			}
+			if test.wantCode && len(configuration.indexOptions.CodeExtensions) == 0 {
+				t.Error("CodeExtensions is empty, want source catalog")
+			}
 		})
+	}
+}
+
+func TestRunAnnotationsIncludesCode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		command  string
+		contains []string
+	}{
+		{name: "JSON list", command: "list", contains: []string{`"document": "main.go"`, `"kind": "code"`, `"language": "go"`}},
+		{name: "Markdown export", command: "export", contains: []string{"## main.go", "- Kind: `code`", "- Language: `go`", "#### Selected source"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			annotationsDir := filepath.Join(t.TempDir(), "annotations")
+			seedCodeCommandAnnotation(t, rootPath, annotationsDir)
+
+			args := []string{test.command, "--root", rootPath, "--annotations-dir", annotationsDir, "--include-code"}
+			var output bytes.Buffer
+			if err := RunAnnotations(args, &output, io.Discard); err != nil {
+				t.Fatalf("RunAnnotations() error = %v", err)
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(output.String(), want) {
+					t.Errorf("output missing %q:\n%s", want, output.String())
+				}
+			}
+		})
+	}
+}
+
+// seedCodeCommandAnnotation creates one source-file sidecar for offline handoff
+// and mutation tests that opt into the same code catalog.
+func seedCodeCommandAnnotation(t *testing.T, rootPath, annotationsDir string) {
+	t.Helper()
+	const sourceText = "package main\nvar less = 1 < 2\n"
+	writeCommandFile(t, filepath.Join(rootPath, "main.go"), sourceText)
+	store, err := annotationstore.Open(annotationsDir)
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	now := time.Date(2026, time.August, 21, 12, 0, 0, 0, time.UTC)
+	selectionStart := strings.Index(sourceText, "less")
+	selected, err := annotation.NewSource([]byte(sourceText), selectionStart, selectionStart+len("less"))
+	if err != nil {
+		t.Fatalf("annotation.NewSource() error = %v", err)
+	}
+	sidecar := annotation.Sidecar{SchemaVersion: annotation.SchemaVersion, Document: "main.go", Annotations: []annotation.Annotation{{ID: "ann_code", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Check comparison", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &selected, Thread: []annotation.ThreadEntry{}}}}
+	if _, err := store.Save(sidecar, ""); err != nil {
+		t.Fatalf("Store.Save() error = %v", err)
 	}
 }
 
@@ -171,7 +232,7 @@ func TestRunAnnotationExport(t *testing.T) {
 		contains   []string
 		notContain string
 	}{
-		{name: "agent handoff", status: "open", contains: []string{"# Annotation review", "## README.md", "### ann_readme", "- Anchor: `exact` at lines 1–1", "#### Selected Markdown", "selected", "````text\nUpdate ``` example\n````", "`reply` by reviewer", "First line second line"}},
+		{name: "agent handoff", status: "open", contains: []string{"# Annotation review", "## README.md", "- Kind: `markdown`", "- Language: `markdown`", "### ann_readme", "- Anchor: `exact` at lines 1–1", "#### Selected source", "selected", "````text\nUpdate ``` example\n````", "`reply` by reviewer", "First line second line"}},
 		{name: "no matches", status: "applied", contains: []string{"No matching annotations."}, notContain: "## README.md"},
 	}
 

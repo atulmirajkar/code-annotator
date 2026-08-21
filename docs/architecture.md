@@ -132,7 +132,7 @@ its backtick delimiters remain an intervening source gap derived by the server.
 Fenced code receives one source-backed span per content line. Browser mapping
 requires both endpoints to share that block and never includes its fences.
 The creation route requires the session security checks and a strong `If-Match`
-sidecar ETag. It recreates source selectors from current Markdown bytes rather
+sidecar ETag. It recreates source selectors from current document bytes rather
 than trusting hashes or context supplied by the browser.
 The browser creation form uses the revision from its latest annotation read,
 preserves a captured selection while focus moves into the panel, and reloads

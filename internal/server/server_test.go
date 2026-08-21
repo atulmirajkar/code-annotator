@@ -121,7 +121,8 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 		token  = "0123456789abcdef0123456789abcdef"
 	)
 	rootPath := t.TempDir()
-	writeTestFile(t, filepath.Join(rootPath, "main.go"), "package main\nvar less = 1 < 2\n")
+	const sourceText = "package main\nvar less = 1 < 2\nvar selected = less\n"
+	writeTestFile(t, filepath.Join(rootPath, "main.go"), sourceText)
 	writeTestFile(t, filepath.Join(rootPath, "notes.txt"), "not cataloged")
 	root, err := content.Open(rootPath)
 	if err != nil {
@@ -135,6 +136,7 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 	if err != nil {
 		t.Fatalf("annotationstore.Open() error = %v", err)
 	}
+	saveTestAnnotation(t, store, "main.go", sourceText)
 	viewer, err := New(root, mdrender.New(), WithIndexOptions(options), WithReviewSession(store, origin, token))
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
@@ -147,7 +149,8 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 		contains   []string
 	}{
 		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `class="source-text" data-source-start="0" data-source-end="12"`, `name="md-viewer-review-token"`, `id="annotation-sidebar"`}},
-		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"annotations":[]`}},
+		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`, `"annotations":[{`}},
+		{name: "agent queue includes source metadata", path: "/api/annotations?status=open", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`}},
 		{name: "uncataloged asset has no annotation endpoint", path: "/api/annotations?document=notes.txt", wantStatus: http.StatusNotFound},
 	}
 	for _, test := range tests {

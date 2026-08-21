@@ -126,8 +126,11 @@ md-viewer annotations resolve --root ./docs --id ann_... \
 
 `list` emits deterministic JSON. `export` produces an agent-friendly Markdown
 handoff containing source quotes, current anchor state, comments, and complete
-threads. Both accept `--annotations-dir` when sidecars are stored outside the
-content root; omitting `--status` includes every lifecycle state.
+threads, plus each document's kind and language. Both accept `--include-code`,
+`--code-extensions`, and `--exclude-dirs` to mirror a source-enabled viewer,
+and accept `--annotations-dir` when sidecars are stored outside the content
+root. Repeat the catalog flags on `reply` and `resolve` when processing a source
+file. Omitting `--status` includes every lifecycle state.
 `reply` appends an ordinary discussion entry directly to the matching sidecar
 and returns the updated annotation and revision as JSON. It does not change the
 annotation lifecycle state.

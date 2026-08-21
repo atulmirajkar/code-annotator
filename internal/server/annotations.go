@@ -17,7 +17,7 @@ import (
 )
 
 // annotationView extends one persisted annotation with its location derived
-// from the current Markdown source. Document-level annotations have no anchor.
+// from the current document source. Document-level annotations have no anchor.
 type annotationView struct {
 	annotation.Annotation
 	Anchor *annotation.AnchorResult `json:"anchor,omitempty"`
@@ -28,6 +28,8 @@ type annotationView struct {
 type annotationListResponse struct {
 	SchemaVersion int              `json:"schemaVersion"`
 	Document      string           `json:"document"`
+	Kind          content.Kind     `json:"kind"`
+	Language      string           `json:"language"`
 	Revision      string           `json:"revision"`
 	Annotations   []annotationView `json:"annotations"`
 }
@@ -50,7 +52,7 @@ type createAnnotationRequest struct {
 	Selection *annotationSelection `json:"selection,omitempty"`
 }
 
-// annotationSelection carries a Markdown byte range bound to the exact source
+// annotationSelection carries a document byte range bound to the exact source
 // revision rendered by the browser. The server derives the quote itself.
 type annotationSelection struct {
 	StartByte      int    `json:"startByte"`
@@ -113,14 +115,14 @@ type reattachAnnotationResponse struct {
 }
 
 // handleAnnotations returns persisted annotations plus anchor locations derived
-// from the current Markdown bytes. It never mutates either root.
+// from the current document bytes. It never mutates either root.
 func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.Request) {
 	document := request.URL.Query().Get("document")
 	if document == "" {
 		s.handleAnnotationQueue(response, request)
 		return
 	}
-	source, ok := s.readAnnotationDocument(response, document)
+	source, catalogDocument, ok := s.readAnnotationDocument(response, document)
 	if !ok {
 		return
 	}
@@ -145,6 +147,8 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 	payload := annotationListResponse{
 		SchemaVersion: sidecar.SchemaVersion,
 		Document:      sidecar.Document,
+		Kind:          catalogDocument.Kind,
+		Language:      catalogDocument.Language,
 		Revision:      string(revision),
 		Annotations:   annotations,
 	}
@@ -205,6 +209,8 @@ func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *ht
 		payload.Documents = append(payload.Documents, annotationListResponse{
 			SchemaVersion: sidecar.SchemaVersion,
 			Document:      sidecar.Document,
+			Kind:          document.Kind,
+			Language:      document.Language,
 			Revision:      string(revision),
 			Annotations:   views,
 		})
@@ -244,7 +250,7 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, ok := s.readAnnotationDocument(response, input.Document)
+	document, _, ok := s.readAnnotationDocument(response, input.Document)
 	if !ok {
 		return
 	}
@@ -334,7 +340,7 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, ok := s.readAnnotationDocument(response, input.Document)
+	document, _, ok := s.readAnnotationDocument(response, input.Document)
 	if !ok {
 		return
 	}
@@ -414,7 +420,7 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, ok := s.readAnnotationDocument(response, input.Document)
+	document, _, ok := s.readAnnotationDocument(response, input.Document)
 	if !ok {
 		return
 	}
@@ -482,7 +488,7 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 }
 
 // handleReattachAnnotation replaces a stale text selector with a range verified
-// against the current Markdown source. It cannot convert document annotations.
+// against the current document source. It cannot convert document annotations.
 func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request *http.Request) {
 	expected, status, err := parseIfMatch(request)
 	if err != nil {
@@ -495,7 +501,7 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, ok := s.readAnnotationDocument(response, input.Document)
+	document, _, ok := s.readAnnotationDocument(response, input.Document)
 	if !ok {
 		return
 	}
@@ -656,26 +662,27 @@ func decodeMutationJSON(request *http.Request, destination any) (int, error) {
 
 // readAnnotationDocument requires both a safe annotation path and membership
 // in the configured reviewable catalog before reading current bytes.
-func (s *Server) readAnnotationDocument(response http.ResponseWriter, documentPath string) ([]byte, bool) {
+func (s *Server) readAnnotationDocument(response http.ResponseWriter, documentPath string) ([]byte, content.Document, bool) {
 	if err := annotation.ValidateDocumentPath(documentPath); err != nil {
 		http.Error(response, "document not found", http.StatusNotFound)
-		return nil, false
+		return nil, content.Document{}, false
 	}
 	index, err := s.root.IndexWithOptions(s.indexOptions)
 	if err != nil {
 		http.Error(response, "could not index documents", http.StatusInternalServerError)
-		return nil, false
+		return nil, content.Document{}, false
 	}
-	if _, ok := findDocument(index, documentPath); !ok {
+	catalogDocument, ok := findDocument(index, documentPath)
+	if !ok {
 		http.Error(response, "document not found", http.StatusNotFound)
-		return nil, false
+		return nil, content.Document{}, false
 	}
 	document, err := s.root.ReadFile(documentPath, maxDocumentBytes)
 	if err != nil {
 		s.writeAnnotationReadError(response, err)
-		return nil, false
+		return nil, content.Document{}, false
 	}
-	return document, true
+	return document, catalogDocument, true
 }
 
 // writeAnnotationReadError hides filesystem details and treats invalid or

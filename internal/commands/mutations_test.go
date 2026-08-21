@@ -191,3 +191,35 @@ func TestRunAnnotationResolve(t *testing.T) {
 		})
 	}
 }
+
+func TestCodeAnnotationMutations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{name: "reply", args: []string{"reply", "--id", "ann_code", "--author", "agent", "--message", "Checked the comparison."}},
+		{name: "resolve", args: []string{"resolve", "--id", "ann_code", "--status", "acknowledged", "--role", "agent", "--author", "codex"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			annotationsDir := filepath.Join(t.TempDir(), "annotations")
+			seedCodeCommandAnnotation(t, rootPath, annotationsDir)
+			args := append([]string{test.args[0], "--root", rootPath, "--annotations-dir", annotationsDir, "--include-code"}, test.args[1:]...)
+			var output bytes.Buffer
+			if err := RunAnnotations(args, &output, io.Discard); err != nil {
+				t.Fatalf("RunAnnotations() error = %v", err)
+			}
+			var result mutationOutput
+			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; output: %s", err, output.String())
+			}
+			if result.Document != "main.go" || result.Annotation.ID != "ann_code" || result.Revision == "" {
+				t.Fatalf("mutation output = %#v", result)
+			}
+		})
+	}
+}

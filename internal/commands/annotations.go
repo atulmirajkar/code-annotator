@@ -24,6 +24,7 @@ type listConfig struct {
 	annotationsDir string
 	statuses       map[annotation.Status]struct{}
 	format         string
+	indexOptions   content.IndexOptions
 }
 
 type listOutput struct {
@@ -33,6 +34,8 @@ type listOutput struct {
 
 type listDocument struct {
 	Document    string           `json:"document"`
+	Kind        content.Kind     `json:"kind"`
+	Language    string           `json:"language"`
 	Annotations []listAnnotation `json:"annotations"`
 }
 
@@ -81,10 +84,13 @@ func RunAnnotations(args []string, stdout, stderr io.Writer) error {
 func parseExportConfig(args []string, stderr io.Writer) (listConfig, error) {
 	flags := flag.NewFlagSet("md-viewer annotations export", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	root := flags.String("root", "", "Markdown content root")
+	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	statuses := flags.String("status", "", "comma-separated annotation statuses")
 	format := flags.String("format", "markdown", "output format (markdown)")
+	includeCode := flags.Bool("include-code", false, "include supported source files")
+	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
+	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer annotations export --root <directory> [options]")
 		flags.PrintDefaults()
@@ -107,17 +113,24 @@ func parseExportConfig(args []string, stderr io.Writer) (listConfig, error) {
 	if err != nil {
 		return listConfig{}, err
 	}
-	return listConfig{rootPath: *root, annotationsDir: *annotationsDir, statuses: statusFilter, format: *format}, nil
+	indexOptions, err := annotationCatalogOptions(*includeCode, *codeExtensions, *excludeDirs)
+	if err != nil {
+		return listConfig{}, err
+	}
+	return listConfig{rootPath: *root, annotationsDir: *annotationsDir, statuses: statusFilter, format: *format, indexOptions: indexOptions}, nil
 }
 
 // parseListConfig validates list flags without opening either filesystem root.
 func parseListConfig(args []string, stderr io.Writer) (listConfig, error) {
 	flags := flag.NewFlagSet("md-viewer annotations list", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	root := flags.String("root", "", "Markdown content root")
+	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	statuses := flags.String("status", "", "comma-separated annotation statuses")
 	format := flags.String("format", "json", "output format (json)")
+	includeCode := flags.Bool("include-code", false, "include supported source files")
+	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
+	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer annotations list --root <directory> [options]")
 		flags.PrintDefaults()
@@ -140,7 +153,39 @@ func parseListConfig(args []string, stderr io.Writer) (listConfig, error) {
 	if err != nil {
 		return listConfig{}, err
 	}
-	return listConfig{rootPath: *root, annotationsDir: *annotationsDir, statuses: statusFilter, format: *format}, nil
+	indexOptions, err := annotationCatalogOptions(*includeCode, *codeExtensions, *excludeDirs)
+	if err != nil {
+		return listConfig{}, err
+	}
+	return listConfig{rootPath: *root, annotationsDir: *annotationsDir, statuses: statusFilter, format: *format, indexOptions: indexOptions}, nil
+}
+
+// annotationCatalogOptions mirrors viewer catalog semantics so offline output
+// addresses the same opt-in source extensions and default excluded directories.
+func annotationCatalogOptions(includeCode bool, codeExtensions, excludeDirs string) (content.IndexOptions, error) {
+	extensions := splitAnnotationCSV(codeExtensions)
+	includeCode = includeCode || len(extensions) > 0
+	if includeCode && len(extensions) == 0 {
+		extensions = content.DefaultCodeExtensions()
+	}
+	excluded := splitAnnotationCSV(excludeDirs)
+	if includeCode {
+		excluded = append(content.DefaultExcludedDirectories(), excluded...)
+	}
+	options, err := content.NewIndexOptions(extensions, excluded)
+	if err != nil {
+		return content.IndexOptions{}, fmt.Errorf("configure content catalog: %w", err)
+	}
+	return options, nil
+}
+
+// splitAnnotationCSV preserves invalid empty entries for catalog validation
+// while treating an omitted flag as no values.
+func splitAnnotationCSV(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ",")
 }
 
 func parseStatuses(value string) (map[annotation.Status]struct{}, error) {
@@ -173,11 +218,11 @@ func runList(configuration listConfig, output io.Writer) error {
 func collectList(configuration listConfig) (listOutput, error) {
 	root, err := content.Open(configuration.rootPath)
 	if err != nil {
-		return listOutput{}, fmt.Errorf("open Markdown directory: %w", err)
+		return listOutput{}, fmt.Errorf("open content directory: %w", err)
 	}
-	index, err := root.Index()
+	index, err := root.IndexWithOptions(configuration.indexOptions)
 	if err != nil {
-		return listOutput{}, fmt.Errorf("index Markdown directory: %w", err)
+		return listOutput{}, fmt.Errorf("index content directory: %w", err)
 	}
 
 	directory := configuration.annotationsDir
@@ -210,9 +255,9 @@ func collectList(configuration listConfig) (listOutput, error) {
 		}
 		source, err := root.ReadFile(document.Path, maxListDocumentBytes)
 		if err != nil {
-			return listOutput{}, fmt.Errorf("read Markdown document %q: %w", document.Path, err)
+			return listOutput{}, fmt.Errorf("read document %q: %w", document.Path, err)
 		}
-		listed := listDocument{Document: document.Path, Annotations: []listAnnotation{}}
+		listed := listDocument{Document: document.Path, Kind: document.Kind, Language: document.Language, Annotations: []listAnnotation{}}
 		for _, item := range sidecar.Annotations {
 			if len(configuration.statuses) > 0 {
 				if _, wanted := configuration.statuses[item.Status]; !wanted {
@@ -257,6 +302,8 @@ func runExport(configuration listConfig, output io.Writer) error {
 	}
 	for _, document := range result.Documents {
 		fmt.Fprintf(&markdown, "## %s\n\n", document.Document)
+		fmt.Fprintf(&markdown, "- Kind: `%s`\n", document.Kind)
+		fmt.Fprintf(&markdown, "- Language: `%s`\n\n", document.Language)
 		for _, item := range document.Annotations {
 			fmt.Fprintf(&markdown, "### %s\n\n", item.ID)
 			fmt.Fprintf(&markdown, "- Intent: `%s`\n", item.Intent)
@@ -265,7 +312,7 @@ func runExport(configuration listConfig, output io.Writer) error {
 			fmt.Fprintf(&markdown, "- Created: %s\n", item.CreatedAt.Format("2006-01-02T15:04:05.999999999Z07:00"))
 			writeAnchorSummary(&markdown, item)
 			if item.Source != nil {
-				markdown.WriteString("\n#### Selected Markdown\n\n")
+				markdown.WriteString("\n#### Selected source\n\n")
 				writeMarkdownCodeBlock(&markdown, item.Source.Selector.Exact)
 			}
 			markdown.WriteString("\n#### Comment\n\n")

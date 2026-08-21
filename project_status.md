@@ -117,7 +117,7 @@ release verification is reviewed.
 - [x] Implement safe code rendering and reuse annotation workflows.
 - [ ] Implement bounded Git comparison and current-file diff presentation.
 - [ ] Add a changed-only document filter backed by the configured Git base.
-- [ ] Extend agent handoff and browser coverage to code review.
+- [x] Extend agent handoff and browser coverage to code review.
 
 ### 11. Live reload
 
