@@ -5,6 +5,10 @@
 - Go `1.26.5` or a compatible newer Go release, matching `go.mod`.
 - A graphical environment with a default browser, unless using `--no-open`.
 
+The optional browser regression suite additionally requires Node.js, npm, and
+Google Chrome. These tools are used only for development tests and are not
+runtime dependencies of `md-viewer`.
+
 The Go toolchain downloads declared module dependencies during the first build.
 
 ## Run from source
@@ -136,6 +140,18 @@ go test ./...
 go vet ./...
 go test -race ./...
 ```
+
+Install the pinned browser-test dependency and run the Playwright suite:
+
+```sh
+npm ci
+npm run test:browser
+```
+
+The suite starts an isolated review server, writes annotations only beneath a
+temporary directory, and uses the installed Chrome browser in headless mode.
+Set `MD_VIEWER_BROWSER_CHANNEL` to another Playwright browser channel when
+needed. Browser traces and reports are ignored build artifacts.
 
 A minimal manual check is:
 

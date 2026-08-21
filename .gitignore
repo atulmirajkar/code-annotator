@@ -18,6 +18,11 @@ profile.cov
 
 # Dependency directories
 # vendor/
+node_modules/
+
+# Browser test output
+test-results/
+playwright-report/
 
 # Go workspace files
 go.work
