@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -228,6 +229,155 @@ func TestAnnotationAPI(t *testing.T) {
 				if anchor == nil || anchor.State != test.wantAnchor || anchor.Reason != test.wantReason {
 					t.Fatalf("anchor = %#v, want state %q and reason %q", anchor, test.wantAnchor, test.wantReason)
 				}
+			}
+		})
+	}
+}
+
+func TestReviewSessionConfiguration(t *testing.T) {
+	t.Parallel()
+
+	store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	validToken := strings.Repeat("t", 32)
+	tests := []struct {
+		name       string
+		store      *annotationstore.Store
+		origin     string
+		token      string
+		wantOrigin string
+		wantErr    bool
+	}{
+		{name: "valid IPv4 loopback", store: store, origin: "http://127.0.0.1:8080/", token: validToken, wantOrigin: "http://127.0.0.1:8080"},
+		{name: "valid IPv6 loopback", store: store, origin: "http://[::1]:8080", token: validToken, wantOrigin: "http://[::1]:8080"},
+		{name: "nil store", origin: "http://127.0.0.1:8080", token: validToken, wantErr: true},
+		{name: "non-loopback host", store: store, origin: "http://example.com:8080", token: validToken, wantErr: true},
+		{name: "HTTPS origin", store: store, origin: "https://127.0.0.1:8080", token: validToken, wantErr: true},
+		{name: "origin path", store: store, origin: "http://127.0.0.1:8080/view", token: validToken, wantErr: true},
+		{name: "origin credentials", store: store, origin: "http://user@127.0.0.1:8080", token: validToken, wantErr: true},
+		{name: "short token", store: store, origin: "http://127.0.0.1:8080", token: "short", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			server := &Server{}
+			err := WithReviewSession(test.store, test.origin, test.token)(server)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("WithReviewSession() error = nil, want rejection")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("WithReviewSession() error = %v", err)
+			}
+			if server.annotations != test.store || server.review == nil || server.review.origin != test.wantOrigin || server.review.token != test.token {
+				t.Fatalf("review session = %#v, annotation store = %#v", server.review, server.annotations)
+			}
+		})
+	}
+}
+
+func TestReviewMutationProtection(t *testing.T) {
+	t.Parallel()
+
+	const origin = "http://127.0.0.1:8080"
+	token := strings.Repeat("t", 32)
+	tests := []struct {
+		name        string
+		review      *reviewSession
+		origin      string
+		token       string
+		contentType string
+		body        string
+		wantStatus  int
+		wantCalled  bool
+	}{
+		{name: "review disabled", contentType: "application/json", body: `{}`, wantStatus: http.StatusNotFound},
+		{name: "missing origin", review: &reviewSession{origin: origin, token: token}, token: token, contentType: "application/json", body: `{}`, wantStatus: http.StatusForbidden},
+		{name: "wrong origin", review: &reviewSession{origin: origin, token: token}, origin: "http://evil.example", token: token, contentType: "application/json", body: `{}`, wantStatus: http.StatusForbidden},
+		{name: "missing token", review: &reviewSession{origin: origin, token: token}, origin: origin, contentType: "application/json", body: `{}`, wantStatus: http.StatusForbidden},
+		{name: "wrong token", review: &reviewSession{origin: origin, token: token}, origin: origin, token: strings.Repeat("x", 32), contentType: "application/json", body: `{}`, wantStatus: http.StatusForbidden},
+		{name: "missing content type", review: &reviewSession{origin: origin, token: token}, origin: origin, token: token, body: `{}`, wantStatus: http.StatusUnsupportedMediaType},
+		{name: "non-JSON content type", review: &reviewSession{origin: origin, token: token}, origin: origin, token: token, contentType: "text/plain", body: `{}`, wantStatus: http.StatusUnsupportedMediaType},
+		{name: "JSON with charset", review: &reviewSession{origin: origin, token: token}, origin: origin, token: token, contentType: "application/json; charset=utf-8", body: `{}`, wantStatus: http.StatusNoContent, wantCalled: true},
+		{name: "oversized body", review: &reviewSession{origin: origin, token: token}, origin: origin, token: token, contentType: "application/json", body: strings.Repeat("x", int(maxAnnotationMutationBytes)+1), wantStatus: http.StatusRequestEntityTooLarge, wantCalled: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			server := &Server{review: test.review}
+			called := false
+			next := http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+				called = true
+				if _, err := io.ReadAll(request.Body); err != nil {
+					http.Error(response, "request body is too large", http.StatusRequestEntityTooLarge)
+					return
+				}
+				response.WriteHeader(http.StatusNoContent)
+			})
+			handler := server.protectReviewMutation(next)
+			request := httptest.NewRequest(http.MethodPost, "/api/annotations", strings.NewReader(test.body))
+			if test.origin != "" {
+				request.Header.Set("Origin", test.origin)
+			}
+			if test.token != "" {
+				request.Header.Set(reviewTokenHeader, test.token)
+			}
+			if test.contentType != "" {
+				request.Header.Set("Content-Type", test.contentType)
+			}
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+			if response.Code != test.wantStatus || called != test.wantCalled {
+				t.Fatalf("status = %d, called = %t; want %d, %t", response.Code, called, test.wantStatus, test.wantCalled)
+			}
+		})
+	}
+}
+
+func TestReviewTokenPageEmbedding(t *testing.T) {
+	t.Parallel()
+
+	token := strings.Repeat("t", 32)
+	tests := []struct {
+		name      string
+		review    bool
+		wantToken bool
+	}{
+		{name: "read-only page omits token"},
+		{name: "review page embeds token", review: true, wantToken: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "# Home")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			var options []Option
+			if test.review {
+				store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+				if err != nil {
+					t.Fatalf("annotationstore.Open() error = %v", err)
+				}
+				options = append(options, WithReviewSession(store, "http://127.0.0.1:8080", token))
+			}
+			viewer, err := New(root, mdrender.New(), options...)
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			response := getResponse(t, viewer.Handler(), "/")
+			hasToken := strings.Contains(response.Body.String(), `name="md-viewer-review-token" content="`+token+`"`)
+			if hasToken != test.wantToken {
+				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
 			}
 		})
 	}

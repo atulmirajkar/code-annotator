@@ -59,6 +59,13 @@ alternate location and is invalid unless review mode is explicit. Mutation
 routes will receive this store rather than constructing writable paths in HTTP
 handlers.
 
+After binding the loopback listener, review mode generates a 256-bit random
+session token and binds it to the exact selected HTTP origin. The token is
+embedded in review pages but is never printed or persisted. The shared mutation
+guard requires the exact `Origin`, the token in `X-MD-Viewer-Token`, an
+`application/json` content type, and a body no larger than 64 KiB. Mutation
+routes are not registered until their handlers use this guard.
+
 ## HTTP routes
 
 | Route | Purpose |

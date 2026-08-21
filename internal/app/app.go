@@ -3,6 +3,8 @@ package app
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"flag"
 	"fmt"
@@ -52,15 +54,6 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	if err != nil {
 		return err
 	}
-	var serverOptions []server.Option
-	if annotations != nil {
-		serverOptions = append(serverOptions, server.WithAnnotationStore(annotations))
-	}
-	viewer, err := server.New(root, mdrender.New(), serverOptions...)
-	if err != nil {
-		return fmt.Errorf("create Markdown viewer: %w", err)
-	}
-
 	address := net.JoinHostPort("127.0.0.1", strconv.Itoa(configuration.port))
 	listener, err := net.Listen("tcp4", address)
 	if err != nil {
@@ -68,8 +61,20 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	}
 	defer listener.Close()
 
-	httpServer := viewer.HTTPServer(listener.Addr().String())
 	viewerURL := "http://" + listener.Addr().String() + "/"
+	var serverOptions []server.Option
+	if annotations != nil {
+		token, err := newReviewToken()
+		if err != nil {
+			return err
+		}
+		serverOptions = append(serverOptions, server.WithReviewSession(annotations, viewerURL, token))
+	}
+	viewer, err := server.New(root, mdrender.New(), serverOptions...)
+	if err != nil {
+		return fmt.Errorf("create Markdown viewer: %w", err)
+	}
+	httpServer := viewer.HTTPServer(listener.Addr().String())
 	fmt.Fprintf(stdout, "Serving %s at %s\n", root.Path(), viewerURL)
 	if annotations != nil {
 		fmt.Fprintf(stdout, "Review mode enabled; annotations: %s\n", annotations.Root())
@@ -107,6 +112,16 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 		}
 		return nil
 	}
+}
+
+// newReviewToken returns 256 bits of URL-safe random session authority. The
+// token is embedded in review pages but never written to terminal output.
+func newReviewToken() (string, error) {
+	random := make([]byte, 32)
+	if _, err := rand.Read(random); err != nil {
+		return "", fmt.Errorf("generate review session token: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(random), nil
 }
 
 func parseConfig(args []string, stderr io.Writer) (config, error) {

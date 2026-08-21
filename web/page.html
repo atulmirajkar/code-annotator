@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{if .ReviewToken}}<meta name="md-viewer-review-token" content="{{.ReviewToken}}">{{end}}
   <title>{{if .Selected}}{{.Selected}} · {{end}}md-viewer</title>
   <style>{{.Styles}}</style>
 </head>

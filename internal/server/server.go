@@ -2,10 +2,13 @@
 package server
 
 import (
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
+	"mime"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,7 +22,11 @@ import (
 	"atulm/md-viewer/web"
 )
 
-const maxDocumentBytes int64 = 4 << 20
+const (
+	maxDocumentBytes           int64 = 4 << 20
+	maxAnnotationMutationBytes int64 = 64 << 10
+	reviewTokenHeader                = "X-MD-Viewer-Token"
+)
 
 const (
 	readHeaderTimeout = 5 * time.Second
@@ -33,9 +40,17 @@ type Server struct {
 	root        *content.Root
 	renderer    *mdrender.Renderer
 	annotations *annotationstore.Store
+	review      *reviewSession
 	page        *template.Template
 	styles      template.CSS
 	handler     http.Handler
+}
+
+// reviewSession contains the browser-bound authority required for annotation
+// mutations. The token is intentionally never exposed through logging APIs.
+type reviewSession struct {
+	origin string
+	token  string
 }
 
 // Option configures an optional Server capability.
@@ -53,13 +68,34 @@ func WithAnnotationStore(store *annotationstore.Store) Option {
 	}
 }
 
+// WithReviewSession enables annotation reads and configures the exact loopback
+// origin and secret header value required by future mutation routes.
+func WithReviewSession(store *annotationstore.Store, origin, token string) Option {
+	return func(server *Server) error {
+		if store == nil {
+			return errors.New("configure review session: nil annotation store")
+		}
+		normalizedOrigin, err := validateReviewOrigin(origin)
+		if err != nil {
+			return err
+		}
+		if len(token) < 32 {
+			return errors.New("configure review session: token must contain at least 32 characters")
+		}
+		server.annotations = store
+		server.review = &reviewSession{origin: normalizedOrigin, token: token}
+		return nil
+	}
+}
+
 type pageData struct {
-	Root      string
-	Selected  string
-	Documents []documentView
-	Content   template.HTML
-	Styles    template.CSS
-	Empty     bool
+	Root        string
+	Selected    string
+	Documents   []documentView
+	Content     template.HTML
+	Styles      template.CSS
+	Empty       bool
+	ReviewToken string
 }
 
 type documentView struct {
@@ -67,6 +103,55 @@ type documentView struct {
 	Directory string
 	URL       string
 	Selected  bool
+}
+
+// validateReviewOrigin accepts only an HTTP origin with a loopback IP host and
+// no path, query, user information, or fragment.
+func validateReviewOrigin(origin string) (string, error) {
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return "", errors.New("configure review session: invalid origin")
+	}
+	if parsed.Scheme != "http" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
+		return "", errors.New("configure review session: invalid origin")
+	}
+	address := net.ParseIP(parsed.Hostname())
+	if address == nil || !address.IsLoopback() {
+		return "", errors.New("configure review session: origin must use a loopback IP address")
+	}
+	return parsed.Scheme + "://" + parsed.Host, nil
+}
+
+// protectReviewMutation enforces the browser session boundary before invoking
+// an annotation mutation handler. The wrapped handler remains responsible for
+// decoding JSON and reporting an oversized body as a client error.
+func (s *Server) protectReviewMutation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if s.review == nil {
+			http.NotFound(response, request)
+			return
+		}
+		if request.Header.Get("Origin") != s.review.origin {
+			http.Error(response, "forbidden review origin", http.StatusForbidden)
+			return
+		}
+		providedToken := request.Header.Get(reviewTokenHeader)
+		if subtle.ConstantTimeCompare([]byte(providedToken), []byte(s.review.token)) != 1 {
+			http.Error(response, "invalid review token", http.StatusForbidden)
+			return
+		}
+		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+		if err != nil {
+			http.Error(response, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+		if mediaType != "application/json" {
+			http.Error(response, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+		request.Body = http.MaxBytesReader(response, request.Body, maxAnnotationMutationBytes)
+		next.ServeHTTP(response, request)
+	})
 }
 
 // New creates the Markdown viewer handler with optional capabilities.
@@ -232,6 +317,9 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		Content:   template.HTML(fragment), // goldmark output with safe defaults.
 		Styles:    s.styles,
 		Empty:     len(index.Documents) == 0,
+	}
+	if s.review != nil {
+		data.ReviewToken = s.review.token
 	}
 	if err := s.page.Execute(response, data); err != nil {
 		// Headers may already be written; this message is primarily useful in
