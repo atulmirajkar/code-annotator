@@ -392,6 +392,102 @@ func stringPointer(value string) *string {
 	return &value
 }
 
+func TestReplyAnnotationAPI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	validBody := `{"document":"README.md","message":"Please also update the example.","author":"reviewer"}`
+	tests := []struct {
+		name         string
+		annotationID string
+		body         string
+		useCurrent   bool
+		omitIfMatch  bool
+		wantStatus   int
+		wantConflict bool
+	}{
+		{name: "append reply", annotationID: "ann_api_test", body: validBody, useCurrent: true, wantStatus: http.StatusCreated},
+		{name: "annotation missing", annotationID: "ann_missing", body: validBody, useCurrent: true, wantStatus: http.StatusNotFound},
+		{name: "empty message", annotationID: "ann_api_test", body: strings.Replace(validBody, "Please also update the example.", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "empty author", annotationID: "ann_api_test", body: strings.Replace(validBody, "reviewer", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "unknown field", annotationID: "ann_api_test", body: strings.TrimSuffix(validBody, "}") + `,"kind":"resolution"}`, useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "missing revision", annotationID: "ann_api_test", body: validBody, omitIfMatch: true, wantStatus: http.StatusPreconditionRequired},
+		{name: "stale revision", annotationID: "ann_api_test", body: validBody, wantStatus: http.StatusConflict, wantConflict: true},
+		{name: "non-Markdown document", annotationID: "ann_api_test", body: strings.Replace(validBody, "README.md", "image.png", 1), useCurrent: true, wantStatus: http.StatusNotFound},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeTestFile(t, filepath.Join(rootPath, "image.png"), "not Markdown")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			currentRevision := saveTestAnnotation(t, store, "README.md", "Before selected after")
+			viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			requestPath := "/api/annotations/" + test.annotationID + "/replies"
+			request := httptest.NewRequest(http.MethodPost, requestPath, strings.NewReader(test.body))
+			request.Header.Set("Origin", origin)
+			request.Header.Set(reviewTokenHeader, token)
+			request.Header.Set("Content-Type", "application/json")
+			if !test.omitIfMatch {
+				revision := annotationstore.Revision("")
+				if test.useCurrent {
+					revision = currentRevision
+				}
+				request.Header.Set("If-Match", strconv.Quote(string(revision)))
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantConflict && response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
+				t.Fatalf("conflict ETag = %q, want current revision", response.Header().Get("ETag"))
+			}
+			if test.wantStatus != http.StatusCreated {
+				return
+			}
+
+			var payload replyAnnotationResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			thread := payload.Annotation.Thread
+			if len(thread) != 1 || thread[0].Kind != annotation.ThreadReply || thread[0].Message != "Please also update the example." || !strings.HasPrefix(thread[0].ID, "msg_") {
+				t.Fatalf("updated thread = %#v", thread)
+			}
+			if payload.Annotation.Status != annotation.StatusOpen {
+				t.Fatalf("status = %q, want unchanged open status", payload.Annotation.Status)
+			}
+			if got := response.Header().Get("Location"); got != requestPath+"/"+thread[0].ID {
+				t.Fatalf("Location = %q, want created reply location", got)
+			}
+			stored, revision, err := store.Load("README.md")
+			if err != nil {
+				t.Fatalf("Store.Load() error = %v", err)
+			}
+			if len(stored.Annotations[0].Thread) != 1 || string(revision) != payload.Revision {
+				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
+			}
+		})
+	}
+}
+
 func TestReviewSessionConfiguration(t *testing.T) {
 	t.Parallel()
 
@@ -542,7 +638,7 @@ func TestReviewTokenPageEmbedding(t *testing.T) {
 }
 
 // saveTestAnnotation persists one selected-text annotation for API test setup.
-func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, sourceText string) {
+func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, sourceText string) annotationstore.Revision {
 	t.Helper()
 	start := strings.Index(sourceText, "selected")
 	if start < 0 {
@@ -552,7 +648,7 @@ func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, so
 	if err != nil {
 		t.Fatalf("annotation.NewSource() error = %v", err)
 	}
-	now := time.Date(2026, 8, 20, 20, 0, 0, 0, time.UTC)
+	now := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 	sidecar := annotation.Sidecar{
 		SchemaVersion: annotation.SchemaVersion,
 		Document:      document,
@@ -570,9 +666,11 @@ func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, so
 			},
 		},
 	}
-	if _, err := store.Save(sidecar, ""); err != nil {
+	revision, err := store.Save(sidecar, "")
+	if err != nil {
 		t.Fatalf("Store.Save() error = %v", err)
 	}
+	return revision
 }
 
 func TestAssetRoute(t *testing.T) {

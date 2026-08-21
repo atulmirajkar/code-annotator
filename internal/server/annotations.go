@@ -56,6 +56,20 @@ type createAnnotationResponse struct {
 	Revision   string         `json:"revision"`
 }
 
+// replyAnnotationRequest contains the reviewer or agent-authored content for an
+// ordinary discussion reply. Structured lifecycle events use transition APIs.
+type replyAnnotationRequest struct {
+	Document string `json:"document"`
+	Message  string `json:"message"`
+	Author   string `json:"author"`
+}
+
+// replyAnnotationResponse returns the updated annotation and sidecar revision.
+type replyAnnotationResponse struct {
+	Annotation annotationView `json:"annotation"`
+	Revision   string         `json:"revision"`
+}
+
 // handleAnnotations returns persisted annotations plus anchor locations derived
 // from the current Markdown bytes. It never mutates either root.
 func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.Request) {
@@ -77,14 +91,10 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 
 	annotations := make([]annotationView, 0, len(sidecar.Annotations))
 	for _, item := range sidecar.Annotations {
-		view := annotationView{Annotation: item}
-		if item.Source != nil {
-			anchor, err := annotation.ResolveAnchor(source, *item.Source)
-			if err != nil {
-				http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-				return
-			}
-			view.Anchor = &anchor
+		view, err := resolveAnnotationView(source, item)
+		if err != nil {
+			http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+			return
 		}
 		annotations = append(annotations, view)
 	}
@@ -197,6 +207,117 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		Annotation: view,
 		Revision:   string(revision),
 	})
+}
+
+// handleReplyAnnotation appends one server-identified ordinary reply while
+// preserving every existing thread entry and annotation lifecycle field.
+func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *http.Request) {
+	expected, status, err := parseIfMatch(request)
+	if err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+
+	var input replyAnnotationRequest
+	if status, err := decodeMutationJSON(request, &input); err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
+		http.Error(response, "Markdown document not found", http.StatusNotFound)
+		return
+	}
+	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
+	if err != nil {
+		s.writeAnnotationReadError(response, err)
+		return
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		http.Error(response, "could not read annotations", http.StatusInternalServerError)
+		return
+	}
+
+	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
+	if annotationIndex < 0 {
+		http.Error(response, "annotation not found", http.StatusNotFound)
+		return
+	}
+	now := time.Now().UTC()
+	identifier, err := annotation.NewThreadID(now)
+	if err != nil {
+		http.Error(response, "could not generate reply identifier", http.StatusInternalServerError)
+		return
+	}
+	reply := annotation.ThreadEntry{
+		ID:        identifier,
+		Kind:      annotation.ThreadReply,
+		Message:   input.Message,
+		Author:    input.Author,
+		CreatedAt: now,
+	}
+	if err := reply.Validate(); err != nil {
+		http.Error(response, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	updated := &sidecar.Annotations[annotationIndex]
+	updated.Thread = append(updated.Thread, reply)
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		http.Error(response, "could not validate updated annotation", http.StatusInternalServerError)
+		return
+	}
+	view, err := resolveAnnotationView(document, *updated)
+	if err != nil {
+		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+		return
+	}
+	revision, err := s.annotations.Save(sidecar, expected)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			response.Header().Set("ETag", strconv.Quote(string(revision)))
+			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
+			return
+		}
+		http.Error(response, "could not save annotation reply", http.StatusInternalServerError)
+		return
+	}
+
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	response.Header().Set("Location", "/api/annotations/"+updated.ID+"/replies/"+reply.ID)
+	response.WriteHeader(http.StatusCreated)
+	_ = json.NewEncoder(response).Encode(replyAnnotationResponse{
+		Annotation: view,
+		Revision:   string(revision),
+	})
+}
+
+// findAnnotation returns the index of identifier or -1 when the sidecar does
+// not contain it.
+func findAnnotation(sidecar annotation.Sidecar, identifier string) int {
+	for index := range sidecar.Annotations {
+		if sidecar.Annotations[index].ID == identifier {
+			return index
+		}
+	}
+	return -1
+}
+
+// resolveAnnotationView derives current anchor state without changing the
+// persisted annotation. Document-level annotations have no derived anchor.
+func resolveAnnotationView(document []byte, item annotation.Annotation) (annotationView, error) {
+	view := annotationView{Annotation: item}
+	if item.Source == nil {
+		return view, nil
+	}
+	anchor, err := annotation.ResolveAnchor(document, *item.Source)
+	if err != nil {
+		return annotationView{}, err
+	}
+	view.Anchor = &anchor
+	return view, nil
 }
 
 // parseIfMatch returns the lowercase sidecar revision carried by one strong

@@ -76,6 +76,7 @@ routes are not registered until their handlers use this guard.
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
 | `GET /api/annotations?document={path}` | In review mode, return annotations, current anchor state, and revision. |
 | `POST /api/annotations` | In a secured review session, create a verified text or document annotation. |
+| `POST /api/annotations/{id}/replies` | Append an ordinary discussion reply without changing lifecycle state. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
@@ -87,6 +88,11 @@ the current file bytes, and returns the revision in both JSON and `ETag` form.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather
 than trusting hashes or context supplied by the browser.
+
+The reply route uses the same security and concurrency checks. It accepts only
+ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
+preserves existing entries. Structured lifecycle activity is reserved for the
+transition route so discussion cannot bypass status validation.
 
 ## Key dependencies
 

@@ -387,6 +387,13 @@ annotation applies to the document. The server owns the initial `open` status,
 UTC timestamps, empty thread, and sortable collision-resistant `ann_` ID.
 Unknown request fields and multiple JSON values are rejected.
 
+The reply route also requires `If-Match` and accepts only `document`, `message`,
+and `author`. The server assigns the `msg_` ID, UTC timestamp, and `reply` kind,
+then appends the entry without changing the annotation status or any earlier
+thread entry. Clients cannot use this route to manufacture `resolution`,
+`review`, or `status_change` events; lifecycle endpoints create those events
+atomically with their corresponding validated transition.
+
 ## Local write security
 
 Loopback does not by itself make mutation endpoints safe: a malicious website

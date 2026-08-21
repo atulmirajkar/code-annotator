@@ -200,6 +200,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	}
 	if server.review != nil {
 		mux.Handle("POST /api/annotations", server.protectReviewMutation(http.HandlerFunc(server.handleCreateAnnotation)))
+		mux.Handle("POST /api/annotations/{id}/replies", server.protectReviewMutation(http.HandlerFunc(server.handleReplyAnnotation)))
 	}
 	server.handler = securityHeaders(mux)
 
