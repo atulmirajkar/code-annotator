@@ -19,6 +19,11 @@ The MVP is implemented and ready to run from source or as a compiled binary.
 Editing, uploads, live reload, full-text search, and network sharing are not in
 the initial MVP.
 
+Fenced `mermaid` blocks render as embedded, client-side SVG diagrams without a
+CDN or runtime network dependency. In review mode, clicking a rendered diagram
+selects its complete source definition for annotation; its collapsible source
+remains available for line-level comments.
+
 ## Usage
 
 Run directly from the repository:
@@ -128,6 +133,21 @@ The client accepts only a loopback viewer URL, obtains the temporary review
 token from that viewer, sends the required `If-Match` revision, and never opens
 annotation sidecars.
 
+### Browser regression tests
+
+Install the pinned development dependency and run the real-browser suite with
+Google Chrome:
+
+```sh
+npm ci
+npm run test:browser
+```
+
+These tests start an isolated review server and cover Mermaid rendering,
+diagram selection, annotation mutation workflows, stale-anchor reattachment,
+and optimistic-concurrency conflicts. Node.js and Playwright are development
+dependencies only; released `md-viewer` binaries remain self-contained.
+
 ### Agent skill
 
 The executable and agent skill are separate artifacts. Installing the skill
@@ -175,8 +195,8 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 ## Development status
 
-The manual-refresh MVP is implemented, and annotation storage and anchoring are
-under active development. Saving a Markdown file and refreshing the browser
-reads and renders the latest contents from disk. See
+The manual-refresh MVP, annotation review workflow, agent handoff, and embedded
+Mermaid rendering are implemented and browser-tested. Saving a Markdown file
+and refreshing the browser reads and renders the latest contents from disk. See
 [`project_status.md`](project_status.md) for release readiness and the planned
 live-reload milestone.

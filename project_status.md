@@ -4,7 +4,7 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Browser verification complete; release verification pending.
+**Phase:** Release candidate verified; review required before live reload.
 
 The manual-refresh MVP and annotation review workflow are implemented, including
 selection mapping, highlights, secured browser mutations, live API agent handoff,
@@ -109,10 +109,10 @@ release verification is reviewed.
 | `github.com/yuin/goldmark` with GFM and raw HTML disabled | Approved |
 | `github.com/pkg/browser` for default-browser launch | Approved |
 | Browser-launch failure is non-fatal | Approved |
-| Annotations stored separately from Markdown in versioned JSON sidecars | Proposed |
+| Annotations stored separately from Markdown in versioned JSON sidecars | Approved |
 | Annotation review scheduled before live reload | Approved |
-| Mermaid rendered client-side from an embedded pinned bundle | Proposed |
-| Mermaid uses strict security and no runtime CDN or browser automation | Proposed |
+| Mermaid rendered client-side from an embedded pinned bundle | Approved |
+| Mermaid uses strict security and no runtime CDN or browser automation | Approved |
 | Live reload deferred until after annotation and diagram milestones | Approved |
 | Editing and network sharing deferred | Approved |
 
@@ -123,10 +123,10 @@ release verification is reviewed.
   and URL-encoded filenames.
 - Browser opening varies in graphical, SSH, container, and WSL environments;
   `--no-open` and a printed URL provide the fallback.
-- The current `go.mod` declares Go `1.26.5`; implementation should confirm that
-  this is the intended minimum toolchain before the first release.
+- The first release tag remains a deliberate maintainer action after review of
+  the verified release candidate.
 
 ## Next milestone
 
-Run release verification, refresh distribution artifacts, and stop for review
-before beginning live reload.
+Review the verified browser coverage and refreshed distribution artifacts.
+Begin live-reload design and implementation only after maintainer approval.
