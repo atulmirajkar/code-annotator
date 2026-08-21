@@ -634,6 +634,12 @@ creation. If another browser or agent writes first, the stale request receives
 to review the latest state before retrying. Ordinary inline discussion replies
 remain a separate control because they do not change lifecycle state.
 
+The reply form records an author and message and posts them to the dedicated
+reply endpoint with the review token and current sidecar revision. A successful
+append reloads the complete authoritative thread. A concurrent-write conflict
+reloads the latest thread before the reviewer retries, preventing an older
+browser view from overwriting agent activity.
+
 Closed and rejected annotations are complete or declined work, so the default
 document view excludes both their cards and their source highlights. The panel
 reports active and total counts and offers an explicit history toggle that

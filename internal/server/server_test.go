@@ -976,7 +976,7 @@ func TestReviewScript(t *testing.T) {
 		wantType     string
 		wantContents []string
 	}{
-		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"submitAnnotation", "submitLifecycle"}},
+		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"submitAnnotation", "submitReply", "submitLifecycle"}},
 		{name: "reject post", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
 	}
 

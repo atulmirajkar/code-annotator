@@ -78,8 +78,8 @@ annotation APIs. Its browser panel displays comments, lifecycle state, threads,
 and stale-anchor warnings. Selections across formatting elements show their
 Markdown byte range and are bound to the rendered document revision. Highlights
 and lifecycle controls let agents acknowledge, apply, or reject work and let
-reviewers close, reopen, or request more changes. Inline discussion replies are
-being delivered in a subsequent milestone commit. The creation form can attach
+reviewers close, reopen, or request more changes. Each card also accepts inline
+discussion replies without changing its lifecycle status. The creation form can attach
 a new annotation to the current selection or the whole document, and annotation
 cards preview their selected source and line range. Resolved selections are highlighted in the document;
 stale and document-level annotations remain panel-only. Closed and rejected

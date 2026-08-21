@@ -405,9 +405,79 @@
       });
       card.append(thread);
     }
+    card.append(createReplyForm(annotation));
     const lifecycle = createLifecycleForm(annotation);
     if (lifecycle) card.append(lifecycle);
     return card;
+  }
+
+  // Ordinary replies extend the discussion thread without implying that the
+  // annotation has advanced through its lifecycle.
+  function createReplyForm(annotation) {
+    const reply = element("form", "annotation-reply");
+    const authorLabel = document.createElement("label");
+    authorLabel.append(document.createTextNode("Reply as"));
+    const author = document.createElement("input");
+    author.name = "author";
+    author.required = true;
+    author.value = form.elements.author.value || "reviewer";
+    authorLabel.append(author);
+
+    const messageLabel = document.createElement("label");
+    messageLabel.append(document.createTextNode("Reply"));
+    const message = document.createElement("textarea");
+    message.name = "message";
+    message.rows = 3;
+    message.required = true;
+    messageLabel.append(message);
+
+    const status = element("p", "reply-status");
+    status.setAttribute("role", "status");
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.textContent = "Add reply";
+    reply.append(authorLabel, messageLabel, status, button);
+    reply.addEventListener("submit", (event) => submitReply(event, annotation.id));
+    return reply;
+  }
+
+  async function submitReply(event, annotationID) {
+    event.preventDefault();
+    const reply = event.currentTarget;
+    const button = reply.querySelector('button[type="submit"]');
+    const status = reply.querySelector(".reply-status");
+    const fields = new FormData(reply);
+    status.textContent = "Saving…";
+    status.classList.remove("error");
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}/replies`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": JSON.stringify(currentRevision),
+          "X-MD-Viewer-Token": reviewToken,
+        },
+        body: JSON.stringify({
+          document: documentPath,
+          author: fields.get("author"),
+          message: fields.get("message"),
+        }),
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          await loadAnnotations();
+          setFormStatus("Annotations changed. Review the latest thread and try again.", true);
+          return;
+        }
+        throw new Error((await response.text()).trim() || `Could not add reply (${response.status}).`);
+      }
+      await loadAnnotations();
+    } catch (error) {
+      status.textContent = error.message || "Could not add reply.";
+      status.classList.add("error");
+      button.disabled = false;
+    }
   }
 
   // Build only the lifecycle actions valid from the annotation's current

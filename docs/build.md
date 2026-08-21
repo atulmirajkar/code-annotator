@@ -76,8 +76,8 @@ The browser includes an annotation panel, previews and highlights selections
 across formatting elements, and creates selection- or document-level
 annotations. Annotation cards expose only lifecycle transitions valid for their
 current status and collect the required resolution summary or review message.
-Inline replies remain pending; replies and stale-anchor reattachment are also
-available through the API.
+Inline replies append discussion without changing lifecycle state. Stale-anchor
+reattachment is also available through the API.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

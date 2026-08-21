@@ -146,7 +146,10 @@ annotations, preserving access to audit history and reopen transitions.
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
 preserves existing entries. Structured lifecycle activity is reserved for the
-transition route so discussion cannot bypass status validation.
+transition route so discussion cannot bypass status validation. The browser
+presents replies as a separate form on each card, sends the latest sidecar
+revision, and reloads the authoritative thread after a successful append. A
+conflict reloads the latest thread before another attempt.
 
 Lifecycle transitions are actor-controlled by the annotation domain model. The
 handler creates any required acknowledgement, resolution, review, or rejection
