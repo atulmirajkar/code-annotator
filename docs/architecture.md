@@ -105,6 +105,10 @@ comment and require a refreshed document selection.
 Annotation cards render the persisted selector quote and line range with DOM
 text nodes. This preserves the original review context even when the separately
 derived current anchor state is stale.
+The same API response drives document highlights: exact and moved anchor byte
+ranges are converted back to DOM boundaries, with overlapping fallback ranges
+merged before markup is introduced. Stale and document-level records remain
+panel-only.
 
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and

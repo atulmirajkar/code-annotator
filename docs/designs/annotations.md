@@ -596,6 +596,12 @@ line range. Stale annotations retain that original quote so the reviewer can see
 what disappeared or became ambiguous. Document-level annotations show a
 distinct whole-document label instead of an empty quote.
 
+Exact and moved anchors are highlighted at their current derived byte ranges.
+The browser converts UTF-8 source offsets back to DOM UTF-16 boundaries and uses
+the CSS Highlight API when available. A merged `<mark>` fallback provides the
+same visual result without creating invalid overlaps. Stale and document-level
+annotations have no current text range and therefore are not highlighted.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.

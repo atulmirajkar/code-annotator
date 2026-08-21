@@ -63,7 +63,7 @@ rendering and live reload follow annotation review.
 - [x] Add an explicit writable review mode and annotation directory handling.
 - [x] Implement atomic sidecar persistence and stale-anchor detection.
 - [x] Implement annotation HTTP APIs with origin and session-token protection.
-- [ ] Add rendered-text selection, highlights, and the review panel.
+- [x] Add rendered-text selection, highlights, and the review panel.
 - [ ] Add annotation list, export, reply, and resolve CLI commands.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
@@ -121,5 +121,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add source-backed annotation highlights as the next independently reviewable
-annotation UI commit.
+Add the annotation list and export CLI commands as the next independently
+reviewable commit.

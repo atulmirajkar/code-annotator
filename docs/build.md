@@ -72,10 +72,10 @@ an alternate location when the content root should remain untouched:
 
 `--annotations-dir` is rejected without `--review`. Review mode initializes and
 reports the writable store and enables annotation reads and secured mutations.
-The browser includes an annotation panel, previews selections across formatting
-elements, and creates selection- or document-level annotations. Highlights and
-remaining browser mutation controls are pending; replies, lifecycle transitions,
-and stale-anchor reattachment are available through the API.
+The browser includes an annotation panel, previews and highlights selections
+across formatting elements, and creates selection- or document-level
+annotations. Remaining browser mutation controls are pending; replies,
+lifecycle transitions, and stale-anchor reattachment are available through the API.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

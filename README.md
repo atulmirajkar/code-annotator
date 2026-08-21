@@ -80,7 +80,8 @@ Markdown byte range and are bound to the rendered document revision. Highlights
 and reply/lifecycle browser controls are being delivered in subsequent
 milestone commits. The creation form can attach a new annotation to the current
 selection or the whole document, and annotation cards preview their selected
-source and line range. By default, sidecars are stored under
+source and line range. Resolved selections are highlighted in the document;
+stale and document-level annotations remain panel-only. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh
