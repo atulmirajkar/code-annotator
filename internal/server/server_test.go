@@ -222,6 +222,109 @@ func TestGitComparisonMetadata(t *testing.T) {
 	}
 }
 
+func TestCodeDiffRoute(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name        string
+		path        string
+		configure   func(*testing.T, string) *gitdiff.Config
+		requiresGit bool
+		wantStatus  int
+		contains    []string
+		excludes    []string
+	}{
+		{
+			name: "side-by-side changes",
+			path: "/view/main.go?mode=diff",
+			configure: func(t *testing.T, rootPath string) *gitdiff.Config {
+				comparison := changedCatalogRepository(t, rootPath)
+				return &comparison
+			},
+			requiresGit: true,
+			wantStatus:  http.StatusOK,
+			contains: []string{
+				`class="source-mode-tabs"`,
+				`href="/view/main.go"`,
+				`href="/view/main.go?mode=diff" aria-current="page"`,
+				`class="diff-view"`,
+				`<code>package main</code>`,
+				`<code>package changed</code>`,
+			},
+			excludes: []string{`class="source-view"`},
+		},
+		{
+			name:       "unconfigured changes view",
+			path:       "/view/main.go?mode=diff",
+			wantStatus: http.StatusNotFound,
+			contains:   []string{"Changes view is unavailable"},
+		},
+		{
+			name: "per-file Git failure preserves file navigation",
+			path: "/view/main.go?mode=diff",
+			configure: func(_ *testing.T, _ string) *gitdiff.Config {
+				return &gitdiff.Config{RepositoryRoot: "/missing/repository", RequestedBase: "HEAD", BaseCommit: strings.Repeat("a", 40)}
+			},
+			wantStatus: http.StatusOK,
+			contains:   []string{`href="/view/main.go"`, "Changes unavailable", "File view remains available."},
+		},
+		{
+			name: "Markdown has no changes view",
+			path: "/view/README.md?mode=diff",
+			configure: func(t *testing.T, rootPath string) *gitdiff.Config {
+				comparison := changedCatalogRepository(t, rootPath)
+				return &comparison
+			},
+			requiresGit: true,
+			wantStatus:  http.StatusNotFound,
+		},
+		{name: "unknown view mode", path: "/view/main.go?mode=split", wantStatus: http.StatusBadRequest, contains: []string{"unsupported document mode"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if test.requiresGit {
+				if _, err := exec.LookPath("git"); err != nil {
+					t.Skip("git executable is unavailable")
+				}
+			}
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "# Home")
+			writeTestFile(t, filepath.Join(rootPath, "main.go"), "package main\n")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			indexOptions, err := content.NewIndexOptions([]string{".go"}, nil)
+			if err != nil {
+				t.Fatalf("content.NewIndexOptions() error = %v", err)
+			}
+			serverOptions := []Option{WithIndexOptions(indexOptions)}
+			if test.configure != nil {
+				serverOptions = append(serverOptions, WithGitComparison(*test.configure(t, rootPath)))
+			}
+			viewer, err := New(root, mdrender.New(), serverOptions...)
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path, nil))
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(response.Body.String(), want) {
+					t.Errorf("response missing %q: %s", want, response.Body.String())
+				}
+			}
+			for _, unwanted := range test.excludes {
+				if strings.Contains(response.Body.String(), unwanted) {
+					t.Errorf("response unexpectedly contains %q", unwanted)
+				}
+			}
+		})
+	}
+}
+
 func TestChangedCatalogMetadata(t *testing.T) {
 	t.Parallel()
 	if _, err := exec.LookPath("git"); err != nil {

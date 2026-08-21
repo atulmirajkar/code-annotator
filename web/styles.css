@@ -8,6 +8,8 @@
   --accent: #3157d5;
   --accent-soft: #e9edff;
   --code: #eef1f5;
+  --diff-added: #e8f5e9;
+  --diff-deleted: #fdebec;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -20,6 +22,8 @@
     --accent: #91a7ff;
     --accent-soft: #242d52;
     --code: #252b34;
+    --diff-added: #183b2a;
+    --diff-deleted: #482428;
   }
 }
 
@@ -59,6 +63,9 @@ a { color: var(--accent); }
 .markdown-body { max-width: 54rem; margin: 0 auto; line-height: 1.7; }
 .code-document { padding: .5rem; }
 .code-document .markdown-body { max-width: none; }
+.source-mode-tabs { display: flex; gap: .3rem; margin-bottom: .5rem; border-bottom: 1px solid var(--border); }
+.source-mode-tabs a { padding: .35rem .65rem; border-bottom: .15rem solid transparent; color: var(--muted); font-size: .8rem; font-weight: 700; text-decoration: none; }
+.source-mode-tabs a[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
 .markdown-body h1, .markdown-body h2 { padding-bottom: .35em; border-bottom: 1px solid var(--border); line-height: 1.25; }
 .markdown-body h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.035em; }
 .markdown-body h2 { margin-top: 2em; }
@@ -71,6 +78,22 @@ a { color: var(--accent); }
 .source-line { display: grid; grid-template-columns: 4rem minmax(0, 1fr); min-height: 1.5em; padding-right: .5rem; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .85rem; line-height: 1.5; white-space: pre; }
 .source-line-number { padding-right: 1rem; color: var(--muted); text-align: right; user-select: none; }
 .source-line code { padding: 0; background: transparent; font: inherit; white-space: pre; }
+.diff-view { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: .55rem; background: var(--code); }
+.diff-column-headings, .diff-row { display: grid; grid-template-columns: minmax(24rem, 1fr) minmax(24rem, 1fr); min-width: 48rem; }
+.diff-column-headings { position: sticky; top: 0; z-index: 1; border-bottom: 1px solid var(--border); background: var(--surface); color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.diff-column-headings span { padding: .4rem 4.5rem; }
+.diff-column-headings span + span, .diff-current { border-left: 1px solid var(--border); }
+.diff-cell { display: grid; grid-template-columns: 1.25rem 3.25rem minmax(0, 1fr); min-height: 1.5em; font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: .8rem; line-height: 1.5; white-space: pre; }
+.diff-cell code { min-width: max-content; padding: 0 .5rem; background: transparent; font: inherit; white-space: pre; }
+.diff-marker, .diff-line-number { color: var(--muted); text-align: right; user-select: none; }
+.diff-marker { text-align: center; }
+.diff-base { user-select: none; }
+.diff-added .diff-current { background: var(--diff-added); }
+.diff-deleted .diff-base { background: var(--diff-deleted); }
+.diff-modified .diff-base { background: var(--diff-deleted); }
+.diff-modified .diff-current { background: var(--diff-added); }
+.diff-unavailable { max-width: 38rem; margin: 15vh auto; text-align: center; }
+.diff-unavailable p { color: var(--muted); }
 .mermaid-diagram { margin: 1.5rem 0; }
 .mermaid-source { margin-bottom: .75rem; color: var(--muted); font-size: .85rem; }
 .mermaid-source summary { cursor: pointer; }

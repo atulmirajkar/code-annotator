@@ -52,6 +52,10 @@
         <p>Add a Markdown file or enable supported source files, then refresh the page.</p>
       </section>
       {{else}}
+      {{if .IsCode}}<nav class="source-mode-tabs" aria-label="Source view">
+        <a href="{{.FileURL}}"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
+        {{if .DiffAvailable}}<a href="{{.ChangesURL}}"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
+      </nav>{{end}}
       <article class="markdown-body"{{if .DocumentSHA256}} data-document-sha256="{{.DocumentSHA256}}"{{end}}>{{.Content}}</article>
       {{end}}
     </main>

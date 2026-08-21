@@ -117,6 +117,10 @@ type pageData struct {
 	DiffCommit     string
 	ChangedReady   bool
 	ChangedError   bool
+	DiffMode       bool
+	DiffAvailable  bool
+	FileURL        string
+	ChangesURL     string
 }
 
 type documentView struct {
@@ -334,11 +338,11 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(request.Context(), response, index, "", nil, "")
+		s.renderPage(request.Context(), response, index, "", nil, "", false)
 		return
 	}
 
-	s.renderDocument(request.Context(), response, index, index.DefaultPath)
+	s.renderDocument(request.Context(), response, index, index.DefaultPath, false)
 }
 
 func (s *Server) handleDocument(response http.ResponseWriter, request *http.Request) {
@@ -353,7 +357,12 @@ func (s *Server) handleDocument(response http.ResponseWriter, request *http.Requ
 		http.Error(response, "could not index documents", http.StatusInternalServerError)
 		return
 	}
-	s.renderDocument(request.Context(), response, index, documentPath)
+	mode := request.URL.Query().Get("mode")
+	if mode != "" && mode != "diff" {
+		http.Error(response, "unsupported document mode", http.StatusBadRequest)
+		return
+	}
+	s.renderDocument(request.Context(), response, index, documentPath, mode == "diff")
 }
 
 func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request) {
@@ -384,7 +393,7 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 	http.ServeContent(response, request, filepath.Base(resolved), info.ModTime(), file)
 }
 
-func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string) {
+func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string, diffMode bool) {
 	document, ok := findDocument(index, documentPath)
 	if !ok {
 		http.Error(response, "document not found", http.StatusNotFound)
@@ -396,8 +405,22 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		return
 	}
 
+	if diffMode && (document.Kind != content.KindCode || s.comparison == nil) {
+		http.Error(response, "Changes view is unavailable", http.StatusNotFound)
+		return
+	}
+
 	var fragment []byte
-	if document.Kind == content.KindCode {
+	if diffMode {
+		diff, diffErr := s.comparison.BuildFileDiff(ctx, documentPath, source)
+		if diffErr != nil {
+			// File view remains usable when a per-file Git operation fails. Avoid
+			// exposing command output or repository details in the browser.
+			fragment = []byte(`<section class="diff-unavailable"><h1>Changes unavailable</h1><p>The Git comparison for this file could not be generated. File view remains available.</p></section>`)
+		} else {
+			fragment, err = s.renderer.RenderDiff(source, diff, s.review != nil)
+		}
+	} else if document.Kind == content.KindCode {
 		fragment, err = s.renderer.RenderCode(source, s.review != nil)
 	} else if s.review != nil {
 		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
@@ -416,10 +439,10 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 	if s.review != nil {
 		digest = annotation.DocumentSHA256(source)
 	}
-	s.renderPage(ctx, response, index, documentPath, fragment, digest)
+	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode)
 }
 
-func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool) {
 	changed := make(map[string]struct{})
 	changedReady := false
 	changedError := false
@@ -469,6 +492,10 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		IsCode:         isCode,
 		ChangedReady:   changedReady,
 		ChangedError:   changedError,
+		DiffMode:       diffMode,
+		DiffAvailable:  isCode && s.comparison != nil,
+		FileURL:        routeURL("/view/", selected),
+		ChangesURL:     routeURL("/view/", selected) + "?mode=diff",
 	}
 	if s.comparison != nil {
 		data.DiffBase = s.comparison.RequestedBase
