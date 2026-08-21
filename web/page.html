@@ -26,10 +26,14 @@
         <span>Find document</span>
         <input type="search" placeholder="Filter by path…" autocomplete="off" spellcheck="false">
       </label>
+      {{if .ChangedReady}}<label class="document-changed-filter">
+        <input type="checkbox">
+        <span>Changed only</span>
+      </label>{{else if .ChangedError}}<p class="document-filter-error">Changed-file lookup unavailable.</p>{{end}}
       <p class="document-search-status" role="status" aria-live="polite" hidden></p>
       <ul class="documents">
         {{range .Documents}}
-        <li>
+        <li data-changed="{{.Changed}}">
           <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
             {{if .Directory}}<span class="directory">{{.Directory}}/</span>{{end}}{{.Name}}
             {{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}

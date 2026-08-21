@@ -1,12 +1,14 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -217,6 +219,86 @@ func TestGitComparisonMetadata(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestChangedCatalogMetadata(t *testing.T) {
+	t.Parallel()
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git executable is unavailable")
+	}
+
+	tests := []struct {
+		name        string
+		configure   func(*testing.T, string) gitdiff.Config
+		wantReady   bool
+		wantError   bool
+		wantChanged int
+	}{
+		{name: "catalog intersects changed paths", configure: changedCatalogRepository, wantReady: true, wantChanged: 2},
+		{name: "failed lookup remains distinct", configure: func(_ *testing.T, _ string) gitdiff.Config {
+			return gitdiff.Config{RepositoryRoot: "/missing/repository", RequestedBase: "HEAD", BaseCommit: strings.Repeat("a", 40)}
+		}, wantError: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "# Home")
+			comparison := test.configure(t, rootPath)
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			options, err := content.NewIndexOptions([]string{".go"}, nil)
+			if err != nil {
+				t.Fatalf("content.NewIndexOptions() error = %v", err)
+			}
+			viewer, err := New(root, mdrender.New(), WithIndexOptions(options), WithGitComparison(comparison))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			response := getResponse(t, viewer.Handler(), "/")
+			body := response.Body.String()
+			if got := strings.Contains(body, `class="document-changed-filter"`); got != test.wantReady {
+				t.Errorf("changed filter present = %t, want %t", got, test.wantReady)
+			}
+			if got := strings.Contains(body, "Changed-file lookup unavailable."); got != test.wantError {
+				t.Errorf("lookup error present = %t, want %t", got, test.wantError)
+			}
+			if got := strings.Count(body, `data-changed="true"`); got != test.wantChanged {
+				t.Errorf("changed document count = %d, want %d", got, test.wantChanged)
+			}
+		})
+	}
+}
+
+// changedCatalogRepository freezes a small worktree, then creates supported
+// tracked and untracked changes plus one unsupported file for intersection.
+func changedCatalogRepository(t *testing.T, repository string) gitdiff.Config {
+	t.Helper()
+	writeTestFile(t, filepath.Join(repository, "README.md"), "# Home")
+	writeTestFile(t, filepath.Join(repository, "main.go"), "package main\n")
+	runServerTestGit(t, repository, "init", "-b", "main")
+	runServerTestGit(t, repository, "add", "README.md", "main.go")
+	runServerTestGit(t, repository, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "initial")
+	comparison, err := gitdiff.Open(context.Background(), repository, "HEAD")
+	if err != nil {
+		t.Fatalf("gitdiff.Open() error = %v", err)
+	}
+	writeTestFile(t, filepath.Join(repository, "main.go"), "package changed\n")
+	writeTestFile(t, filepath.Join(repository, "new.go"), "package added\n")
+	writeTestFile(t, filepath.Join(repository, "unsupported.txt"), "not reviewable")
+	return comparison
+}
+
+// runServerTestGit executes fixture setup without involving production command
+// execution, which remains owned and bounded by internal/gitdiff.
+func runServerTestGit(t *testing.T, repository string, arguments ...string) {
+	t.Helper()
+	command := exec.Command("git", append([]string{"-C", repository}, arguments...)...)
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("git %v error = %v: %s", arguments, err, output)
 	}
 }
 
@@ -1316,7 +1398,7 @@ func TestStaticAssets(t *testing.T) {
 		wantContents []string
 	}{
 		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle", "captureDiagramSelection", "diagramSelectionActive", "renderDiagramHighlights"}},
-		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "No matching documents"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "matching changed"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},

@@ -35,6 +35,7 @@
   // Enter opens the first match, while slash focuses lookup from document view.
   function bindDocumentSearch() {
     const input = document.querySelector(".document-search input");
+    const changedOnly = document.querySelector(".document-changed-filter input");
     const status = document.querySelector(".document-search-status");
     const items = Array.from(document.querySelectorAll(".documents li"));
     if (!input || !status || items.length === 0) return;
@@ -42,17 +43,22 @@
     const visibleLinks = () => items.filter((item) => !item.hidden).map((item) => item.querySelector("a"));
     const filter = () => {
       const query = input.value.trim().toLocaleLowerCase();
+      const changed = Boolean(changedOnly?.checked);
       let matches = 0;
       items.forEach((item) => {
         const path = (item.textContent || "").trim().toLocaleLowerCase();
-        item.hidden = Boolean(query) && !path.includes(query);
+        const pathMatches = !query || path.includes(query);
+        const changeMatches = !changed || item.dataset.changed === "true";
+        item.hidden = !pathMatches || !changeMatches;
         if (!item.hidden) matches++;
       });
-      status.hidden = !query;
-      status.textContent = matches === 0 ? "No matching documents." : `${matches} matching document${matches === 1 ? "" : "s"}.`;
+      status.hidden = !query && !changed;
+      const qualifier = changed ? (query ? "matching changed" : "changed") : "matching";
+      status.textContent = matches === 0 ? `No ${qualifier} documents.` : `${matches} ${qualifier} document${matches === 1 ? "" : "s"}.`;
     };
 
     input.addEventListener("input", filter);
+    changedOnly?.addEventListener("change", filter);
     input.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         input.value = "";

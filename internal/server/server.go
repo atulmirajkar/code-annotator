@@ -3,6 +3,7 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"crypto/subtle"
 	"errors"
 	"fmt"
@@ -114,6 +115,8 @@ type pageData struct {
 	IsCode         bool
 	DiffBase       string
 	DiffCommit     string
+	ChangedReady   bool
+	ChangedError   bool
 }
 
 type documentView struct {
@@ -122,6 +125,7 @@ type documentView struct {
 	URL       string
 	Selected  bool
 	Kind      string
+	Changed   bool
 }
 
 // WithIndexOptions configures the reviewable content catalog.
@@ -330,11 +334,11 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(response, index, "", nil, "")
+		s.renderPage(request.Context(), response, index, "", nil, "")
 		return
 	}
 
-	s.renderDocument(response, index, index.DefaultPath)
+	s.renderDocument(request.Context(), response, index, index.DefaultPath)
 }
 
 func (s *Server) handleDocument(response http.ResponseWriter, request *http.Request) {
@@ -349,7 +353,7 @@ func (s *Server) handleDocument(response http.ResponseWriter, request *http.Requ
 		http.Error(response, "could not index documents", http.StatusInternalServerError)
 		return
 	}
-	s.renderDocument(response, index, documentPath)
+	s.renderDocument(request.Context(), response, index, documentPath)
 }
 
 func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request) {
@@ -380,7 +384,7 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 	http.ServeContent(response, request, filepath.Base(resolved), info.ModTime(), file)
 }
 
-func (s *Server) renderDocument(response http.ResponseWriter, index content.Index, documentPath string) {
+func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string) {
 	document, ok := findDocument(index, documentPath)
 	if !ok {
 		http.Error(response, "document not found", http.StatusNotFound)
@@ -412,10 +416,24 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 	if s.review != nil {
 		digest = annotation.DocumentSHA256(source)
 	}
-	s.renderPage(response, index, documentPath, fragment, digest)
+	s.renderPage(ctx, response, index, documentPath, fragment, digest)
 }
 
-func (s *Server) renderPage(response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string) {
+	changed := make(map[string]struct{})
+	changedReady := false
+	changedError := false
+	if s.comparison != nil {
+		paths, err := s.comparison.ChangedPaths(ctx)
+		if err != nil {
+			changedError = true
+		} else {
+			changedReady = true
+			for _, changedPath := range paths {
+				changed[changedPath] = struct{}{}
+			}
+		}
+	}
 	documents := make([]documentView, 0, len(index.Documents))
 	isCode := false
 	for _, document := range index.Documents {
@@ -428,6 +446,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 			URL:       routeURL("/view/", document.Path),
 			Selected:  document.Path == selected,
 			Kind:      string(document.Kind),
+			Changed:   containsPath(changed, document.Path),
 		})
 	}
 
@@ -448,6 +467,8 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     hasMermaid,
 		IsCode:         isCode,
+		ChangedReady:   changedReady,
+		ChangedError:   changedError,
 	}
 	if s.comparison != nil {
 		data.DiffBase = s.comparison.RequestedBase
@@ -461,6 +482,13 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		// tests and terminal diagnostics until structured logging is added.
 		http.Error(response, "could not render viewer page", http.StatusInternalServerError)
 	}
+}
+
+// containsPath reports changed-set membership without exposing the mutable map
+// to templates or duplicating lookup code in the render loop.
+func containsPath(paths map[string]struct{}, documentPath string) bool {
+	_, ok := paths[documentPath]
+	return ok
 }
 
 // findDocument performs an exact membership check against the safe catalog.

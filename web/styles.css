@@ -45,6 +45,8 @@ a { color: var(--accent); }
 .document-search span { color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
 .document-search input { min-width: 0; width: 100%; padding: .48rem .55rem; border: 1px solid var(--border); border-radius: .4rem; background: var(--background); color: var(--text); font: inherit; font-size: .82rem; }
 .document-search input:focus { border-color: var(--accent); outline: .12rem solid var(--accent-soft); }
+.document-changed-filter { display: flex; align-items: center; gap: .4rem; margin: -.15rem .5rem .75rem; color: var(--muted); font-size: .75rem; }
+.document-filter-error { margin: -.15rem .5rem .75rem; color: var(--muted); font-size: .72rem; }
 .document-search-status { margin: -.3rem .5rem .65rem; color: var(--muted); font-size: .72rem; }
 .documents { margin: 0; padding: 0; list-style: none; }
 .documents a { display: block; padding: .55rem .65rem; border-radius: .45rem; color: var(--text); font-size: .9rem; text-decoration: none; overflow-wrap: anywhere; }

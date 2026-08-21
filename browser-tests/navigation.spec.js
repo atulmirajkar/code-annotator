@@ -50,6 +50,25 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".documents li:not([hidden]) a")).toBeFocused();
   });
 
+  test("composes Changed only with path lookup", async ({ page, viewerURL }) => {
+    await page.goto(viewerURL);
+    const changedOnly = page.getByRole("checkbox", { name: "Changed only" });
+    await expect(changedOnly).toBeVisible();
+    await changedOnly.check();
+    await expect(page.locator(".documents li:not([hidden]) a", { hasText: "changed-only.go" })).toBeVisible();
+    await expect(page.locator(".documents li:not([hidden]) a", { hasText: "valid.md" })).toHaveCount(0);
+
+    const search = page.getByRole("searchbox", { name: "Find document" });
+    await search.fill("missing-change");
+    await expect(page.locator(".document-search-status")).toHaveText("No matching changed documents.");
+    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(0);
+
+    await search.fill("changed-only");
+    await expect(page.locator(".document-search-status")).toHaveText("1 matching changed document.");
+    await search.press("Enter");
+    await expect(page).toHaveURL(/\/view\/changed-only\.go$/);
+  });
+
   test("keeps panel controls usable without horizontal page overflow on mobile", async ({ page, viewerURL }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${viewerURL}view/valid.md`);

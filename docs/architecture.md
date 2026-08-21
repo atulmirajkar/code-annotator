@@ -99,6 +99,11 @@ the containing worktree and resolve the requested local revision to a full
 commit ID. The server receives that immutable configuration and exposes the
 requested name and resolved commit as read-only page metadata. Per-file patch
 generation cannot replace or reinterpret the base during the server lifetime.
+Each page render obtains one bounded changed-path snapshot from that base,
+intersects it with the current safe content catalog, and marks matching sidebar
+entries. The browser's Changed-only and path filters compose over this snapshot.
+Discovery failure leaves the full catalog usable and is presented as
+unavailable rather than as an empty changed set.
 
 ## HTTP routes
 

@@ -98,6 +98,10 @@ as Markdown. Side-by-side Git diff presentation remains pending milestone work.
 remote-tracking ref such as `HEAD~1` or `origin/main`. It never fetches. The
 revision is resolved to an immutable full commit at startup, and startup fails
 if the content root is outside its Git worktree or the revision is unavailable.
+When comparison is configured, the document sidebar offers **Changed only**.
+It includes supported tracked changes against the frozen base and untracked,
+non-ignored files, and composes with **Find document**. Refresh the browser to
+evaluate a new worktree snapshot.
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,

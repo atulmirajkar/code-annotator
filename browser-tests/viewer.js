@@ -1,8 +1,11 @@
 const { test: base, expect } = require("@playwright/test");
-const { spawn } = require("node:child_process");
-const { cp, mkdtemp, rm } = require("node:fs/promises");
+const { execFile, spawn } = require("node:child_process");
+const { cp, mkdtemp, rm, writeFile } = require("node:fs/promises");
 const { tmpdir } = require("node:os");
 const path = require("node:path");
+const { promisify } = require("node:util");
+
+const runFile = promisify(execFile);
 
 // viewerURL owns one isolated review server per Playwright worker. Content is
 // read from immutable fixtures while annotation writes go to a temporary root.
@@ -11,10 +14,12 @@ const test = base.extend({
     const annotationRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-annotations-"));
     const contentRoot = await mkdtemp(path.join(tmpdir(), "md-viewer-browser-content-"));
     await cp(path.join(__dirname, "fixtures"), contentRoot, { recursive: true });
+    await initializeGitFixture(contentRoot);
     const server = spawn("go", [
       "run", "./cmd/md-viewer",
       "-review",
-	  "-include-code",
+      "-include-code",
+	  "-diff-base", "HEAD",
       "-no-open",
       "-port", "0",
       "-annotations-dir", annotationRoot,
@@ -42,6 +47,15 @@ const test = base.extend({
   }, { scope: "worker" }],
   viewerURL: [async ({ viewer }, use) => use(viewer.url), { scope: "worker" }],
 });
+
+// initializeGitFixture freezes all ordinary fixtures at HEAD, then adds one
+// untracked source document for deterministic Changed-only browser coverage.
+async function initializeGitFixture(contentRoot) {
+  await runFile("git", ["-C", contentRoot, "init", "-b", "main"]);
+  await runFile("git", ["-C", contentRoot, "add", "."]);
+  await runFile("git", ["-C", contentRoot, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixtures"]);
+  await writeFile(path.join(contentRoot, "changed-only.go"), "package changed\n");
+}
 
 // waitForViewerURL resolves startup output while retaining stderr for useful
 // failures when the Go process exits before binding its loopback listener.
