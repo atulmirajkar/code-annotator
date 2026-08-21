@@ -970,13 +970,13 @@ func TestReviewScript(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name        string
-		method      string
-		wantStatus  int
-		wantType    string
-		wantContent string
+		name         string
+		method       string
+		wantStatus   int
+		wantType     string
+		wantContents []string
 	}{
-		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContent: "submitAnnotation"},
+		{name: "get embedded script", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"submitAnnotation", "submitLifecycle"}},
 		{name: "reject post", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
 	}
 
@@ -994,8 +994,10 @@ func TestReviewScript(t *testing.T) {
 			if test.wantType != "" && response.Header().Get("Content-Type") != test.wantType {
 				t.Errorf("Content-Type = %q, want %q", response.Header().Get("Content-Type"), test.wantType)
 			}
-			if test.wantContent != "" && !strings.Contains(response.Body.String(), test.wantContent) {
-				t.Errorf("script does not contain %q", test.wantContent)
+			for _, wantContent := range test.wantContents {
+				if !strings.Contains(response.Body.String(), wantContent) {
+					t.Errorf("script does not contain %q", wantContent)
+				}
 			}
 		})
 	}

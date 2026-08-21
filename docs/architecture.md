@@ -130,6 +130,13 @@ ranges are converted back to DOM boundaries, with overlapping fallback ranges
 merged before markup is introduced. Stale and document-level records remain
 panel-only.
 
+Each annotation card derives its available lifecycle controls from the current
+status. The chosen transition supplies the required actor role and determines
+whether the form must collect a resolution summary or review message. Mutations
+send the review token and the latest sidecar revision to the shared transition
+endpoint. On a revision conflict, the browser reloads the authoritative list
+and asks the user to review the new state before retrying.
+
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and
 preserves existing entries. Structured lifecycle activity is reserved for the

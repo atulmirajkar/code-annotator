@@ -388,7 +388,150 @@
       });
       card.append(thread);
     }
+    const lifecycle = createLifecycleForm(annotation);
+    if (lifecycle) card.append(lifecycle);
     return card;
+  }
+
+  // Build only the lifecycle actions valid from the annotation's current
+  // state. Actor roles and required activity are derived from that action so
+  // the browser cannot accidentally submit an invalid transition shape.
+  function createLifecycleForm(annotation) {
+    const options = transitionOptions(annotation.status);
+    if (options.length === 0) return null;
+
+    const lifecycle = element("form", "annotation-lifecycle");
+    const actionLabel = document.createElement("label");
+    actionLabel.append(document.createTextNode("Action"));
+    const action = document.createElement("select");
+    action.name = "status";
+    options.forEach((option) => {
+      const item = document.createElement("option");
+      item.value = option.status;
+      item.textContent = option.label;
+      item.dataset.role = option.role;
+      item.dataset.activity = option.activity || "";
+      action.append(item);
+    });
+    actionLabel.append(action);
+
+    const authorLabel = document.createElement("label");
+    authorLabel.append(document.createTextNode("Author"));
+    const author = document.createElement("input");
+    author.name = "author";
+    author.required = true;
+    author.value = form.elements.author.value || "reviewer";
+    authorLabel.append(author);
+
+    const activityLabel = document.createElement("label");
+    activityLabel.className = "lifecycle-activity";
+    const activityTitle = document.createElement("span");
+    const activity = document.createElement("textarea");
+    activity.name = "activity";
+    activity.rows = 3;
+    activityLabel.append(activityTitle, activity);
+
+    const commitLabel = document.createElement("label");
+    commitLabel.className = "lifecycle-commit";
+    commitLabel.append(document.createTextNode("Commit (optional)"));
+    const commit = document.createElement("input");
+    commit.name = "commit";
+    commitLabel.append(commit);
+
+    const status = element("p", "lifecycle-status");
+    status.setAttribute("role", "status");
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.textContent = "Update status";
+
+    lifecycle.append(actionLabel, authorLabel, activityLabel, commitLabel, status, button);
+    const updateFields = () => {
+      const selected = action.selectedOptions[0];
+      const activityKind = selected.dataset.activity;
+      activityLabel.hidden = !activityKind;
+      activity.required = Boolean(activityKind);
+      activityTitle.textContent = activityKind === "summary" ? "Summary" : "Message";
+      commitLabel.hidden = activityKind !== "summary";
+      if (!activityKind) activity.value = "";
+      if (activityKind !== "summary") commit.value = "";
+    };
+    action.addEventListener("change", updateFields);
+    lifecycle.addEventListener("submit", (event) => submitLifecycle(event, annotation.id));
+    updateFields();
+    return lifecycle;
+  }
+
+  // Keep the browser controls aligned with the server-owned transition model.
+  // The server remains authoritative and validates every submitted action.
+  function transitionOptions(status) {
+    const transitions = {
+      open: [
+        { status: "acknowledged", label: "Acknowledge", role: "agent" },
+        { status: "rejected", label: "Reject", role: "agent", activity: "message" },
+      ],
+      acknowledged: [
+        { status: "applied", label: "Mark applied", role: "agent", activity: "summary" },
+        { status: "rejected", label: "Reject", role: "agent", activity: "message" },
+      ],
+      needs_changes: [{ status: "acknowledged", label: "Acknowledge retry", role: "agent" }],
+      applied: [
+        { status: "closed", label: "Close", role: "reviewer" },
+        { status: "needs_changes", label: "Needs changes", role: "reviewer", activity: "message" },
+      ],
+      closed: [{ status: "open", label: "Reopen", role: "reviewer" }],
+      rejected: [{ status: "open", label: "Reopen", role: "reviewer" }],
+    };
+    return transitions[status] || [];
+  }
+
+  async function submitLifecycle(event, annotationID) {
+    event.preventDefault();
+    const lifecycle = event.currentTarget;
+    const button = lifecycle.querySelector('button[type="submit"]');
+    const status = lifecycle.querySelector(".lifecycle-status");
+    const fields = new FormData(lifecycle);
+    const selected = lifecycle.elements.status.selectedOptions[0];
+    const activityKind = selected.dataset.activity;
+    const payload = {
+      document: documentPath,
+      status: fields.get("status"),
+      actorRole: selected.dataset.role,
+      author: fields.get("author"),
+    };
+    if (activityKind === "message") payload.message = fields.get("activity");
+    if (activityKind === "summary") {
+      payload.summary = fields.get("activity");
+      const commit = fields.get("commit");
+      if (commit) payload.commit = commit;
+    }
+
+    status.textContent = "Saving…";
+    status.classList.remove("error");
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": JSON.stringify(currentRevision),
+          "X-MD-Viewer-Token": reviewToken,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          await loadAnnotations();
+          setFormStatus("Annotations changed. Review the latest status and try again.", true);
+          return;
+        }
+        throw new Error((await response.text()).trim() || `Could not update annotation (${response.status}).`);
+      }
+      await loadAnnotations();
+    } catch (error) {
+      status.textContent = error.message || "Could not update annotation.";
+      status.classList.add("error");
+      button.disabled = false;
+    }
   }
 
   function threadText(entry) {

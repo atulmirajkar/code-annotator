@@ -624,6 +624,16 @@ the CSS Highlight API when available. A merged `<mark>` fallback provides the
 same visual result without creating invalid overlaps. Stale and document-level
 annotations have no current text range and therefore are not highlighted.
 
+Lifecycle controls appear within each annotation card and expose only valid
+next states. The selected action determines the actor role sent to the server
+and whether a message or resolution summary is required; an applied action may
+also include a commit reference. Every update carries the review token and the
+latest sidecar revision. The server still owns validation and atomic thread
+creation. If another browser or agent writes first, the stale request receives
+`409`; the browser reloads the authoritative annotations and requires the user
+to review the latest state before retrying. Ordinary inline discussion replies
+remain a separate control because they do not change lifecycle state.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.

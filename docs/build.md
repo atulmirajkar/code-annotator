@@ -74,8 +74,10 @@ an alternate location when the content root should remain untouched:
 reports the writable store and enables annotation reads and secured mutations.
 The browser includes an annotation panel, previews and highlights selections
 across formatting elements, and creates selection- or document-level
-annotations. Remaining browser mutation controls are pending; replies,
-lifecycle transitions, and stale-anchor reattachment are available through the API.
+annotations. Annotation cards expose only lifecycle transitions valid for their
+current status and collect the required resolution summary or review message.
+Inline replies remain pending; replies and stale-anchor reattachment are also
+available through the API.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

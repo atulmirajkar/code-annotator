@@ -65,6 +65,7 @@ rendering and live reload follow annotation review.
 - [x] Implement annotation HTTP APIs with origin and session-token protection.
 - [x] Add rendered-text selection, highlights, and the review panel.
 - [x] Add annotation list, export, reply, and resolve CLI commands.
+- [x] Add actor-aware annotation lifecycle controls to the browser panel.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
 ### 7. Mermaid and sequence diagrams
@@ -121,5 +122,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add browser reply and lifecycle controls as the next independently reviewable
+Add inline browser discussion replies as the next independently reviewable
 commit.
