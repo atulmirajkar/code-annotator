@@ -79,8 +79,8 @@ Embedded diagram rendering and live reload follow annotation review.
 - [x] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
   network dependency.
 - [x] Recognize fenced `mermaid` blocks and render them as client-side SVG.
-- [x] Use strict Mermaid security, bounded diagram input, and a self-only script
-  Content Security Policy without `unsafe-inline`.
+- [x] Use strict Mermaid security, bounded diagram input, and self-only scripts;
+  permit generated inline SVG styles only on pages containing Mermaid.
 - [x] Preserve the source code block and show a useful message when diagram
   parsing or rendering fails.
 - [x] Add responsive diagram styling and viewer-theme integration.

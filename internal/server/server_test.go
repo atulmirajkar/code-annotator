@@ -1188,12 +1188,13 @@ func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
-		name       string
-		source     string
-		wantAssets bool
+		name                  string
+		source                string
+		wantAssets            bool
+		wantInlineStylePolicy bool
 	}{
 		{name: "ordinary Markdown omits Mermaid assets", source: "# Home\n"},
-		{name: "Mermaid fence loads Mermaid assets", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", wantAssets: true},
+		{name: "Mermaid fence loads Mermaid assets and permits generated styles", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", wantAssets: true, wantInlineStylePolicy: true},
 	}
 
 	for _, test := range tests {
@@ -1209,10 +1210,15 @@ func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
 			}
-			body := getResponse(t, viewer.Handler(), "/").Body.String()
+			response := getResponse(t, viewer.Handler(), "/")
+			body := response.Body.String()
 			hasAssets := strings.Contains(body, `src="/static/mermaid.tiny.js"`) && strings.Contains(body, `src="/static/mermaid.js"`)
 			if hasAssets != test.wantAssets {
 				t.Fatalf("page contains Mermaid assets = %t, want %t", hasAssets, test.wantAssets)
+			}
+			hasInlineStylePolicy := strings.Contains(response.Header().Get("Content-Security-Policy"), "style-src 'self' 'unsafe-inline'")
+			if hasInlineStylePolicy != test.wantInlineStylePolicy {
+				t.Fatalf("page permits generated inline styles = %t, want %t; policy: %q", hasInlineStylePolicy, test.wantInlineStylePolicy, response.Header().Get("Content-Security-Policy"))
 			}
 		})
 	}
@@ -1352,7 +1358,7 @@ func TestSecurityHeaders(t *testing.T) {
 				t.Errorf("GET %q %s = %q, want %q", requestPath, name, got, want)
 			}
 		}
-		if got := response.Header().Get("Content-Security-Policy"); got != "default-src 'none'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" {
+		if got := response.Header().Get("Content-Security-Policy"); got != baseContentSecurityPolicy {
 			t.Errorf("GET %q Content-Security-Policy = %q", requestPath, got)
 		}
 	}

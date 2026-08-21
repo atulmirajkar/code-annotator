@@ -37,6 +37,11 @@ const (
 	idleTimeout       = 60 * time.Second
 )
 
+const (
+	baseContentSecurityPolicy    = "default-src 'none'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+	mermaidContentSecurityPolicy = "default-src 'none'; img-src 'self' data: http: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+)
+
 // Server serves an index and rendered Markdown documents from a content root.
 type Server struct {
 	root        *content.Root
@@ -375,6 +380,13 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		})
 	}
 
+	hasMermaid := bytes.Contains(fragment, []byte(`class="mermaid-diagram"`))
+	if hasMermaid {
+		// Mermaid generates scoped SVG style elements and style attributes. Allow
+		// inline CSS only for pages that render diagrams; script execution remains
+		// restricted to application-owned, same-origin assets.
+		response.Header().Set("Content-Security-Policy", mermaidContentSecurityPolicy)
+	}
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := pageData{
 		Root:           s.root.Path(),
@@ -383,7 +395,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		Content:        template.HTML(fragment), // goldmark output with safe defaults.
 		Empty:          len(index.Documents) == 0,
 		DocumentSHA256: documentSHA256,
-		HasMermaid:     bytes.Contains(fragment, []byte(`class="mermaid-diagram"`)),
+		HasMermaid:     hasMermaid,
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token
@@ -431,7 +443,7 @@ func escapedRoutePath(request *http.Request, prefix string) string {
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		response.Header().Set("Cache-Control", "no-store")
-		response.Header().Set("Content-Security-Policy", "default-src 'none'; img-src 'self' data: http: https:; style-src 'self'; script-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+		response.Header().Set("Content-Security-Policy", baseContentSecurityPolicy)
 		response.Header().Set("Referrer-Policy", "no-referrer")
 		response.Header().Set("X-Content-Type-Options", "nosniff")
 		response.Header().Set("X-Frame-Options", "DENY")

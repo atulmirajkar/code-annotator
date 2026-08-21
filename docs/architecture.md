@@ -236,6 +236,13 @@ files and directories are omitted. The page template provides a navigation
 sidebar and a readable document pane; on desktop, the sidebar remains visible
 and scrolls independently from the document.
 
+Fenced `mermaid` blocks load the embedded Mermaid Tiny bundle only on pages that
+need it. Mermaid runs with strict security and a bounded input size, and no
+diagram asset is fetched at runtime. The default Content Security Policy allows
+styles and scripts only from the viewer origin. Because Mermaid emits scoped
+SVG style elements and style attributes, diagram pages additionally permit
+inline CSS; scripts remain self-only and Markdown raw HTML remains disabled.
+
 Relative Markdown links to other `.md` files should resolve to `/view/` routes.
 Relative image and asset references should resolve to `/asset/` routes relative
 to the current document's directory. External `http` and `https` links remain
