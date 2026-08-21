@@ -114,7 +114,17 @@ activity. For example, `applied` requires `--summary`, while `needs_changes` and
 
 These commands are offline tooling. While a review server is live, agents use
 its annotation HTTP API so browser and agent mutations share the same revision
-coordinator; the repository agent skill provides that client workflow.
+coordinator:
+
+```sh
+./bin/md-viewer agent queue --url http://127.0.0.1:54321
+./bin/md-viewer agent resolve --url http://127.0.0.1:54321 \
+  --document README.md --revision <revision> --id ann_... \
+  --status acknowledged --role agent --author codex
+```
+
+The agent client obtains the ephemeral review token from the supplied loopback
+viewer page and never accesses sidecar storage directly.
 
 ## Verify
 

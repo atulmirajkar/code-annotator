@@ -45,6 +45,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	if len(args) > 0 && args[0] == "annotations" {
 		return commands.RunAnnotations(args[1:], stdout, stderr)
 	}
+	if len(args) > 0 && args[0] == "agent" {
+		return commands.RunAgent(args[1:], stdout, stderr)
+	}
 	configuration, err := parseConfig(args, stderr)
 	if err != nil {
 		return err

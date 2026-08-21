@@ -114,6 +114,20 @@ annotation lifecycle state.
 `resolve` performs the same actor-validated lifecycle transitions as the HTTP
 API and records both structured activity and status history atomically.
 
+When the review server is running, agents use the live HTTP client instead of
+the offline commands so browser and agent writes share one revision authority:
+
+```sh
+md-viewer agent queue --url http://127.0.0.1:54321
+md-viewer agent resolve --url http://127.0.0.1:54321 \
+  --document README.md --revision <revision> --id ann_... \
+  --status applied --role agent --author codex --summary "Implemented request"
+```
+
+The client accepts only a loopback viewer URL, obtains the temporary review
+token from that viewer, sends the required `If-Match` revision, and never opens
+annotation sidecars.
+
 ## Documentation
 
 - [MVP design](docs/designs/mvp.md)

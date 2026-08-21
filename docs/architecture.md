@@ -45,7 +45,7 @@ internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
-internal/commands/          offline annotation list and export workflows
+internal/commands/          offline annotation tools and live HTTP agent client
 web/                        embedded HTML, CSS, and review-panel JavaScript
 ```
 
@@ -67,6 +67,13 @@ content index for one globally unique annotation ID, appends a validated
 ordinary reply, validates the complete sidecar, and saves against the revision
 loaded during lookup. Missing storage is an error rather than an instruction to
 create a new annotation root.
+
+The `agent` command family is separate from offline `annotations` commands. It
+accepts only a loopback HTTP viewer origin, reads the ephemeral review token
+from the served page, and calls the live queue, reply, and transition endpoints.
+It never opens content or sidecar storage. Mutation requests carry the exact
+origin, token, and quoted document revision; `409` instructs the caller to
+reload rather than retrying stale state.
 Transition-entry construction lives in `internal/annotation` and is shared by
 the HTTP handler and `annotations resolve`. The offline command locates the same
 stable ID, applies actor-role validation, appends activity plus status change,

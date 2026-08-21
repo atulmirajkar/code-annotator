@@ -584,10 +584,11 @@ A live agent workflow is:
 7. On `409`, reload the API queue and reconsider the action against the latest
    status and complete thread. Never retry a stale mutation blindly.
 
-The repository skill provides a small API client so agents do not reproduce
-authentication headers or JSON shapes by hand. The client discovers the token
-from the supplied loopback viewer URL and never writes sidecars. The viewer must
-not execute arbitrary agent commands.
+The Go application provides an `agent` HTTP-client command family so agents do
+not reproduce authentication headers or JSON shapes by hand. It discovers the
+token from the supplied loopback viewer URL and never opens or writes sidecars.
+The repository skill instructs agents to use this client. The viewer must not
+execute arbitrary agent commands.
 
 ## Proposed packages
 
