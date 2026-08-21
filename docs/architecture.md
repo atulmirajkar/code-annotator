@@ -40,6 +40,8 @@ can accept connections.
 ```text
 cmd/md-viewer/main.go       command-line parsing, process lifecycle, signals
 internal/content/           directory indexing and root-contained file lookup
+internal/annotation/        annotation schema, lifecycle, and anchor resolution
+internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
@@ -49,6 +51,13 @@ web/                        embedded HTML templates and CSS
 Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
+
+Read-only mode never opens or creates annotation storage. With `--review`, the
+application opens a separate symlink-resolved writable root. The default is
+`<content-root>/.md-viewer/annotations/`; `--annotations-dir` selects an
+alternate location and is invalid unless review mode is explicit. Mutation
+routes will receive this store rather than constructing writable paths in HTTP
+handlers.
 
 ## HTTP routes
 

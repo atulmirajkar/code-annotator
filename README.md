@@ -67,8 +67,19 @@ available in the terminal.
 Available flags:
 
 ```text
---port <number>  Use a specific loopback port instead of an OS-selected port
---no-open        Start the server without opening a browser
+--port <number>             Use a specific loopback port instead of an OS-selected port
+--no-open                   Start the server without opening a browser
+--review                    Enable writable annotation review mode
+--annotations-dir <path>    Store annotations at a custom path; requires --review
+```
+
+Review mode currently establishes the annotation storage boundary; its browser
+API and review interface are being delivered in subsequent milestone commits.
+By default, sidecars are stored under
+`<content-root>/.md-viewer/annotations/`. To select another location:
+
+```sh
+md-viewer --review --annotations-dir ./reviews ./docs
 ```
 
 ## Documentation
@@ -82,7 +93,8 @@ Available flags:
 
 ## Development status
 
-The manual-refresh MVP is implemented. Saving a Markdown file and refreshing the
-browser reads and renders the latest contents from disk. See
+The manual-refresh MVP is implemented, and annotation storage and anchoring are
+under active development. Saving a Markdown file and refreshing the browser
+reads and renders the latest contents from disk. See
 [`project_status.md`](project_status.md) for release readiness and the planned
 live-reload milestone.

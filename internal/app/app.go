@@ -9,9 +9,11 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"time"
 
+	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 	"atulm/md-viewer/internal/launch"
 	mdrender "atulm/md-viewer/internal/render"
@@ -21,9 +23,11 @@ import (
 const shutdownTimeout = 5 * time.Second
 
 type config struct {
-	rootPath string
-	port     int
-	noOpen   bool
+	rootPath       string
+	port           int
+	noOpen         bool
+	review         bool
+	annotationsDir string
 }
 
 // Run parses args, starts the local viewer, and blocks until ctx is canceled or
@@ -44,6 +48,10 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	if err != nil {
 		return fmt.Errorf("open Markdown directory: %w", err)
 	}
+	annotations, err := openAnnotationStore(configuration, root)
+	if err != nil {
+		return err
+	}
 	viewer, err := server.New(root, mdrender.New())
 	if err != nil {
 		return fmt.Errorf("create Markdown viewer: %w", err)
@@ -59,6 +67,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	httpServer := viewer.HTTPServer(listener.Addr().String())
 	viewerURL := "http://" + listener.Addr().String() + "/"
 	fmt.Fprintf(stdout, "Serving %s at %s\n", root.Path(), viewerURL)
+	if annotations != nil {
+		fmt.Fprintf(stdout, "Review mode enabled; annotations: %s\n", annotations.Root())
+	}
 	fmt.Fprintln(stdout, "Press Ctrl-C to stop")
 
 	serveResult := make(chan error, 1)
@@ -99,6 +110,8 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	flags.SetOutput(stderr)
 	port := flags.Int("port", 0, "loopback port; 0 selects an available port")
 	noOpen := flags.Bool("no-open", false, "do not open the default browser")
+	review := flags.Bool("review", false, "enable writable annotation review mode")
+	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory (requires --review)")
 	flags.Usage = func() {
 		fmt.Fprintln(stderr, "Usage: md-viewer [options] <directory>")
 		fmt.Fprintln(stderr)
@@ -116,10 +129,33 @@ func parseConfig(args []string, stderr io.Writer) (config, error) {
 	if *port < 0 || *port > 65535 {
 		return config{}, fmt.Errorf("port must be between 0 and 65535: %d", *port)
 	}
+	if *annotationsDir != "" && !*review {
+		return config{}, errors.New("--annotations-dir requires --review")
+	}
 
 	return config{
-		rootPath: flags.Arg(0),
-		port:     *port,
-		noOpen:   *noOpen,
+		rootPath:       flags.Arg(0),
+		port:           *port,
+		noOpen:         *noOpen,
+		review:         *review,
+		annotationsDir: *annotationsDir,
 	}, nil
+}
+
+// openAnnotationStore establishes the writable boundary for review mode. The
+// default remains inside the content root, while an explicit path is resolved
+// relative to the process working directory by the store.
+func openAnnotationStore(configuration config, root *content.Root) (*annotationstore.Store, error) {
+	if !configuration.review {
+		return nil, nil
+	}
+	directory := configuration.annotationsDir
+	if directory == "" {
+		directory = filepath.Join(root.Path(), ".md-viewer", "annotations")
+	}
+	annotations, err := annotationstore.Open(directory)
+	if err != nil {
+		return nil, fmt.Errorf("open annotation directory: %w", err)
+	}
+	return annotations, nil
 }

@@ -15,6 +15,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"atulm/md-viewer/internal/content"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -29,6 +31,9 @@ func TestParseConfig(t *testing.T) {
 	}{
 		{name: "defaults", args: []string{"./docs"}, want: config{rootPath: "./docs"}},
 		{name: "options", args: []string{"--port", "8080", "--no-open", "./notes"}, want: config{rootPath: "./notes", port: 8080, noOpen: true}},
+		{name: "review defaults", args: []string{"--review", "./docs"}, want: config{rootPath: "./docs", review: true}},
+		{name: "custom annotations", args: []string{"--review", "--annotations-dir", "./reviews", "./docs"}, want: config{rootPath: "./docs", review: true, annotationsDir: "./reviews"}},
+		{name: "annotations without review", args: []string{"--annotations-dir", "./reviews", "./docs"}, wantErr: "requires --review"},
 		{name: "missing directory", wantErr: "exactly one"},
 		{name: "extra directory", args: []string{"one", "two"}, wantErr: "exactly one"},
 		{name: "negative port", args: []string{"--port", "-1", "./docs"}, wantErr: "between 0 and 65535"},
@@ -56,6 +61,71 @@ func TestParseConfig(t *testing.T) {
 				if got != tt.want {
 					t.Fatalf("parseConfig() = %#v, want %#v", got, tt.want)
 				}
+			}
+		})
+	}
+}
+
+func TestOpenAnnotationStore(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		review  bool
+		custom  bool
+		invalid bool
+		wantNil bool
+		wantErr string
+	}{
+		{name: "disabled", wantNil: true},
+		{name: "default under content root", review: true},
+		{name: "custom directory", review: true, custom: true},
+		{name: "invalid custom directory", review: true, custom: true, invalid: true, wantErr: "open annotation directory"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			rootPath := t.TempDir()
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			configuration := config{review: test.review}
+			wantRoot := filepath.Join(root.Path(), ".md-viewer", "annotations")
+			if test.custom {
+				wantRoot = filepath.Join(t.TempDir(), "reviews")
+				configuration.annotationsDir = wantRoot
+			}
+			if test.invalid {
+				if err := os.WriteFile(wantRoot, []byte("not a directory"), 0o600); err != nil {
+					t.Fatalf("WriteFile() error = %v", err)
+				}
+			}
+
+			got, err := openAnnotationStore(configuration, root)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("openAnnotationStore() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("openAnnotationStore() error = %v", err)
+			}
+			if test.wantNil {
+				if got != nil {
+					t.Fatalf("openAnnotationStore() = %#v, want nil", got)
+				}
+				return
+			}
+			resolvedWant, err := filepath.EvalSymlinks(wantRoot)
+			if err != nil {
+				t.Fatalf("EvalSymlinks() error = %v", err)
+			}
+			if got == nil || got.Root() != resolvedWant {
+				t.Fatalf("openAnnotationStore() root = %v, want %q", got, resolvedWant)
 			}
 		})
 	}

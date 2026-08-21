@@ -57,6 +57,23 @@ Start without opening a browser:
 ./bin/md-viewer --no-open ./docs
 ```
 
+Enable the annotation review storage boundary:
+
+```sh
+./bin/md-viewer --review ./docs
+```
+
+The default sidecar directory is `<content-root>/.md-viewer/annotations/`. Use
+an alternate location when the content root should remain untouched:
+
+```sh
+./bin/md-viewer --review --annotations-dir ./reviews ./docs
+```
+
+`--annotations-dir` is rejected without `--review`. Review mode currently
+initializes and reports the writable store; mutation APIs and browser controls
+are scheduled in the next implementation commits.
+
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.
 

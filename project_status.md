@@ -60,7 +60,7 @@ live reload.
 - [x] Design the selection, comment panel, and annotation status workflow.
 - [x] Design threaded replies and the `needs_changes` agent retry loop.
 - [x] Define CLI export commands for AI-agent consumption.
-- [ ] Add an explicit writable review mode and annotation directory handling.
+- [x] Add an explicit writable review mode and annotation directory handling.
 - [x] Implement atomic sidecar persistence and stale-anchor detection.
 - [ ] Implement annotation HTTP APIs with origin and session-token protection.
 - [ ] Add rendered-text selection, highlights, and the review panel.
