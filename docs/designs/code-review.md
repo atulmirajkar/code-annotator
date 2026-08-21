@@ -25,6 +25,7 @@ bytes do not exist in the current file.
 ## Goals
 
 - Discover an explicit, configurable set of source-file extensions.
+- Filter the document sidebar to files changed from the configured Git base.
 - Render supported text source safely with stable line numbers and byte ranges.
 - Reuse the complete annotation workflow for source files.
 - Compare the current worktree with `HEAD`, a local branch, a tag, a commit, or
@@ -94,6 +95,20 @@ Annotations created in Changes view appear in File view because both views
 anchor to the same current bytes. Existing annotations also appear in Changes
 view when their current anchor resolves.
 
+### Changed-files filter
+
+When `--diff-base` is configured, the document sidebar adds a `Changed only`
+toggle next to the existing path lookup. Enabling it shows reviewable files
+whose current worktree content differs from the frozen base commit, including
+untracked reviewable files. Disabling it restores the complete catalog without
+discarding the path lookup text. The two filters compose: a file must match the
+path lookup and the changed-files filter when both are active.
+
+The toggle is hidden when Git comparison is not configured. An empty result
+shows a clear message instead of an empty navigation region. The active file
+remains visible until the reviewer opens another result; filtering the list
+must not unexpectedly navigate away from the document being reviewed.
+
 ## Command-line contract
 
 Code discovery is opt-in so the existing Markdown-only behavior remains the
@@ -118,7 +133,7 @@ default.
 Initial default source extensions:
 
 ```text
-.go,.cs,.fs,.fsx,.vb,.js,.jsx,.mjs,.cjs,.ts,.tsx,.json,.csproj,.fsproj,.vbproj
+.go,.cs,.js,.jsx,.mjs,.cjs,.ts,.tsx,.json,.csproj
 ```
 
 Initial default excluded directories when code discovery is enabled:
@@ -140,6 +155,9 @@ md-viewer --review --include-code .
 # Review the worktree against the last commit.
 md-viewer --review --include-code --diff-base HEAD .
 
+# Review the worktree against the parent of the current commit.
+md-viewer --review --include-code --diff-base 'HEAD~1' .
+
 # Review the worktree against a local branch.
 md-viewer --review --include-code --diff-base main .
 
@@ -152,8 +170,10 @@ md-viewer --review --include-code \
   --diff-base origin/main .
 ```
 
-`--code-extensions` implies `--include-code`. `--diff-base` requires a Git
-worktree containing the selected content root. It never runs `git fetch`.
+`--code-extensions` implies `--include-code`. The revision may be a full commit
+ID or any locally resolvable Git revision expression, including `HEAD~1`, a
+branch, a tag, or a remote-tracking ref. `--diff-base` requires a Git worktree
+containing the selected content root. It never runs `git fetch`.
 
 The first version always compares the configured base commit with the current
 worktree. Comparing two historical targets, the index alone, or staged changes
@@ -240,26 +260,55 @@ packages consume typed results and never parse Git output themselves.
 
 ```go
 type Config struct {
+    // RepositoryRoot is the absolute root returned by Git for the worktree.
     RepositoryRoot string
-    ContentPrefix  string
-    RequestedBase  string
-    BaseCommit     string
+
+    // ContentPrefix locates the viewer content root relative to RepositoryRoot
+    // using slash-separated Git paths.
+    ContentPrefix string
+
+    // RequestedBase preserves the entered revision for display, such as
+    // "HEAD~1" or "origin/main".
+    RequestedBase string
+
+    // BaseCommit is the immutable full commit SHA resolved at startup.
+    BaseCommit string
 }
 
 type FileDiff struct {
-    Path       string
-    BasePath   string
+    // Path is the current file path relative to the viewer content root.
+    Path string
+
+    // BasePath is the corresponding base path. It may differ once rename
+    // support is introduced.
+    BasePath string
+
+    // BaseCommit identifies the exact snapshot used by this comparison.
     BaseCommit string
-    Rows       []Row
+
+    // Rows is the complete display sequence, including unchanged current
+    // lines and inserted read-only deleted context.
+    Rows []Row
 }
 
 type Row struct {
-    Kind          RowKind
-    OldLine       int
-    NewLine       int
-    CurrentStart  int
-    CurrentEnd    int
-    DeletedText   string
+    // Kind identifies unchanged, added, modified, or deleted context.
+    Kind RowKind
+
+    // OldLine is the one-based base line, or zero when no base line exists.
+    OldLine int
+
+    // NewLine is the one-based current line, or zero for deleted context.
+    NewLine int
+
+    // CurrentStart and CurrentEnd are byte offsets into current source. Both
+    // are zero for a deleted-context row.
+    CurrentStart int
+    CurrentEnd   int
+
+    // DeletedText contains base text only for deleted context. Rendering must
+    // escape it before inserting it into HTML.
+    DeletedText string
 }
 ```
 
@@ -301,6 +350,13 @@ usable.
 `git diff <base>` covers staged and unstaged changes to tracked files. Git does
 not include untracked files. The package checks tracking status separately; an
 untracked source file is represented as entirely added against an empty base.
+
+The changed-files sidebar filter uses one repository-level status query rather
+than executing Git once per catalog entry. Its result is intersected with the
+safe reviewable catalog and content prefix. Modified, added, deleted, renamed,
+copied, type-changed, conflicted, and untracked paths count as changed. A
+deleted path with no current file is not reviewable in the first version and
+therefore does not appear. Ignored files remain excluded.
 
 Rename-aware base paths are useful but not required in the first slice. A
 renamed current path may initially appear as a delete/add comparison. Full
@@ -489,6 +545,8 @@ All Go cases remain table-driven.
 ### Browser tests
 
 - Source-file lookup, line numbers, safe escaping, and multi-line selection.
+- Changed-only filtering, composition with path lookup, untracked files, and
+  empty-result behavior.
 - Existing annotation creation, highlighting, replies, lifecycle, and filtering
   on code files.
 - Added/modified/deleted styling and line-number mapping.
@@ -505,7 +563,8 @@ Each slice should be independently reviewable:
 2. Render safe plain source with line numbers, without annotations.
 3. Generalize annotation path validation and enable code-file annotations.
 4. Extend queue, CLI export, and agent skill for code documents.
-5. Add bounded Git repository discovery and immutable base resolution.
+5. Add bounded Git repository discovery, immutable base resolution, and the
+   changed-file catalog filter.
 6. Parse Git patches into validated current/deleted row metadata.
 7. Add File/Changes UI with current-side annotation selection.
 8. Persist and expose optional immutable diff review context.
@@ -521,6 +580,7 @@ Each slice should be independently reviewable:
 4. Approve default exclusions for `node_modules`, `vendor`, `bin`, and `obj`.
 5. Approve plain escaped source first and defer syntax highlighting.
 6. Approve optional immutable Git review context without a schema-version bump.
+7. Approve a changed-only sidebar toggle when Git comparison is configured.
 
 These boundaries produce a useful code-review system while preserving the
 existing annotation model and keeping Git exposure narrow.

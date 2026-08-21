@@ -104,6 +104,7 @@ release verification is reviewed.
 - [ ] Approve immutable startup Git base semantics and annotation context.
 - [ ] Implement safe code rendering and reuse annotation workflows.
 - [ ] Implement bounded Git comparison and current-file diff presentation.
+- [ ] Add a changed-only document filter backed by the configured Git base.
 - [ ] Extend agent handoff and browser coverage to code review.
 
 ### 10. Live reload
@@ -115,6 +116,15 @@ release verification is reviewed.
 - [ ] Refresh changed images and assets without stale browser-cache results.
 - [ ] Debounce duplicate filesystem events and recover when the watcher fails.
 - [ ] Add watcher, SSE, reconnection, and end-to-end live-reload tests.
+
+### 11. Source syntax highlighting
+
+- [ ] Select an offline, embedded highlighter with Go, C#, JavaScript, and
+  TypeScript support.
+- [ ] Preserve source-backed outer spans and exact annotation byte ranges.
+- [ ] Support nested token elements in selection and annotation highlights.
+- [ ] Add light/dark themes without runtime network dependencies.
+- [ ] Add rendering, selection, CSP, and browser regression coverage.
 
 ## Decisions
 
