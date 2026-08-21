@@ -56,6 +56,7 @@ func newSourceTextRenderer() *sourceTextRenderer {
 func (r *sourceTextRenderer) RegisterFuncs(register renderer.NodeRendererFuncRegisterer) {
 	register.Register(ast.KindText, r.renderText)
 	register.Register(ast.KindCodeSpan, r.renderCodeSpan)
+	register.Register(ast.KindFencedCodeBlock, r.renderFencedCodeBlock)
 }
 
 func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -133,6 +134,35 @@ func (r *sourceTextRenderer) renderCodeSpan(writer util.BufWriter, source []byte
 		_, _ = writer.WriteString("</span>")
 	}
 	return ast.WalkSkipChildren, nil
+}
+
+// renderFencedCodeBlock gives each code line its exact source byte range. The
+// opening fence, info string, and closing fence remain outside selectable spans.
+func (r *sourceTextRenderer) renderFencedCodeBlock(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		_, _ = writer.WriteString("</code></pre>\n")
+		return ast.WalkContinue, nil
+	}
+
+	block := node.(*ast.FencedCodeBlock)
+	_, _ = writer.WriteString("<pre><code")
+	if language := block.Language(source); language != nil {
+		_, _ = writer.WriteString(` class="language-`)
+		r.writer.Write(writer, language)
+		_ = writer.WriteByte('"')
+	}
+	_ = writer.WriteByte('>')
+	for index := 0; index < block.Lines().Len(); index++ {
+		line := block.Lines().At(index)
+		_, _ = writer.WriteString(`<span class="source-text source-code-text" data-source-start="`)
+		_, _ = writer.WriteString(strconv.Itoa(line.Start))
+		_, _ = writer.WriteString(`" data-source-end="`)
+		_, _ = writer.WriteString(strconv.Itoa(line.Stop))
+		_, _ = writer.WriteString(`">`)
+		r.writer.RawWrite(writer, line.Value(source))
+		_, _ = writer.WriteString("</span>")
+	}
+	return ast.WalkContinue, nil
 }
 
 // Render converts source into an HTML fragment. documentPath is the URL-style

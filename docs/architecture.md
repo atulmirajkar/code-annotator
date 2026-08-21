@@ -93,6 +93,8 @@ DOM UTF-16 offsets to Markdown UTF-8 byte offsets, including across formatting
 elements; normal viewer output is unchanged.
 Single-line inline code receives the same endpoint metadata around its content;
 its backtick delimiters remain an intervening source gap derived by the server.
+Fenced code receives one source-backed span per content line. Browser mapping
+requires both endpoints to share that block and never includes its fences.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather
 than trusting hashes or context supplied by the browser.

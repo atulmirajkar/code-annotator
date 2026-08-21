@@ -88,7 +88,20 @@
     const endIndex = spans.indexOf(endSpan);
     if (startIndex < 0 || endIndex < startIndex) return null;
 
-    return spans.slice(startIndex, endIndex + 1);
+    const selected = spans.slice(startIndex, endIndex + 1);
+    const startBlock = codeBlock(startSpan);
+    const endBlock = codeBlock(endSpan);
+    if (startBlock || endBlock) {
+      return startBlock && startBlock === endBlock ? selected : null;
+    }
+    // Keep block-code selection pure even when both endpoints are outside it.
+    if (selected.some((span) => codeBlock(span))) return null;
+    return selected;
+  }
+
+  function codeBlock(span) {
+    const code = span.closest("code");
+    return code && code.parentElement && code.parentElement.tagName === "PRE" ? code : null;
   }
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.

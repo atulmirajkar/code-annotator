@@ -284,6 +284,12 @@ ineligible. Single-line inline-code content is source-backed inside its
 inline code remains ineligible because CommonMark normalizes its source
 newlines to displayed spaces.
 
+Each line of a fenced code block is source-backed, including its trailing
+newline. A selection may span any number of lines when both endpoints are in
+the same fenced block. The fence and info string are excluded, and selections
+that cross into or out of the block are rejected. Indented code blocks remain a
+follow-up because their rendered indentation does not map one-to-one to source.
+
 ## Persistence and concurrency
 
 ### Store behavior

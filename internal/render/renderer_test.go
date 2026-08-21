@@ -165,6 +165,14 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 			excludes: []string{`<code><span class="source-text"`},
 		},
 		{
+			name:   "fenced code lines",
+			source: "```go\nfirst()\nsecond()\n```\n",
+			contains: []string{
+				`<pre><code class="language-go"><span class="source-text source-code-text" data-source-start="6" data-source-end="14">first()`,
+				`data-source-start="14" data-source-end="23">second()`,
+			},
+		},
+		{
 			name:     "escaped text is not mapped",
 			source:   `Escaped \* marker`,
 			excludes: []string{`data-source-start="0"`},
