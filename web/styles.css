@@ -74,6 +74,8 @@ a { color: var(--accent); }
 .markdown-body blockquote { margin-left: 0; padding-left: 1rem; border-left: .25rem solid var(--border); color: var(--muted); }
 .markdown-body mark.annotation-highlight-fallback { border-radius: .15em; background: rgba(255, 204, 0, .38); color: inherit; }
 ::highlight(md-viewer-annotations) { background: rgba(255, 204, 0, .38); color: inherit; }
+.markdown-body .annotation-navigation-target { border-radius: .2rem; outline: .2rem solid var(--accent); outline-offset: .25rem; animation: annotation-target-pulse .55s ease-in-out 2 alternate; }
+@keyframes annotation-target-pulse { from { outline-color: transparent; } to { outline-color: var(--accent); } }
 .markdown-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .markdown-body th, .markdown-body td { padding: .5rem .75rem; border: 1px solid var(--border); }
 .empty-state { max-width: 38rem; margin: 15vh auto; text-align: center; }
@@ -106,6 +108,9 @@ a { color: var(--accent); }
 .annotation-summary-comment { display: -webkit-box; overflow: hidden; color: var(--text); font-size: .85rem; line-height: 1.35; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .annotation-card[open] .annotation-summary-comment { display: none; }
 .annotation-card-body { padding: .15rem .85rem .85rem; }
+.annotation-navigation-status { min-height: 0; margin: 0 0 .45rem; color: var(--muted); font-size: .72rem; }
+.annotation-navigation-status:empty { display: none; }
+.annotation-navigation-status.approximate { color: #8a4b08; }
 .annotation-badge { padding: .12rem .4rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
 .annotation-badge.stale { background: #fff0d5; color: #8a4b08; }
 .annotation-source { margin: 0 0 .7rem; padding: .55rem .65rem; border-left: .2rem solid var(--accent); background: var(--surface); font-size: .8rem; }
@@ -126,6 +131,10 @@ a { color: var(--accent); }
 .annotation-reattach button:disabled, .annotation-reply button:disabled, .annotation-lifecycle button:disabled { cursor: wait; opacity: .65; }
 .reattach-help, .reattach-status, .reply-status, .lifecycle-status { min-height: 1.15em; margin: 0; color: var(--muted); font-size: .75rem; }
 .reattach-status.error, .reply-status.error, .lifecycle-status.error { color: #b42318; }
+
+@media (prefers-reduced-motion: reduce) {
+  .markdown-body .annotation-navigation-target { animation: none; }
+}
 
 @media (max-width: 720px) {
 	.topbar { flex-wrap: wrap; }

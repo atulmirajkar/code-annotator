@@ -28,6 +28,44 @@ async function createSelectionAnnotation(page, comment) {
 }
 
 test.describe("annotation review interactions", () => {
+  test("navigates annotation cards to resolved and approximate source", async ({ page, viewer }) => {
+    const documentPath = path.join(viewer.contentRoot, "source-navigation.md");
+    const filler = Array.from({ length: 45 }, (_, index) => `Paragraph ${index + 1} keeps the target below the fold.`).join("\n\n");
+    await writeFile(documentPath, `# Navigation fixture\n\n${filler}\n\nReview this selected phrase before release.\n`);
+    await page.goto(`${viewer.url}view/source-navigation.md`);
+    await createSelectionAnnotation(page, "Navigate to this text.");
+
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const card = page.locator(".annotation-card");
+    await card.locator(".annotation-summary").press("Enter");
+    const exactTarget = page.locator(".source-text", { hasText: "selected phrase" });
+    await expect(exactTarget).toHaveClass(/annotation-navigation-target/);
+    await expect.poll(() => exactTarget.evaluate((target) => {
+      const bounds = target.getBoundingClientRect();
+      return bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+    })).toBe(true);
+    await expect(card.locator(".annotation-navigation-status")).toBeEmpty();
+
+    await writeFile(documentPath, `# Navigation fixture\n\n${filler}\n\nThe reviewed wording was removed.\n`);
+    await page.reload();
+    const staleCard = page.locator(".annotation-card");
+    await expect(staleCard.locator(".annotation-badge.stale")).toBeVisible();
+    await staleCard.locator(".annotation-summary").click();
+    await expect(staleCard.locator(".annotation-navigation-status")).toContainText("approximate original location");
+    await expect(page.locator(".annotation-navigation-target")).toHaveCount(1);
+  });
+
+  test("navigates a document annotation to the heading", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/document-navigation.md`);
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Review the whole document.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card");
+    await card.locator(".annotation-summary").click();
+    await expect(page.locator(".markdown-body h1")).toHaveClass(/annotation-navigation-target/);
+    await expect(card.locator(".annotation-navigation-status")).toBeEmpty();
+  });
+
   test("creates, replies to, transitions, and filters an annotation", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/lifecycle.md`);
     await createSelectionAnnotation(page, "Clarify this wording.");

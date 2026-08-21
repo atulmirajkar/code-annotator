@@ -34,6 +34,7 @@ test.describe("viewer navigation", () => {
   test("supports lookup focus, empty results, clearing, and result focus", async ({ page, viewerURL }) => {
     await page.goto(viewerURL);
     const search = page.getByRole("searchbox", { name: "Find document" });
+    const initialDocumentCount = await page.locator(".documents li:not([hidden])").count();
     await page.keyboard.press("/");
     await expect(search).toBeFocused();
 
@@ -42,7 +43,7 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".documents li:not([hidden])")).toHaveCount(0);
     await search.press("Escape");
     await expect(search).toHaveValue("");
-    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(5);
+    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(initialDocumentCount);
 
     await search.fill("stale");
     await search.press("ArrowDown");
