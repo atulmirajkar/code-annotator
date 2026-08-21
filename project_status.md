@@ -139,10 +139,10 @@ release verification is reviewed.
   themes.
 - [x] Design a bounded revision selector and explicit Git comparison refresh
   with atomic server-wide state and optimistic concurrency.
-- [ ] Implement bounded recent-commit discovery and comparison snapshots.
-- [ ] Implement authenticated comparison state/select/refresh API routes.
-- [ ] Add the revision selector, truncated subject, and Refresh Git diff UI.
-- [ ] Add unit, handler, concurrency, and browser coverage for selection,
+- [x] Implement bounded recent-commit discovery and comparison snapshots.
+- [x] Implement authenticated comparison state/select/refresh API routes.
+- [x] Add the revision selector, truncated subject, and Refresh Git diff UI.
+- [x] Add unit, handler, concurrency, and browser coverage for selection,
   refresh, stale tabs, failures, and clean-worktree behavior.
 - [ ] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.

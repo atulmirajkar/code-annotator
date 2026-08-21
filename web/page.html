@@ -56,7 +56,13 @@
       {{if .IsCode}}<nav class="source-mode-tabs" aria-label="Source view">
         <a href="{{.FileURL}}"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
         {{if .DiffAvailable}}<a href="{{.ChangesURL}}"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
-        {{if .DiffAvailable}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}
+        {{if .DiffAvailable}}{{if .ComparisonToken}}<div class="diff-comparison-control" data-active-commit="{{.DiffCommit}}">
+          <select class="revision-selector" aria-label="Comparison base" disabled>
+            <option value="{{.DiffCommit}}" selected>{{.DiffBase}} ({{.DiffCommitShort}})</option>
+          </select>
+          <button type="button" class="refresh-git-diff" disabled>Refresh Git diff</button>
+          <span class="diff-comparison-status" role="status" aria-live="polite"></span>
+        </div>{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
       </nav>{{end}}
       <article class="markdown-body"{{if .DocumentSHA256}} data-document-sha256="{{.DocumentSHA256}}"{{end}}>{{.Content}}</article>
       {{end}}

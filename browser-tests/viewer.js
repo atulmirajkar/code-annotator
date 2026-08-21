@@ -49,11 +49,16 @@ const test = base.extend({
 });
 
 // initializeGitFixture freezes all ordinary fixtures at HEAD, then adds one
-// untracked source document for deterministic Changed-only browser coverage.
+// untracked source document for deterministic Changed-only browser coverage. A
+// second non-catalog commit gives the revision selector more than one bounded
+// option without altering any reviewable file's committed content.
 async function initializeGitFixture(contentRoot) {
   await runFile("git", ["-C", contentRoot, "init", "-b", "main"]);
   await runFile("git", ["-C", contentRoot, "add", "."]);
   await runFile("git", ["-C", contentRoot, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixtures"]);
+  await writeFile(path.join(contentRoot, "git-history.txt"), "baseline\n");
+  await runFile("git", ["-C", contentRoot, "add", "git-history.txt"]);
+  await runFile("git", ["-C", contentRoot, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "add history marker"]);
   await writeFile(path.join(contentRoot, "changed-only.go"), "package changed\n");
   await writeFile(path.join(contentRoot, "diff-layout.go"), `package fixture
 

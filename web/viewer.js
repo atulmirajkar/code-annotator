@@ -21,6 +21,7 @@
   });
   bindSourceModePreference();
   bindDocumentSearch();
+  bindComparisonControl();
 
   // bindPanelToggle keeps the visual state, accessible state, and grid layout
   // synchronized for one optional viewer panel.
@@ -120,6 +121,108 @@
         input.focus();
       }
     });
+  }
+
+  // bindComparisonControl turns the static base label into a bounded revision
+  // selector and Refresh Git diff button backed by the server comparison API.
+  // Selection and refresh reload the page in its existing File/Changes mode so
+  // the server recomputes the diff against the newly adopted base.
+  function bindComparisonControl() {
+    const control = document.querySelector(".diff-comparison-control");
+    const token = document.querySelector('meta[name="md-viewer-comparison-token"]')?.content || "";
+    if (!control || !token) return;
+    const selector = control.querySelector(".revision-selector");
+    const refreshButton = control.querySelector(".refresh-git-diff");
+    const status = control.querySelector(".diff-comparison-status");
+    let currentRevision = "";
+
+    selector.addEventListener("change", () => {
+      mutate({ action: "select", commit: selector.value }, "Updating comparison base…");
+    });
+    refreshButton.addEventListener("click", () => {
+      mutate({ action: "refresh" }, "Refreshing Git diff…");
+    });
+    load();
+
+    async function load() {
+      try {
+        const response = await fetch("/api/git-comparison", { headers: { Accept: "application/json" } });
+        if (!response.ok) throw new Error();
+        render(await response.json());
+      } catch (_) {
+        setStatus("Revision list unavailable.", true);
+      }
+    }
+
+    // render rebuilds the selector from server state. An active commit that is
+    // no longer among the options, such as a pinned commit dropped from the
+    // bounded list, is preserved as a leading selected entry.
+    function render(state) {
+      currentRevision = state.revision;
+      const options = Array.isArray(state.options) ? state.options : [];
+      selector.replaceChildren();
+      if (!options.some((option) => option.commit === state.activeCommit)) {
+        selector.append(buildOption({ commit: state.activeCommit, commitShort: state.activeShort, name: state.requestedBase, configured: !state.explicit }, state.activeCommit));
+      }
+      options.forEach((option) => selector.append(buildOption(option, state.activeCommit)));
+      selector.disabled = false;
+      refreshButton.disabled = false;
+      setStatus("");
+    }
+
+    function buildOption(option, activeCommit) {
+      const element = document.createElement("option");
+      element.value = option.commit;
+      element.textContent = optionLabel(option);
+      element.title = option.subject ? `${option.commit} ${option.subject}` : option.commit;
+      element.selected = option.commit === activeCommit;
+      return element;
+    }
+
+    function optionLabel(option) {
+      const name = option.configured && option.name ? `${option.name}: ` : "";
+      const subject = option.subject ? ` ${truncate(option.subject, 72)}` : "";
+      return `${name}${option.commitShort || ""}${subject}`;
+    }
+
+    async function mutate(payload, pending) {
+      selector.disabled = true;
+      refreshButton.disabled = true;
+      setStatus(pending);
+      try {
+        const response = await fetch("/api/git-comparison", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": JSON.stringify(currentRevision),
+            "X-MD-Viewer-Comparison-Token": token,
+          },
+          body: JSON.stringify(payload),
+        });
+        if (response.status === 409) {
+          render(await response.json());
+          setStatus("The comparison base changed in another tab. Try again.", true);
+          return;
+        }
+        if (!response.ok) throw new Error();
+        // The server adopted the new base; reload keeps the current mode and URL
+        // so diffs, highlights, and the changed-only filter recompute together.
+        window.location.reload();
+      } catch (_) {
+        setStatus("The Git comparison could not be updated.", true);
+        selector.disabled = false;
+        refreshButton.disabled = false;
+      }
+    }
+
+    function setStatus(message, isError) {
+      status.textContent = message || "";
+      status.classList.toggle("error", Boolean(isError));
+    }
+
+    function truncate(value, limit) {
+      return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
+    }
   }
 
   // Session storage keeps an explicit reviewer choice across document
