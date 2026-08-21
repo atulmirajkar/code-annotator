@@ -238,29 +238,33 @@ func TestCreateAnnotationAPI(t *testing.T) {
 	t.Parallel()
 
 	const (
-		origin = "http://127.0.0.1:8080"
-		token  = "0123456789abcdef0123456789abcdef"
+		origin           = "http://127.0.0.1:8080"
+		token            = "0123456789abcdef0123456789abcdef"
+		selectedDocument = "Before **selected** after"
 	)
-	selectedBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":7,"endByte":15,"exact":"selected"}}`
+	digest := annotation.DocumentSHA256([]byte(selectedDocument))
+	selectedBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":9,"endByte":17,"documentSHA256":"` + digest + `"}}`
+	crossTagBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":0,"endByte":19,"documentSHA256":"` + digest + `"}}`
 	documentBody := `{"document":"README.md","intent":"question","comment":"Why this document?","author":"reviewer"}`
 	tests := []struct {
-		name          string
-		body          string
-		ifMatch       *string
-		seedSidecar   bool
-		omitToken     bool
-		wantStatus    int
-		wantSelection bool
-		wantConflict  bool
+		name         string
+		body         string
+		ifMatch      *string
+		seedSidecar  bool
+		omitToken    bool
+		wantStatus   int
+		wantExact    string
+		wantConflict bool
 	}{
-		{name: "selected text", body: selectedBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantSelection: true},
+		{name: "selected text", body: selectedBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantExact: "selected"},
+		{name: "selection across formatting", body: crossTagBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantExact: "Before **selected**"},
 		{name: "document level", body: documentBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated},
 		{name: "missing review token", body: documentBody, ifMatch: stringPointer(`""`), omitToken: true, wantStatus: http.StatusForbidden},
 		{name: "missing revision", body: documentBody, wantStatus: http.StatusPreconditionRequired},
 		{name: "malformed revision", body: documentBody, ifMatch: stringPointer("unquoted"), wantStatus: http.StatusBadRequest},
 		{name: "stale revision", body: documentBody, ifMatch: stringPointer(`""`), seedSidecar: true, wantStatus: http.StatusConflict, wantConflict: true},
-		{name: "selection text mismatch", body: strings.Replace(selectedBody, `"exact":"selected"`, `"exact":"different"`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusConflict},
-		{name: "selection range invalid", body: strings.Replace(selectedBody, `"endByte":15`, `"endByte":100`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
+		{name: "stale document digest", body: strings.Replace(selectedBody, digest, strings.Repeat("0", 64), 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusConflict},
+		{name: "selection range invalid", body: strings.Replace(selectedBody, `"endByte":17`, `"endByte":100`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
 		{name: "invalid intent", body: strings.Replace(documentBody, `"question"`, `"unsupported"`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
 		{name: "unknown field", body: strings.TrimSuffix(documentBody, "}") + `,"status":"closed"}`, ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
 		{name: "multiple JSON values", body: documentBody + `{}`, ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
@@ -272,7 +276,7 @@ func TestCreateAnnotationAPI(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			rootPath := t.TempDir()
-			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), selectedDocument)
 			writeTestFile(t, filepath.Join(rootPath, "image.png"), "not Markdown")
 			root, err := content.Open(rootPath)
 			if err != nil {
@@ -327,8 +331,8 @@ func TestCreateAnnotationAPI(t *testing.T) {
 			if got := response.Header().Get("Location"); got != "/api/annotations/"+payload.Annotation.ID {
 				t.Fatalf("Location = %q, want created annotation location", got)
 			}
-			if test.wantSelection {
-				if payload.Annotation.Source == nil || payload.Annotation.Source.Selector.Exact != "selected" || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorExact {
+			if test.wantExact != "" {
+				if payload.Annotation.Source == nil || payload.Annotation.Source.Selector.Exact != test.wantExact || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorExact {
 					t.Fatalf("selected annotation = %#v", payload.Annotation)
 				}
 			} else if payload.Annotation.Source != nil || payload.Annotation.Anchor != nil {
@@ -634,10 +638,12 @@ func TestReattachAnnotationAPI(t *testing.T) {
 	t.Parallel()
 
 	const (
-		origin = "http://127.0.0.1:8080"
-		token  = "0123456789abcdef0123456789abcdef"
+		origin          = "http://127.0.0.1:8080"
+		token           = "0123456789abcdef0123456789abcdef"
+		currentDocument = "Before new selection after"
 	)
-	validBody := `{"document":"README.md","selection":{"startByte":7,"endByte":20,"exact":"new selection"}}`
+	digest := annotation.DocumentSHA256([]byte(currentDocument))
+	validBody := `{"document":"README.md","selection":{"startByte":7,"endByte":20,"documentSHA256":"` + digest + `"}}`
 	tests := []struct {
 		name         string
 		annotationID string
@@ -651,7 +657,7 @@ func TestReattachAnnotationAPI(t *testing.T) {
 		{name: "reattach stale anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusOK},
 		{name: "resolved anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "exact", useCurrent: true, wantStatus: http.StatusConflict},
 		{name: "document annotation", annotationID: "ann_reattach_test", body: validBody, sourceMode: "document", useCurrent: true, wantStatus: http.StatusConflict},
-		{name: "quote mismatch", annotationID: "ann_reattach_test", body: strings.Replace(validBody, "new selection", "old selection", 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusConflict},
+		{name: "stale document digest", annotationID: "ann_reattach_test", body: strings.Replace(validBody, digest, strings.Repeat("0", 64), 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusConflict},
 		{name: "invalid range", annotationID: "ann_reattach_test", body: strings.Replace(validBody, `"endByte":20`, `"endByte":200`, 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusBadRequest},
 		{name: "annotation missing", annotationID: "ann_missing", body: validBody, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusNotFound},
 		{name: "unknown field", annotationID: "ann_reattach_test", body: strings.TrimSuffix(validBody, "}") + `,"reason":"moved"}`, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusBadRequest},
@@ -663,7 +669,7 @@ func TestReattachAnnotationAPI(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 			rootPath := t.TempDir()
-			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before new selection after")
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), currentDocument)
 			root, err := content.Open(rootPath)
 			if err != nil {
 				t.Fatalf("content.Open() error = %v", err)
@@ -911,9 +917,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 		wantToken  bool
 		wantPanel  bool
 		wantSource bool
+		wantDigest bool
 	}{
 		{name: "read-only page omits token"},
-		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true},
+		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true, wantDigest: true},
 	}
 
 	for _, test := range tests {
@@ -949,6 +956,11 @@ func TestReviewPageEmbedding(t *testing.T) {
 			hasSource := strings.Contains(response.Body.String(), `class="source-text" data-source-start=`)
 			if hasSource != test.wantSource {
 				t.Fatalf("page contains source metadata = %t, want %t", hasSource, test.wantSource)
+			}
+			digest := annotation.DocumentSHA256([]byte("# Home"))
+			hasDigest := strings.Contains(response.Body.String(), `data-document-sha256="`+digest+`"`)
+			if hasDigest != test.wantDigest {
+				t.Fatalf("page contains document digest = %t, want %t", hasDigest, test.wantDigest)
 			}
 		})
 	}

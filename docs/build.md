@@ -72,8 +72,8 @@ an alternate location when the content root should remain untouched:
 
 `--annotations-dir` is rejected without `--review`. Review mode initializes and
 reports the writable store and enables annotation reads and secured mutations.
-The browser includes a read-only annotation panel and previews exact selections
-across source-contiguous plain text with their Markdown byte range. Highlights and
+The browser includes a read-only annotation panel and previews selections
+across formatting elements with their Markdown byte range. Highlights and
 browser mutation controls remain pending; creation, replies, lifecycle
 transitions, and stale-anchor reattachment are available through the API.
 

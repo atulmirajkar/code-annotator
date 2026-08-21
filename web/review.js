@@ -32,8 +32,9 @@
     document.addEventListener("selectionchange", updateSelectionPreview);
   }
 
-  // Map a selection across one or more source-contiguous spans. A byte gap
-  // indicates invisible Markdown syntax or unsupported rendered content.
+  // Map any ordered pair of source-backed endpoints. Byte gaps may contain
+  // Markdown delimiters; the server derives the exact source after verifying
+  // the document digest instead of asking the browser to reconstruct them.
   function updateSelectionPreview() {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
@@ -51,10 +52,11 @@
     const sourceStart = Number.parseInt(startSpan.dataset.sourceStart, 10);
     const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd, 10);
     const spans = sourceSpanRange(startSpan, endSpan);
+    const documentSHA256 = markdown.dataset.documentSha256;
     const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
     const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
     const exact = range.toString();
-    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || startOffset < 0 || endOffset < 0 || !exact) {
+    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
       clearSelectionPreview();
       return;
     }
@@ -68,6 +70,7 @@
     preview.dataset.startByte = String(startByte);
     preview.dataset.endByte = String(endByte);
     preview.dataset.exact = exact;
+    preview.dataset.documentSha256 = documentSHA256;
     previewQuote.textContent = exact;
     previewRange.textContent = `bytes ${startByte}–${endByte}`;
     preview.hidden = false;
@@ -78,20 +81,14 @@
     return element ? element.closest(".source-text") : null;
   }
 
-  // Return the ordered span chain only when its Markdown byte ranges touch.
+  // Confirm that the selection endpoints occur in document source order.
   function sourceSpanRange(startSpan, endSpan) {
     const spans = Array.from(markdown.querySelectorAll(".source-text"));
     const startIndex = spans.indexOf(startSpan);
     const endIndex = spans.indexOf(endSpan);
     if (startIndex < 0 || endIndex < startIndex) return null;
 
-    const selected = spans.slice(startIndex, endIndex + 1);
-    for (let index = 1; index < selected.length; index++) {
-      const previousEnd = Number.parseInt(selected[index - 1].dataset.sourceEnd, 10);
-      const currentStart = Number.parseInt(selected[index].dataset.sourceStart, 10);
-      if (!Number.isInteger(previousEnd) || previousEnd !== currentStart) return null;
-    }
-    return selected;
+    return spans.slice(startIndex, endIndex + 1);
   }
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.
@@ -115,6 +112,7 @@
     delete preview.dataset.startByte;
     delete preview.dataset.endByte;
     delete preview.dataset.exact;
+    delete preview.dataset.documentSha256;
     previewQuote.textContent = "";
     previewRange.textContent = "";
   }

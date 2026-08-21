@@ -75,9 +75,10 @@ Available flags:
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,
-and stale-anchor warnings. Exact selections across source-contiguous plain text
-show their Markdown byte range. Cross-format selection, highlights, and browser
-mutation controls are being delivered in subsequent milestone commits. By default, sidecars are stored under
+and stale-anchor warnings. Selections across formatting elements show their
+Markdown byte range and are bound to the rendered document revision. Highlights
+and browser mutation controls are being delivered in subsequent milestone
+commits. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh

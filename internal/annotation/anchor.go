@@ -60,7 +60,7 @@ func NewSource(document []byte, startByte, endByte int) (Source, error) {
 	startLine, endLine := lineRange(document, startByte, endByte)
 
 	result := Source{
-		SHA256: documentSHA256(document),
+		SHA256: DocumentSHA256(document),
 		Selector: Selector{
 			Exact:     string(document[startByte:endByte]),
 			Prefix:    string(document[prefixStart:startByte]),
@@ -88,7 +88,7 @@ func ResolveAnchor(document []byte, source Source) (AnchorResult, error) {
 	}
 
 	selector := source.Selector
-	if strings.EqualFold(documentSHA256(document), source.SHA256) &&
+	if strings.EqualFold(DocumentSHA256(document), source.SHA256) &&
 		selector.StartByte >= 0 && selector.EndByte <= len(document) &&
 		bytes.Equal(document[selector.StartByte:selector.EndByte], []byte(selector.Exact)) {
 		return resolvedResult(AnchorExact, document, selector.StartByte, selector.EndByte, 1), nil
@@ -120,7 +120,9 @@ func ResolveAnchor(document []byte, source Source) (AnchorResult, error) {
 	}
 }
 
-func documentSHA256(document []byte) string {
+// DocumentSHA256 returns the canonical lowercase digest used to bind browser
+// selections and persisted selectors to one Markdown source revision.
+func DocumentSHA256(document []byte) string {
 	digest := sha256.Sum256(document)
 	return hex.EncodeToString(digest[:])
 }

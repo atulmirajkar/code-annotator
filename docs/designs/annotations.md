@@ -272,14 +272,14 @@ containers from goldmark AST segments. The browser sends source offsets and a
 quoted selector, and the server verifies them against the current file before
 persisting.
 
-The first mapping implementation wraps eligible goldmark text segments with
-their start and exclusive end byte offsets in review mode only. A selection is
-accepted across one or more segments only when every adjacent source range is
-byte-contiguous. The browser converts UTF-16 DOM offsets to UTF-8 byte lengths
-and exposes the resulting range for the creation form. Segments whose rendered text differs from their
-Markdown bytes, such as backslash escapes and entities, are not marked. This
-conservative boundary rejects cross-format selections instead of silently
-including invisible Markdown delimiters in the quoted selector.
+Review-mode rendering wraps eligible goldmark text segments with their start
+and exclusive end byte offsets and exposes the complete document digest. The
+browser converts the two DOM endpoints from UTF-16 offsets to UTF-8 byte
+positions. The spans between those endpoints may contain formatting elements
+and invisible Markdown delimiters. The browser sends only the range and digest;
+the server verifies the source revision and derives the exact Markdown quote.
+Endpoints whose rendered text cannot be mapped, such as entities, remain
+ineligible.
 
 ## Persistence and concurrency
 
@@ -388,10 +388,10 @@ revision returns `409` with the current ETag so the client can reload instead of
 overwriting another writer's annotations.
 
 The create body contains `document`, `intent`, `comment`, `author`, and an
-optional `selection` with `startByte`, exclusive `endByte`, and `exact` quote.
-The server reads the current Markdown, recreates the SHA-256 digest, quote
-context, and line range from those offsets, and rejects a quote mismatch rather
-than trusting browser-derived selector metadata. Without `selection`, the
+optional `selection` with `startByte`, exclusive `endByte`, and
+`documentSHA256`. The server reads the current Markdown, rejects a stale digest,
+then derives the exact source quote, context, and line range from those offsets.
+Without `selection`, the
 annotation applies to the document. The server owns the initial `open` status,
 UTC timestamps, empty thread, and sortable collision-resistant `ann_` ID.
 Unknown request fields and multiple JSON values are rejected.
@@ -424,7 +424,7 @@ write. Like other mutations, the request requires the current strong ETag.
 
 Reattachment is available only for a text annotation whose selector currently
 resolves to `stale`. The request supplies `document` and a replacement
-`selection` with byte offsets and exact quote. The server verifies the old stale
+`selection` with byte offsets and the rendered document digest. The server verifies the old stale
 state, recreates the full selector from current Markdown, and atomically replaces
 only `source` and `updatedAt`. The annotation ID, original comment, lifecycle
 status, and complete thread remain unchanged. Document-level annotations and

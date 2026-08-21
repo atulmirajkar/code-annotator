@@ -36,7 +36,7 @@
         <p>Add a <code>.md</code> file below this directory, then refresh the page.</p>
       </section>
       {{else}}
-      <article class="markdown-body">{{.Content}}</article>
+      <article class="markdown-body"{{if .DocumentSHA256}} data-document-sha256="{{.DocumentSHA256}}"{{end}}>{{.Content}}</article>
       {{end}}
     </main>
     {{if .ReviewToken}}
@@ -46,7 +46,7 @@
         <span class="annotation-count" aria-live="polite"></span>
       </div>
       <section class="selection-preview" hidden aria-live="polite">
-        <span class="selection-label">Selected source</span>
+        <span class="selection-label">Selected text</span>
         <q class="selection-quote"></q>
         <span class="selection-range"></span>
       </section>

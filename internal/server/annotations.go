@@ -44,12 +44,12 @@ type createAnnotationRequest struct {
 	Selection *annotationSelection `json:"selection,omitempty"`
 }
 
-// annotationSelection carries the browser's Markdown byte range and quote. The
-// server recreates the complete source selector from current document bytes.
+// annotationSelection carries a Markdown byte range bound to the exact source
+// revision rendered by the browser. The server derives the quote itself.
 type annotationSelection struct {
-	StartByte int    `json:"startByte"`
-	EndByte   int    `json:"endByte"`
-	Exact     string `json:"exact"`
+	StartByte      int    `json:"startByte"`
+	EndByte        int    `json:"endByte"`
+	DocumentSHA256 string `json:"documentSHA256"`
 }
 
 // createAnnotationResponse returns the created annotation and the sidecar
@@ -177,13 +177,13 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 	var source *annotation.Source
 	var anchor *annotation.AnchorResult
 	if input.Selection != nil {
+		if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
+			http.Error(response, "Markdown document changed; refresh and select again", http.StatusConflict)
+			return
+		}
 		created, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
 		if err != nil {
 			http.Error(response, err.Error(), http.StatusBadRequest)
-			return
-		}
-		if created.Selector.Exact != input.Selection.Exact {
-			http.Error(response, "selected text no longer matches the Markdown source", http.StatusConflict)
 			return
 		}
 		source = &created
@@ -439,6 +439,10 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		s.writeAnnotationReadError(response, err)
 		return
 	}
+	if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
+		http.Error(response, "Markdown document changed; refresh and select again", http.StatusConflict)
+		return
+	}
 	sidecar, _, err := s.annotations.Load(input.Document)
 	if err != nil {
 		http.Error(response, "could not read annotations", http.StatusInternalServerError)
@@ -468,10 +472,6 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 	replacement, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
 	if err != nil {
 		http.Error(response, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if replacement.Selector.Exact != input.Selection.Exact {
-		http.Error(response, "selected text no longer matches the Markdown source", http.StatusConflict)
 		return
 	}
 	newAnchor, err := annotation.ResolveAnchor(document, replacement)

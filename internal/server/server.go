@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"atulm/md-viewer/internal/annotation"
 	annotationstore "atulm/md-viewer/internal/annotation/store"
 	"atulm/md-viewer/internal/content"
 	mdrender "atulm/md-viewer/internal/render"
@@ -90,13 +91,14 @@ func WithReviewSession(store *annotationstore.Store, origin, token string) Optio
 }
 
 type pageData struct {
-	Root        string
-	Selected    string
-	Documents   []documentView
-	Content     template.HTML
-	Styles      template.CSS
-	Empty       bool
-	ReviewToken string
+	Root           string
+	Selected       string
+	Documents      []documentView
+	Content        template.HTML
+	Styles         template.CSS
+	Empty          bool
+	ReviewToken    string
+	DocumentSHA256 string
 }
 
 type documentView struct {
@@ -248,7 +250,7 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(response, index, "", nil)
+		s.renderPage(response, index, "", nil, "")
 		return
 	}
 
@@ -320,10 +322,14 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 		http.Error(response, "could not render Markdown document", http.StatusInternalServerError)
 		return
 	}
-	s.renderPage(response, index, documentPath, fragment)
+	digest := ""
+	if s.review != nil {
+		digest = annotation.DocumentSHA256(source)
+	}
+	s.renderPage(response, index, documentPath, fragment, digest)
 }
 
-func (s *Server) renderPage(response http.ResponseWriter, index content.Index, selected string, fragment []byte) {
+func (s *Server) renderPage(response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string) {
 	documents := make([]documentView, 0, len(index.Documents))
 	for _, document := range index.Documents {
 		documents = append(documents, documentView{
@@ -336,12 +342,13 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := pageData{
-		Root:      s.root.Path(),
-		Selected:  selected,
-		Documents: documents,
-		Content:   template.HTML(fragment), // goldmark output with safe defaults.
-		Styles:    s.styles,
-		Empty:     len(index.Documents) == 0,
+		Root:           s.root.Path(),
+		Selected:       selected,
+		Documents:      documents,
+		Content:        template.HTML(fragment), // goldmark output with safe defaults.
+		Styles:         s.styles,
+		Empty:          len(index.Documents) == 0,
+		DocumentSHA256: documentSHA256,
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

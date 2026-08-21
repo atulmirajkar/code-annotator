@@ -88,8 +88,9 @@ It verifies that the requested Markdown document exists under the content root,
 loads its sidecar from the separate writable root, resolves text anchors against
 the current file bytes, and returns the revision in both JSON and `ETag` form.
 Review-mode rendering adds source byte ranges to eligible goldmark text
-segments. The browser maps selections across byte-contiguous segments from DOM
-UTF-16 offsets to Markdown UTF-8 byte offsets; normal viewer output is unchanged.
+segments and binds them to the document digest. The browser maps endpoints from
+DOM UTF-16 offsets to Markdown UTF-8 byte offsets, including across formatting
+elements; normal viewer output is unchanged.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather
 than trusting hashes or context supplied by the browser.
@@ -106,8 +107,8 @@ returning applied work to `needs_changes` cannot change status without retaining
 the reviewer's required message.
 
 Reattachment first derives the old anchor against the current document and
-accepts only `stale` text annotations. It verifies the replacement byte range
-and quote, regenerates the digest and context, and changes no review content,
+accepts only `stale` text annotations. It verifies the replacement document
+digest and byte range, regenerates the quote and context, and changes no review content,
 thread history, or lifecycle state.
 
 ## Key dependencies
