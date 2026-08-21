@@ -88,13 +88,19 @@ List annotations without running the server:
 
 ./bin/md-viewer annotations export --root ./docs \
   --status open,needs_changes --format markdown
+
+./bin/md-viewer annotations reply --root ./docs --id ann_... \
+  --author reviewer --message "Please retain the default."
 ```
 
 Use `--annotations-dir ./reviews` when review mode used an external sidecar
 root. A missing annotation directory returns an empty JSON document list and is
 not created by these read-only commands.
-Both commands are read-only. Markdown export includes stable IDs, original
+The `list` and `export` commands are read-only. Markdown export includes stable IDs, original
 source selections, current anchor state, reviewer comments, and thread history.
+The `reply` command is a mutation: it requires an existing annotation directory,
+appends one ordinary thread entry, and uses the loaded revision for optimistic
+concurrency. It never changes lifecycle status.
 
 ## Verify
 

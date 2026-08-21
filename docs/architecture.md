@@ -62,6 +62,11 @@ opening the store so a read against a missing annotation root creates nothing.
 formats it as deterministic Markdown. Arbitrary source and comment text is
 placed in dynamically sized code fences so embedded backticks cannot corrupt
 the handoff structure.
+`annotations reply` is the first offline mutation. It searches the stable
+content index for one globally unique annotation ID, appends a validated
+ordinary reply, validates the complete sidecar, and saves against the revision
+loaded during lookup. Missing storage is an error rather than an instruction to
+create a new annotation root.
 
 Read-only mode never opens or creates annotation storage. With `--review`, the
 application opens a separate symlink-resolved writable root. The default is

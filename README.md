@@ -93,12 +93,17 @@ List annotations for agents or local tooling without starting the server:
 ```sh
 md-viewer annotations list --root ./docs --status open,needs_changes
 md-viewer annotations export --root ./docs --status open,needs_changes
+md-viewer annotations reply --root ./docs --id ann_... \
+  --author reviewer --message "Please retain the default."
 ```
 
 `list` emits deterministic JSON. `export` produces an agent-friendly Markdown
 handoff containing source quotes, current anchor state, comments, and complete
 threads. Both accept `--annotations-dir` when sidecars are stored outside the
 content root; omitting `--status` includes every lifecycle state.
+`reply` appends an ordinary discussion entry directly to the matching sidecar
+and returns the updated annotation and revision as JSON. It does not change the
+annotation lifecycle state.
 
 ## Documentation
 

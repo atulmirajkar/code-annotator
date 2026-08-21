@@ -121,5 +121,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add offline reply and lifecycle transition commands as the next independently
-reviewable commit.
+Add the actor-validated offline lifecycle transition command as the next
+independently reviewable commit.

@@ -551,6 +551,12 @@ selector text and lines, derived anchor location or stale reason, comments, and
 the complete thread. Source and comment blocks choose a backtick fence longer
 than any run in their content, preserving arbitrary Markdown as data.
 
+Offline `reply` locates one globally unique annotation ID across the current
+content index, assigns a `msg_` ID and timestamp, and appends only an ordinary
+discussion event. It preserves lifecycle status and saves with the revision
+loaded during lookup so a concurrent sidecar edit is rejected rather than
+overwritten.
+
 An agent workflow is:
 
 1. List unresolved `question`, `suggestion`, and `change_request` annotations.
