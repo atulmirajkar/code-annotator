@@ -34,6 +34,6 @@ They still need access to the Markdown directory supplied on the command line.
 Use [`SHA256SUMS`](SHA256SUMS) to verify the artifacts after copying them.
 
 Each binary also includes the live `code-annotator agent` HTTP client commands. The
-`code-annotator-annotations` agent skill is a separate artifact and is not bundled
+`code-annotator` agent skill is a separate artifact and is not bundled
 inside the executable; follow the [skill installation instructions](../README.md#agent-skill)
 when an agent needs the guided annotation workflow.

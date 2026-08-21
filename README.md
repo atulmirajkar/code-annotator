@@ -205,29 +205,29 @@ two setup steps:
 1. Make the API client available by installing or building `code-annotator` and
    placing it on `PATH`. When working in this source repository, agents can use
    `go run ./cmd/code-annotator` instead.
-2. Make the `code-annotator-annotations` skill available to the agent, either through
+2. Make the `code-annotator` skill available to the agent, either through
    repository-local discovery or installation with the Skills CLI.
 
-The repository includes the `code-annotator-annotations` skill under
+The repository includes the `code-annotator` skill under
 `.agents/skills/`. Agents working from this repository can discover it without
 installation. Use the Skills CLI to install it from a local checkout for the
 current project:
 
 ```sh
-npx skills add . --skill code-annotator-annotations -y
+npx skills add . --skill code-annotator -y
 ```
 
 Install it for personal use across projects with:
 
 ```sh
-npx skills add . --skill code-annotator-annotations -g -y
+npx skills add . --skill code-annotator -g -y
 ```
 
 After the repository is published, the same convention supports installation
 without a checkout:
 
 ```sh
-npx skills add <owner>/<repository> --skill code-annotator-annotations -g -y
+npx skills add <owner>/<repository> --skill code-annotator -g -y
 ```
 
 The Skills CLI discovers the skill directly from `.agents/skills/`.

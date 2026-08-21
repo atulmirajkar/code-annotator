@@ -1,9 +1,9 @@
 ---
-name: code-annotator-annotations
+name: code-annotator
 description: Process code-annotator annotations when asked to discover, implement, discuss, or report review work. Use the live HTTP API whenever a review server is running; use offline commands only after confirming no server is active, and never write sidecars directly.
 ---
 
-# code-annotator annotations
+# code-annotator
 
 Choose exactly one operating mode before reading or mutating annotations:
 
