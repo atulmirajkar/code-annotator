@@ -55,6 +55,7 @@ func newSourceTextRenderer() *sourceTextRenderer {
 // node kind on the safe default HTML renderer.
 func (r *sourceTextRenderer) RegisterFuncs(register renderer.NodeRendererFuncRegisterer) {
 	register.Register(ast.KindText, r.renderText)
+	register.Register(ast.KindCodeSpan, r.renderCodeSpan)
 }
 
 func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
@@ -93,6 +94,45 @@ func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, no
 		_ = writer.WriteByte('\n')
 	}
 	return ast.WalkContinue, nil
+}
+
+// renderCodeSpan maps single-line inline-code content while keeping its
+// backtick delimiters outside the source-backed span. Multiline code spans are
+// left unmapped because goldmark normalizes their newlines to spaces.
+func (r *sourceTextRenderer) renderCodeSpan(writer util.BufWriter, source []byte, node ast.Node, entering bool) (ast.WalkStatus, error) {
+	if !entering {
+		_, _ = writer.WriteString("</code>")
+		return ast.WalkContinue, nil
+	}
+	_, _ = writer.WriteString("<code")
+	if node.Attributes() != nil {
+		goldmarkhtml.RenderAttributes(writer, node, goldmarkhtml.CodeAttributeFilter)
+	}
+	_ = writer.WriteByte('>')
+
+	first := node.FirstChild()
+	eligible := first != nil && first == node.LastChild() && !bytes.ContainsAny(first.(*ast.Text).Segment.Value(source), "\r\n")
+	if eligible {
+		segment := first.(*ast.Text).Segment
+		_, _ = writer.WriteString(`<span class="source-text" data-source-start="`)
+		_, _ = writer.WriteString(strconv.Itoa(segment.Start))
+		_, _ = writer.WriteString(`" data-source-end="`)
+		_, _ = writer.WriteString(strconv.Itoa(segment.Stop))
+		_, _ = writer.WriteString(`">`)
+	}
+	for child := first; child != nil; child = child.NextSibling() {
+		value := child.(*ast.Text).Segment.Value(source)
+		if bytes.HasSuffix(value, []byte("\n")) {
+			r.writer.RawWrite(writer, value[:len(value)-1])
+			r.writer.RawWrite(writer, []byte(" "))
+		} else {
+			r.writer.RawWrite(writer, value)
+		}
+	}
+	if eligible {
+		_, _ = writer.WriteString("</span>")
+	}
+	return ast.WalkSkipChildren, nil
 }
 
 // Render converts source into an HTML fragment. documentPath is the URL-style

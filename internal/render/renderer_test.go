@@ -153,6 +153,18 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 			},
 		},
 		{
+			name:   "inline code content",
+			source: "Before `code` after",
+			contains: []string{
+				`<code><span class="source-text" data-source-start="8" data-source-end="12">code</span></code>`,
+			},
+		},
+		{
+			name:     "multiline inline code is not mapped",
+			source:   "`code\nspan`",
+			excludes: []string{`<code><span class="source-text"`},
+		},
+		{
 			name:     "escaped text is not mapped",
 			source:   `Escaped \* marker`,
 			excludes: []string{`data-source-start="0"`},

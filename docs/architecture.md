@@ -91,6 +91,8 @@ Review-mode rendering adds source byte ranges to eligible goldmark text
 segments and binds them to the document digest. The browser maps endpoints from
 DOM UTF-16 offsets to Markdown UTF-8 byte offsets, including across formatting
 elements; normal viewer output is unchanged.
+Single-line inline code receives the same endpoint metadata around its content;
+its backtick delimiters remain an intervening source gap derived by the server.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current Markdown bytes rather
 than trusting hashes or context supplied by the browser.

@@ -279,7 +279,10 @@ positions. The spans between those endpoints may contain formatting elements
 and invisible Markdown delimiters. The browser sends only the range and digest;
 the server verifies the source revision and derives the exact Markdown quote.
 Endpoints whose rendered text cannot be mapped, such as entities, remain
-ineligible.
+ineligible. Single-line inline-code content is source-backed inside its
+`<code>` element, so a selection can begin, end, or pass through it. Multiline
+inline code remains ineligible because CommonMark normalizes its source
+newlines to displayed spaces.
 
 ## Persistence and concurrency
 
