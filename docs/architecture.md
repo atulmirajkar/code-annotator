@@ -98,8 +98,8 @@ routes are not registered until their handlers use this guard.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /` | Display a recursive, sorted tree of Markdown documents. |
-| `GET /view/{path}` | Safely load and render a `.md` file. |
+| `GET /` | Display the recursive, sorted reviewable document catalog. |
+| `GET /view/{path}` | Safely load and render a cataloged Markdown or source file. |
 | `GET /asset/{path}` | Serve a document-relative local asset. |
 | `GET /healthz` | Return a minimal readiness response for tests and tooling. |
 | `GET /api/annotations?status={states}` | Return the cross-document agent queue with a revision per sidecar. |
@@ -116,13 +116,17 @@ The annotation read route is registered only when `--review` supplies a store.
 Without a `document` query it traverses the stable content index, applies an
 optional status filter, and returns only documents with matching annotations.
 Each document carries its own sidecar revision for subsequent mutations.
-It verifies that the requested Markdown document exists under the content root,
+It verifies that the requested document is in the configured reviewable catalog,
 loads its sidecar from the separate writable root, resolves text anchors against
 the current file bytes, and returns the revision in both JSON and `ETag` form.
 Review-mode rendering adds source byte ranges to eligible goldmark text
 segments and binds them to the document digest. The browser maps endpoints from
 DOM UTF-16 offsets to Markdown UTF-8 byte offsets, including across formatting
 elements; normal viewer output is unchanged.
+Source rendering uses the same contract: escaped line content is wrapped in
+source-backed spans, while line terminators remain byte gaps. This permits exact
+code selections without allowing annotation APIs to address excluded files or
+non-document assets.
 Single-line inline code receives the same endpoint metadata around its content;
 its backtick delimiters remain an intervening source gap derived by the server.
 Fenced code receives one source-backed span per content line. Browser mapping

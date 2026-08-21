@@ -22,7 +22,6 @@ func TestSidecarValidate(t *testing.T) {
 	}{
 		{name: "schema", mutate: func(sidecar *Sidecar) { sidecar.SchemaVersion = 2 }, wantErr: "unsupported"},
 		{name: "document traversal", mutate: func(sidecar *Sidecar) { sidecar.Document = "../secret.md" }, wantErr: "escapes"},
-		{name: "document extension", mutate: func(sidecar *Sidecar) { sidecar.Document = "notes.txt" }, wantErr: ".md"},
 		{name: "duplicate annotation", mutate: func(sidecar *Sidecar) { sidecar.Annotations = append(sidecar.Annotations, sidecar.Annotations[0]) }, wantErr: "duplicate id"},
 		{name: "duplicate thread id", mutate: func(sidecar *Sidecar) {
 			copy := sidecar.Annotations[0]
@@ -37,6 +36,32 @@ func TestSidecarValidate(t *testing.T) {
 			tt.mutate(&sidecar)
 			if err := sidecar.Validate(); err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("Validate() error = %v, want containing %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateDocumentPath(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		document string
+		wantErr  bool
+	}{
+		{name: "Markdown", document: "docs/design.md"},
+		{name: "Go source", document: "internal/server/server.go"},
+		{name: "TypeScript source", document: "web/viewer.ts"},
+		{name: "empty", wantErr: true},
+		{name: "traversal", document: "../secret.go", wantErr: true},
+		{name: "absolute", document: "/tmp/source.go", wantErr: true},
+		{name: "backslash", document: `internal\\source.go`, wantErr: true},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			err := ValidateDocumentPath(test.document)
+			if (err != nil) != test.wantErr {
+				t.Fatalf("ValidateDocumentPath(%q) error = %v, wantErr %t", test.document, err, test.wantErr)
 			}
 		})
 	}

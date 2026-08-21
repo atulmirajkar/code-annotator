@@ -377,7 +377,7 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 
 	var fragment []byte
 	if document.Kind == content.KindCode {
-		fragment, err = s.renderer.RenderCode(source, false)
+		fragment, err = s.renderer.RenderCode(source, s.review != nil)
 	} else if s.review != nil {
 		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
 	} else {
@@ -392,7 +392,7 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 		return
 	}
 	digest := ""
-	if s.review != nil && document.Kind == content.KindMarkdown {
+	if s.review != nil {
 		digest = annotation.DocumentSHA256(source)
 	}
 	s.renderPage(response, index, documentPath, fragment, digest)
@@ -427,8 +427,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     hasMermaid,
 	}
-	selectedDocument, selectedFound := findDocument(index, selected)
-	if s.review != nil && (!selectedFound || selectedDocument.Kind == content.KindMarkdown) {
+	if s.review != nil {
 		data.ReviewToken = s.review.token
 	}
 	if err := s.page.Execute(response, data); err != nil {

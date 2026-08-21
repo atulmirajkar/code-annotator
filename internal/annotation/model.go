@@ -54,7 +54,7 @@ const (
 	ThreadStatusChange    ThreadKind = "status_change"
 )
 
-// Sidecar contains all annotations for one Markdown document.
+// Sidecar contains all annotations for one reviewable document.
 type Sidecar struct {
 	SchemaVersion int          `json:"schemaVersion"`
 	Document      string       `json:"document"`
@@ -289,8 +289,9 @@ func ValidateTransition(from, to Status, actor ActorRole) error {
 	return nil
 }
 
-// ValidateDocumentPath checks the canonical slash-separated Markdown path used
-// by sidecars and storage APIs.
+// ValidateDocumentPath checks the canonical slash-separated reviewable path
+// used by sidecars and storage APIs. Content-type authorization belongs to the
+// caller's catalog rather than this filesystem-safety validator.
 func ValidateDocumentPath(document string) error {
 	if document == "" || strings.ContainsRune(document, '\x00') || strings.Contains(document, `\`) || strings.HasPrefix(document, "/") {
 		return errors.New("document must be a non-empty slash-separated relative path")
@@ -298,9 +299,6 @@ func ValidateDocumentPath(document string) error {
 	cleaned := path.Clean(document)
 	if cleaned != document || cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
 		return errors.New("document path is not clean or escapes the root")
-	}
-	if !strings.EqualFold(path.Ext(document), ".md") {
-		return errors.New("document must have a .md extension")
 	}
 	return nil
 }

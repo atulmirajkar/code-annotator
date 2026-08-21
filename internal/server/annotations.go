@@ -120,13 +120,8 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 		s.handleAnnotationQueue(response, request)
 		return
 	}
-	if err := annotation.ValidateDocumentPath(document); err != nil {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
-		return
-	}
-	source, err := s.root.ReadFile(document, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+	source, ok := s.readAnnotationDocument(response, document)
+	if !ok {
 		return
 	}
 	sidecar, revision, err := s.annotations.Load(document)
@@ -169,9 +164,9 @@ func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *ht
 		http.Error(response, err.Error(), http.StatusBadRequest)
 		return
 	}
-	index, err := s.root.Index()
+	index, err := s.root.IndexWithOptions(s.indexOptions)
 	if err != nil {
-		http.Error(response, "could not index Markdown documents", http.StatusInternalServerError)
+		http.Error(response, "could not index documents", http.StatusInternalServerError)
 		return
 	}
 
@@ -249,13 +244,8 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		http.Error(response, err.Error(), status)
 		return
 	}
-	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
-		return
-	}
-	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+	document, ok := s.readAnnotationDocument(response, input.Document)
+	if !ok {
 		return
 	}
 
@@ -263,7 +253,7 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 	var anchor *annotation.AnchorResult
 	if input.Selection != nil {
 		if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
-			http.Error(response, "Markdown document changed; refresh and select again", http.StatusConflict)
+			http.Error(response, "document changed; refresh and select again", http.StatusConflict)
 			return
 		}
 		created, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
@@ -344,13 +334,8 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		http.Error(response, err.Error(), status)
 		return
 	}
-	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
-		return
-	}
-	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+	document, ok := s.readAnnotationDocument(response, input.Document)
+	if !ok {
 		return
 	}
 	sidecar, _, err := s.annotations.Load(input.Document)
@@ -429,13 +414,8 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 		http.Error(response, err.Error(), status)
 		return
 	}
-	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
-		return
-	}
-	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+	document, ok := s.readAnnotationDocument(response, input.Document)
+	if !ok {
 		return
 	}
 	sidecar, _, err := s.annotations.Load(input.Document)
@@ -515,17 +495,12 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		http.Error(response, err.Error(), status)
 		return
 	}
-	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
-		return
-	}
-	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+	document, ok := s.readAnnotationDocument(response, input.Document)
+	if !ok {
 		return
 	}
 	if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
-		http.Error(response, "Markdown document changed; refresh and select again", http.StatusConflict)
+		http.Error(response, "document changed; refresh and select again", http.StatusConflict)
 		return
 	}
 	sidecar, _, err := s.annotations.Load(input.Document)
@@ -679,16 +654,40 @@ func decodeMutationJSON(request *http.Request, destination any) (int, error) {
 	return http.StatusBadRequest, errors.New("request body must contain one JSON value")
 }
 
+// readAnnotationDocument requires both a safe annotation path and membership
+// in the configured reviewable catalog before reading current bytes.
+func (s *Server) readAnnotationDocument(response http.ResponseWriter, documentPath string) ([]byte, bool) {
+	if err := annotation.ValidateDocumentPath(documentPath); err != nil {
+		http.Error(response, "document not found", http.StatusNotFound)
+		return nil, false
+	}
+	index, err := s.root.IndexWithOptions(s.indexOptions)
+	if err != nil {
+		http.Error(response, "could not index documents", http.StatusInternalServerError)
+		return nil, false
+	}
+	if _, ok := findDocument(index, documentPath); !ok {
+		http.Error(response, "document not found", http.StatusNotFound)
+		return nil, false
+	}
+	document, err := s.root.ReadFile(documentPath, maxDocumentBytes)
+	if err != nil {
+		s.writeAnnotationReadError(response, err)
+		return nil, false
+	}
+	return document, true
+}
+
 // writeAnnotationReadError hides filesystem details and treats invalid or
 // unavailable document paths as missing resources.
 func (s *Server) writeAnnotationReadError(response http.ResponseWriter, err error) {
 	if content.IsNotExist(err) || errors.Is(err, content.ErrInvalidPath) || errors.Is(err, content.ErrOutsideRoot) || errors.Is(err, content.ErrNotRegular) {
-		http.Error(response, "Markdown document not found", http.StatusNotFound)
+		http.Error(response, "document not found", http.StatusNotFound)
 		return
 	}
 	if errors.Is(err, content.ErrTooLarge) {
-		http.Error(response, "Markdown document is too large", http.StatusRequestEntityTooLarge)
+		http.Error(response, "document is too large", http.StatusRequestEntityTooLarge)
 		return
 	}
-	http.Error(response, "could not read Markdown document", http.StatusInternalServerError)
+	http.Error(response, "could not read document", http.StatusInternalServerError)
 }

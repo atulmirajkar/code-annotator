@@ -121,7 +121,7 @@ func ResolveAnchor(document []byte, source Source) (AnchorResult, error) {
 }
 
 // DocumentSHA256 returns the canonical lowercase digest used to bind browser
-// selections and persisted selectors to one Markdown source revision.
+// selections and persisted selectors to one document source revision.
 func DocumentSHA256(document []byte) string {
 	digest := sha256.Sum256(document)
 	return hex.EncodeToString(digest[:])

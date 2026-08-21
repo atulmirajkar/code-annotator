@@ -82,7 +82,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	flags.SetOutput(stderr)
 	viewerURL := flags.String("url", "", "running loopback md-viewer URL")
 	status := flags.String("status", "", "status filter or target lifecycle status")
-	document := flags.String("document", "", "Markdown document path")
+	document := flags.String("document", "", "reviewable document path")
 	revision := flags.String("revision", "", "current document sidecar revision")
 	identifier := flags.String("id", "", "annotation identifier")
 	author := flags.String("author", "", "agent name")

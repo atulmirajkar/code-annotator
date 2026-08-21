@@ -89,8 +89,9 @@ Available flags:
 ```
 
 For example, `--include-code` adds escaped, line-numbered Go, C#, JavaScript,
-TypeScript, JSON, and `.csproj` files. Code annotations and Git comparison are
-still pending milestone work.
+TypeScript, JSON, and `.csproj` files. With `--review`, these source files use
+the same selection, annotation, thread, lifecycle, and agent handoff workflows
+as Markdown. Git comparison remains pending milestone work.
 
 Review mode establishes the annotation storage boundary and enables the
 annotation APIs. Its browser panel displays comments, lifecycle state, threads,

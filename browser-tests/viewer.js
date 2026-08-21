@@ -14,6 +14,7 @@ const test = base.extend({
     const server = spawn("go", [
       "run", "./cmd/md-viewer",
       "-review",
+	  "-include-code",
       "-no-open",
       "-port", "0",
       "-annotations-dir", annotationRoot,

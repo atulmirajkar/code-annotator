@@ -21,6 +21,7 @@ func TestStore(t *testing.T) {
 	}{
 		{name: "load missing sidecar", run: testLoadMissingReturnsEmptySidecar},
 		{name: "save and load", run: testSaveAndLoad},
+		{name: "support reviewable extensions", run: testReviewableExtensions},
 		{name: "reject stale revision", run: testSaveRejectsStaleRevision},
 		{name: "preserve unknown fields", run: testSavePreservesUnknownFields},
 		{name: "reject unsafe paths", run: testStoreRejectsUnsafePaths},
@@ -31,6 +32,36 @@ func TestStore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, test.run)
+	}
+}
+
+func testReviewableExtensions(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name     string
+		document string
+	}{
+		{name: "Markdown", document: "docs/design.md"},
+		{name: "Go", document: "internal/server/server.go"},
+		{name: "TypeScript", document: "web/viewer.ts"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			storage := openTestStore(t)
+			sidecar := testSidecar(test.document)
+			revision, err := storage.Save(sidecar, "")
+			if err != nil {
+				t.Fatalf("Save() error = %v", err)
+			}
+			loaded, loadedRevision, err := storage.Load(test.document)
+			if err != nil {
+				t.Fatalf("Load() error = %v", err)
+			}
+			if loaded.Document != test.document || loadedRevision != revision {
+				t.Fatalf("Load() = document %q, revision %q; want %q, %q", loaded.Document, loadedRevision, test.document, revision)
+			}
+		})
 	}
 }
 
@@ -179,7 +210,6 @@ func testStoreRejectsUnsafePaths(t *testing.T) {
 		{name: "parent traversal", document: "../secret.md"},
 		{name: "absolute path", document: "/absolute.md"},
 		{name: "backslash separator", document: `windows\\path.md`},
-		{name: "non-Markdown extension", document: "notes.txt"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

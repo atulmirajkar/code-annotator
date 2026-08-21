@@ -113,6 +113,60 @@ func TestCodeDocumentRoute(t *testing.T) {
 	}
 }
 
+func TestCodeAnnotationCatalog(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	rootPath := t.TempDir()
+	writeTestFile(t, filepath.Join(rootPath, "main.go"), "package main\nvar less = 1 < 2\n")
+	writeTestFile(t, filepath.Join(rootPath, "notes.txt"), "not cataloged")
+	root, err := content.Open(rootPath)
+	if err != nil {
+		t.Fatalf("content.Open() error = %v", err)
+	}
+	options, err := content.NewIndexOptions([]string{".go"}, nil)
+	if err != nil {
+		t.Fatalf("content.NewIndexOptions() error = %v", err)
+	}
+	store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	viewer, err := New(root, mdrender.New(), WithIndexOptions(options), WithReviewSession(store, origin, token))
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		path       string
+		wantStatus int
+		contains   []string
+	}{
+		{name: "source page has review metadata", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="source-text" data-source-start="0" data-source-end="12"`, `name="md-viewer-review-token"`, `id="annotation-sidebar"`}},
+		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"annotations":[]`}},
+		{name: "uncataloged asset has no annotation endpoint", path: "/api/annotations?document=notes.txt", wantStatus: http.StatusNotFound},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path, nil))
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			for _, want := range test.contains {
+				if !strings.Contains(response.Body.String(), want) {
+					t.Errorf("response missing %q", want)
+				}
+			}
+		})
+	}
+}
+
 func TestDocumentRouteDecodesPercentOnce(t *testing.T) {
 	t.Parallel()
 

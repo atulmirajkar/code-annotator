@@ -111,10 +111,10 @@ release verification is reviewed.
 ### 10. Code review and Git diff
 
 - [x] Define the proposed current-file code review and diff architecture.
-- [ ] Approve code discovery extensions and default excluded directories.
-- [ ] Approve current-side-only annotations and read-only deleted rows.
-- [ ] Approve immutable startup Git base semantics and annotation context.
-- [ ] Implement safe code rendering and reuse annotation workflows.
+- [x] Approve code discovery extensions and default excluded directories.
+- [x] Approve current-side-only annotations and read-only deleted rows.
+- [x] Approve immutable startup Git base semantics and annotation context.
+- [x] Implement safe code rendering and reuse annotation workflows.
 - [ ] Implement bounded Git comparison and current-file diff presentation.
 - [ ] Add a changed-only document filter backed by the configured Git base.
 - [ ] Extend agent handoff and browser coverage to code review.

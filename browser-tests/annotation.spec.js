@@ -27,7 +27,37 @@ async function createSelectionAnnotation(page, comment) {
   await expect(page.locator(".annotation-card")).toHaveCount(1);
 }
 
+// hasAnnotationHighlight inspects the browser-native highlight registry used
+// by Chromium. The fallback DOM marks are covered by unit-level rendering.
+async function hasAnnotationHighlight(page, text) {
+  return page.evaluate((selectedText) => {
+    const highlight = globalThis.CSS?.highlights?.get("md-viewer-annotations");
+    return highlight ? Array.from(highlight).some((range) => range.toString() === selectedText) : false;
+  }, text);
+}
+
 test.describe("annotation review interactions", () => {
+  test("creates and restores an annotation on source code", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/code-annotation.go`);
+    await expect(page.locator(".source-view")).toBeVisible();
+    await expect(page.locator("#annotation-sidebar")).toBeVisible();
+
+    await selectText(page, "left < right");
+    await expect(page.locator(".selection-preview")).toContainText("left < right");
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Check the comparison direction.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card");
+    await expect(card).toHaveCount(1);
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-source")).toContainText("left < right");
+    await expect.poll(() => hasAnnotationHighlight(page, "left < right")).toBe(true);
+
+    await page.reload();
+    await expect(page.locator(".annotation-card")).toHaveCount(1);
+    await expect.poll(() => hasAnnotationHighlight(page, "left < right")).toBe(true);
+  });
+
   test("navigates annotation cards to resolved and approximate source", async ({ page, viewer }) => {
     const documentPath = path.join(viewer.contentRoot, "source-navigation.md");
     const filler = Array.from({ length: 45 }, (_, index) => `Paragraph ${index + 1} keeps the target below the fold.`).join("\n\n");
