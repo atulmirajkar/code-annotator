@@ -257,7 +257,8 @@ Markdown continues through goldmark. The initial code renderer:
 4. Emits one row per file line in File view and one aligned two-cell row per
    `FileDiff` row in Changes view.
 5. Wraps only the visible line content in `.source-text` with exact byte
-   offsets; line terminators remain source gaps between spans.
+   offsets; review-mode empty lines receive a zero-length `.source-text`
+   anchor, while line terminators remain source gaps between spans.
 6. Adds non-selectable base/current line-number gutters and diff markers.
 7. Emits escaped base text only in the left cell, without `.source-text`
    metadata; only right/current text receives source offsets.
@@ -654,7 +655,9 @@ current-side `.source-text` spans and inserts newlines for intervening display
 rows. It must not use the raw DOM range text, because that includes line-number
 and diff-marker siblings between multi-line endpoints. The server remains
 authoritative and derives the stored quote from submitted current-file byte
-offsets.
+offsets. A native boundary on an empty current row maps to that row's
+zero-length source anchor, allowing a selection to end at the empty line's byte
+position without treating its gutter as source.
 
 Deleted text, line numbers, diff markers, toolbar controls, and syntax chrome
 use `user-select: none`. Keyboard selection remains available within current

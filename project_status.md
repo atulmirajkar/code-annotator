@@ -127,6 +127,8 @@ release verification is reviewed.
   cross-pane selections in the browser.
 - [x] Exclude line-number gutters and diff markers from multi-line selection
   previews while preserving source blank lines.
+- [x] Support selection endpoints on empty current-file lines using zero-length
+  source anchors in File and Changes views.
 - [ ] Complete diff-specific browser coverage for File/Changes tab navigation,
   narrow layouts, and light/dark themes.
 - [ ] Update user-facing build/run documentation and refresh distributions

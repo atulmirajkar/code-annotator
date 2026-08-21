@@ -113,24 +113,52 @@ test.describe("side-by-side diff", () => {
     await selectBetween(
       page,
       ".diff-current-pane .source-text",
-      "fixtures",
+      "fixture",
       ".diff-current-pane .source-text",
       "current-side replacement",
     );
 
     const preview = page.locator(".selection-preview");
     await expect(preview).toBeVisible();
-    await expect(preview).toContainText("fixtures");
+    await expect(preview).toContainText("fixture");
     await expect(preview).toContainText("current-side replacement");
-    await expect(preview.locator(".selection-quote")).toHaveText('fixtures\n\nconst layoutMessage = "This current-side replacement');
+    await expect(preview.locator(".selection-quote")).toHaveText('fixture\n\nconst layoutMessage = "This current-side replacement');
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review this multi-line replacement context.");
     await page.locator('.annotation-form button[type="submit"]').click();
 
     const card = page.locator(".annotation-card", { hasText: "Review this multi-line replacement context." });
     await expect(card).toHaveCount(1);
     await card.locator(".annotation-summary").click();
-    await expect(card.locator(".annotation-source")).toContainText("fixtures");
+    await expect(card.locator(".annotation-source")).toContainText("fixture");
     await expect(card.locator(".annotation-source")).toContainText("current-side replacement");
+  });
+
+  test("maps a selection ending on an empty current line", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await page.evaluate(() => {
+      const startSpan = Array.from(document.querySelectorAll(".diff-current-pane .source-text"))
+        .find((span) => span.textContent.includes("current-side replacement"));
+      const start = startSpan?.textContent.indexOf("current-side replacement") ?? -1;
+      const startRow = startSpan?.closest(".diff-current");
+      const emptyRow = startRow?.nextElementSibling;
+      const emptySpan = emptyRow?.querySelector(".source-text");
+      const emptyCode = emptyRow?.querySelector("code");
+      if (!startSpan?.firstChild || start < 0 || !emptySpan || emptySpan.textContent !== "" || !emptyCode) {
+        throw new Error("empty-line selection endpoints not found");
+      }
+      const range = document.createRange();
+      range.setStart(startSpan.firstChild, start);
+      range.setEnd(emptyCode, 0);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+
+    await expect(page.locator(".selection-preview")).toBeVisible();
+    await expect(page.locator('input[name="scope"][value="selection"]')).toBeChecked();
+    const quote = await page.locator(".selection-quote").textContent();
+    expect(quote).toBe('current-side replacement is also deliberately long so its highlight stays inside the independently scrollable current pane."\n');
   });
 
   test("rejects base-side and cross-pane selections", async ({ page, viewerURL }) => {

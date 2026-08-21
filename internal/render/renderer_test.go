@@ -19,6 +19,7 @@ func TestRenderCode(t *testing.T) {
 	}{
 		{name: "escapes source", source: []byte("if a < b && b > c {}\n"), contains: []string{`data-line="1"`, `if a &lt; b &amp;&amp; b &gt; c {}`}},
 		{name: "review byte ranges with CRLF gaps", source: []byte("café\r\nnext"), review: true, contains: []string{`data-source-start="0" data-source-end="5">café`, `data-source-start="7" data-source-end="11">next`}},
+		{name: "review empty line anchor", source: []byte("one\n\ntwo"), review: true, contains: []string{`data-source-start="4" data-source-end="4"></span>`}},
 		{name: "empty file", source: nil, contains: []string{`data-line="1"`, `<code></code>`}},
 		{name: "invalid UTF-8", source: []byte{0xff}, wantErr: ErrUnsupportedText},
 		{name: "NUL byte", source: []byte{'a', 0, 'b'}, wantErr: ErrUnsupportedText},
@@ -96,7 +97,7 @@ func TestRenderDiff(t *testing.T) {
 				{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 1, BaseText: "a"},
 				{Kind: gitdiff.RowAdded, NewLine: 2, CurrentStart: 3, CurrentEnd: 3},
 			}},
-			contains: []string{`data-source-start="0" data-source-end="1">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code></code>`},
+			contains: []string{`data-source-start="0" data-source-end="1">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code><span class="source-text" data-source-start="3" data-source-end="3"></span></code>`},
 		},
 		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-pane diff-base-pane"></div>`, `<div class="diff-pane diff-current-pane"></div>`}},
 		{name: "invalid UTF-8", current: []byte{0xff}, wantErr: ErrUnsupportedText},

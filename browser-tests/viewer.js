@@ -55,9 +55,11 @@ async function initializeGitFixture(contentRoot) {
   await runFile("git", ["-C", contentRoot, "add", "."]);
   await runFile("git", ["-C", contentRoot, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixtures"]);
   await writeFile(path.join(contentRoot, "changed-only.go"), "package changed\n");
-  await writeFile(path.join(contentRoot, "diff-layout.go"), `package fixtures
+  await writeFile(path.join(contentRoot, "diff-layout.go"), `package fixture
 
 const layoutMessage = "This current-side replacement is also deliberately long so its highlight stays inside the independently scrollable current pane."
+
+var afterSelection = true
 `);
 }
 

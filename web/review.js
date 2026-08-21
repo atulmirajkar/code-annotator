@@ -151,7 +151,12 @@
 
   function sourceSpan(node) {
     const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    return element ? element.closest(".source-text") : null;
+    if (!element) return null;
+    const direct = element.closest(".source-text");
+    if (direct) return direct;
+    // Empty source lines have a zero-length span with no text node of their
+    // own, so a native selection boundary lands on the surrounding row/code.
+    return element.closest(".source-line, .diff-current")?.querySelector(".source-text") || null;
   }
 
   // Browser Range text includes line-number and diff-marker siblings between
@@ -205,6 +210,9 @@
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.
   function textOffset(span, boundaryNode, boundaryOffset) {
+    if (!(span.textContent || "") && span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
+      return 0;
+    }
     const range = document.createRange();
     range.selectNodeContents(span);
     try {

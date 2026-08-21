@@ -278,11 +278,11 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 			contentEnd--
 		}
 		fmt.Fprintf(&output, `<li class="source-line" data-line="%d"><span class="source-line-number" aria-hidden="true">%d</span><code>`, line, line)
-		if review && contentEnd > start {
+		if review {
 			fmt.Fprintf(&output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, contentEnd)
 		}
 		output.WriteString(html.EscapeString(string(source[start:contentEnd])))
-		if review && contentEnd > start {
+		if review {
 			output.WriteString(`</span>`)
 		}
 		output.WriteString(`</code></li>`)
@@ -400,11 +400,11 @@ func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, 
 	fmt.Fprintf(output, `<div class="diff-cell diff-%s diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, kind, marker)
 	if line > 0 {
 		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
-		if review && side == "current" && end > start {
+		if review && side == "current" {
 			fmt.Fprintf(output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, end)
 		}
 		output.WriteString(html.EscapeString(content))
-		if review && side == "current" && end > start {
+		if review && side == "current" {
 			output.WriteString(`</span>`)
 		}
 		output.WriteString(`</code>`)
