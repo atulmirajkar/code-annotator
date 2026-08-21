@@ -1,6 +1,7 @@
 (() => {
   "use strict";
 
+  const changedOnlyStorageKey = "md-viewer.changed-only";
   const layout = document.querySelector(".layout");
   if (!layout) return;
 
@@ -39,6 +40,7 @@
     const status = document.querySelector(".document-search-status");
     const items = Array.from(document.querySelectorAll(".documents li"));
     if (!input || !status || items.length === 0) return;
+    if (changedOnly) changedOnly.checked = readChangedOnlyPreference();
 
     const visibleLinks = () => items.filter((item) => !item.hidden).map((item) => item.querySelector("a"));
     const filter = () => {
@@ -58,7 +60,11 @@
     };
 
     input.addEventListener("input", filter);
-    changedOnly?.addEventListener("change", filter);
+    changedOnly?.addEventListener("change", () => {
+      writeChangedOnlyPreference(changedOnly.checked);
+      filter();
+    });
+    filter();
     input.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
         input.value = "";
@@ -78,5 +84,23 @@
         input.focus();
       }
     });
+  }
+
+  // Session storage keeps an explicit reviewer choice across document
+  // navigation in one tab without turning it into a server-wide preference.
+  function readChangedOnlyPreference() {
+    try {
+      return sessionStorage.getItem(changedOnlyStorageKey) === "true";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function writeChangedOnlyPreference(enabled) {
+    try {
+      sessionStorage.setItem(changedOnlyStorageKey, String(enabled));
+    } catch (_) {
+      // Filtering still works for this page when storage is unavailable.
+    }
   }
 })();

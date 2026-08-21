@@ -67,6 +67,8 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".document-search-status")).toHaveText("1 matching changed document.");
     await search.press("Enter");
     await expect(page).toHaveURL(/\/view\/changed-only\.go$/);
+    await expect(page.getByRole("checkbox", { name: "Changed only" })).toBeChecked();
+    await expect(page.locator(".document-search-status")).toHaveText(/changed document/);
   });
 
   test("keeps panel controls usable without horizontal page overflow on mobile", async ({ page, viewerURL }) => {
