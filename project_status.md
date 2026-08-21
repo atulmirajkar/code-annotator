@@ -93,7 +93,7 @@ release verification is reviewed.
 ### 8. Viewer navigation polish
 
 - [x] Make the document and annotation sidebars independently collapsible.
-- [ ] Add case-insensitive document-path lookup in the document sidebar.
+- [x] Add case-insensitive document-path lookup in the document sidebar.
 - [ ] Add browser coverage for panel collapse, lookup, and navigation.
 
 ### 9. Live reload

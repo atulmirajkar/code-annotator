@@ -20,6 +20,11 @@
     <nav class="sidebar" id="documents-sidebar" aria-label="Markdown documents">
       <h2>Documents</h2>
       {{if .Documents}}
+      <label class="document-search">
+        <span>Find document</span>
+        <input type="search" placeholder="Filter by path…" autocomplete="off" spellcheck="false">
+      </label>
+      <p class="document-search-status" role="status" aria-live="polite" hidden></p>
       <ul class="documents">
         {{range .Documents}}
         <li>
