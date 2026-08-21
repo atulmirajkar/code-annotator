@@ -96,7 +96,18 @@ release verification is reviewed.
 - [x] Add case-insensitive document-path lookup in the document sidebar.
 - [x] Add browser coverage for panel collapse, lookup, and navigation.
 
-### 9. Code review and Git diff
+### 9. Annotation-to-source navigation
+
+- [ ] Scroll exact and moved annotation cards to their resolved highlights.
+- [ ] Scroll stale annotations to the nearest source-backed position around
+  their original byte offset and identify the result as approximate.
+- [ ] Scroll document-level annotations to the document heading or top.
+- [ ] Add keyboard activation, focus handling, and temporary target emphasis.
+- [ ] Keep nested card controls and text selection from triggering navigation.
+- [ ] Add browser coverage for resolved, stale, collapsed-panel, and
+  reduced-motion behavior.
+
+### 10. Code review and Git diff
 
 - [x] Define the proposed current-file code review and diff architecture.
 - [ ] Approve code discovery extensions and default excluded directories.
@@ -107,7 +118,7 @@ release verification is reviewed.
 - [ ] Add a changed-only document filter backed by the configured Git base.
 - [ ] Extend agent handoff and browser coverage to code review.
 
-### 10. Live reload
+### 11. Live reload
 
 - [ ] Watch the selected content directory for Markdown and asset changes.
 - [ ] Notify connected browser sessions using Server-Sent Events.
@@ -117,7 +128,7 @@ release verification is reviewed.
 - [ ] Debounce duplicate filesystem events and recover when the watcher fails.
 - [ ] Add watcher, SSE, reconnection, and end-to-end live-reload tests.
 
-### 11. Source syntax highlighting
+### 12. Source syntax highlighting
 
 - [ ] Select an offline, embedded highlighter with Go, C#, JavaScript, and
   TypeScript support.
@@ -154,6 +165,7 @@ release verification is reviewed.
 
 ## Next milestone
 
-Review and approve the decisions in `docs/designs/code-review.md`, then implement
-that milestone in small commits. Live reload remains deferred until code review
-is complete and separately approved.
+Implement annotation-to-source navigation in small reviewable commits. Then
+review and approve the decisions in `docs/designs/code-review.md`; live reload
+remains deferred until the preceding milestones are complete and separately
+approved.

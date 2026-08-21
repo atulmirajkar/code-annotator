@@ -650,6 +650,34 @@ the CSS Highlight API when available. A merged `<mark>` fallback provides the
 same visual result without creating invalid overlaps. Stale and document-level
 annotations have no current text range and therefore are not highlighted.
 
+### Annotation-to-source navigation
+
+Selecting an annotation card navigates the document to the location associated
+with that annotation. This remains useful after an agent marks a change
+`applied`, when the reviewer needs to inspect the corresponding document edit:
+
+1. For an `exact` or `moved` anchor, scroll the resolved highlight into the
+   center of the document viewport and briefly emphasize it.
+2. For a `stale` anchor, do not select an ambiguous quote or silently reattach
+   the annotation. Use the original byte offset to find the nearest current
+   source-backed element, scroll it into view, and label the result as an
+   approximate location.
+3. For a document-level annotation, scroll to the document heading or top; do
+   not display source-target emphasis.
+4. If the rendered document has no source-backed element, leave the scroll
+   position unchanged and explain that no approximate location is available.
+
+The card is keyboard activatable with Enter or Space. Pointer events from
+buttons, links, form fields, status controls, and text selection inside the card
+retain their existing behavior and do not trigger navigation. Navigation also
+expands the selected card, applies programmatic focus without losing the
+reviewer's place in the sidebar, and respects reduced-motion preferences.
+
+The temporary emphasis is presentation only. It does not change annotation
+state, persist a new anchor, or imply that an approximate stale location is
+correct. Browser coverage includes exact, moved, not-found, ambiguous,
+keyboard, nested-control, collapsed-sidebar, and reduced-motion cases.
+
 Lifecycle controls appear within each annotation card and expose only valid
 next states. The selected action determines the actor role sent to the server
 and whether a message or resolution summary is required; an applied action may
