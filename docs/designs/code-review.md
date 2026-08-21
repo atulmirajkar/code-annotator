@@ -368,21 +368,79 @@ usable.
 
 ### Tracked and untracked files
 
-`git diff <base>` covers staged and unstaged changes to tracked files. Git does
-not include untracked files. The package checks tracking status separately; an
-untracked source file is represented as entirely added against an empty base.
+Changed-file discovery evaluates the current worktree against the immutable
+`BaseCommit`; it does not evaluate only `HEAD` against the working directory.
+This distinction means a clean file committed after an older configured base
+is still changed for this review.
 
-The changed-files sidebar filter uses one repository-level status query rather
-than executing Git once per catalog entry. Its result is intersected with the
-safe reviewable catalog and content prefix. Modified, added, deleted, renamed,
-copied, type-changed, conflicted, and untracked paths count as changed. A
-deleted path with no current file is not reviewable in the first version and
-therefore does not appear. Ignored files remain excluded.
+Git requires two bounded repository-level queries because a normal diff never
+reports untracked files:
 
-Rename-aware base paths are useful but not required in the first slice. A
-renamed current path may initially appear as a delete/add comparison. Full
-rename metadata can be added after the basic anchor and diff workflows are
-verified.
+```text
+# Tracked paths whose current index/worktree result differs from BaseCommit.
+git -C <repository> diff \
+  --name-only -z --no-renames --no-ext-diff --no-textconv \
+  <base-commit> -- [<literal-content-prefix>]
+
+# Untracked paths, excluding files ignored by normal Git rules.
+git -C <repository> ls-files \
+  --others --exclude-standard -z -- [<literal-content-prefix>]
+```
+
+The first query observes the combined current result: commits after the frozen
+base, staged changes, unstaged changes, additions, deletions, type changes, and
+conflicts. The second adds only untracked, non-ignored paths. Neither query
+changes the index, obtains remote data, invokes text conversion, or executes an
+external diff driver. `-z` makes paths unambiguous even when a valid filename
+contains whitespace or a newline.
+
+The content prefix is derived once from canonical roots. If the repository is
+`/work/repository` and the viewer root is `/work/repository/docs`, Git path
+`docs/design/view.go` becomes viewer path `design/view.go`; `internal/app.go`
+is outside the content root and is discarded. When the viewer root equals the
+repository root, the pathspec is omitted. Otherwise literal pathspec magic is
+used so brackets, asterisks, and other characters in directory names cannot be
+interpreted as patterns.
+
+The evaluation pipeline is:
+
+```text
+tracked paths from BaseCommit
+        + untracked non-ignored paths
+        -> validate NUL-terminated repository paths
+        -> remove the canonical content prefix
+        -> normalize, deduplicate, and sort
+        -> intersect with the current safe reviewable catalog
+        -> mark matching sidebar entries as changed
+```
+
+Catalog intersection is an authorization and presentation boundary, not only
+a file-extension filter. It removes unsupported assets, default-excluded or
+hidden directories, unsafe symlinks, and paths that no longer resolve to a
+regular current file. Consequently, a deleted path is detected by Git but does
+not appear in the first-version sidebar because there is no current document to
+open or annotate. An untracked supported source file does appear and its diff
+is represented as entirely added against an empty base.
+
+`--no-renames` deliberately makes the initial result deterministic without a
+similarity threshold. A rename is evaluated as deletion of the old path plus
+addition of the new path; catalog intersection removes the missing old path and
+retains the current new path. Copy and richer rename metadata can be introduced
+later without changing the definition of “changed against BaseCommit.”
+
+Changed paths are evaluated once for each fresh catalog/page render, never once
+per catalog entry. A browser refresh therefore observes new worktree changes;
+live updates wait for the live-reload milestone. The path lookup and Changed
+only toggle compose entirely over that one snapshot. Filtering never changes
+the selected document or the frozen base.
+
+Each Git query has its own three-second deadline and 64 KiB output limit in the
+initial implementation. A timeout, oversized result, malformed path stream, or
+Git failure makes changed-file discovery unavailable for that response. The
+normal catalog and File view remain usable; the server must not silently label
+every file unchanged, because that would misrepresent an incomplete query.
+Browser-facing errors remain generic while terminal diagnostics may identify
+the failed operation without exposing file contents.
 
 ## Annotation model
 
@@ -509,8 +567,10 @@ Initial limits proposed for implementation:
 | Resource | Limit |
 | --- | --- |
 | Current source file | 4 MiB |
+| Changed-path output per Git query | 64 KiB |
+| Changed-path Git command duration | 3 seconds |
 | Git patch output per request | 8 MiB |
-| Git command duration | 5 seconds |
+| Git patch command duration | 5 seconds |
 | Configured source extensions | 64 |
 | Configured excluded directory names | 128 |
 
@@ -550,6 +610,9 @@ All Go cases remain table-driven.
 - Code escaping, UTF-8 byte ranges, LF/CRLF gaps, tabs, and final lines without
   terminators.
 - Git revision validation and immutable SHA resolution.
+- Changed-path discovery for committed-after-base, staged, unstaged, deleted,
+  untracked, ignored, nested-content, malformed-output, and bounded-failure
+  cases.
 - Unified-hunk parsing for additions, deletions, replacements, empty files,
   untracked files, malformed ranges, oversized output, and timeouts.
 - Catalog-based annotation path validation and sidecar mapping.
