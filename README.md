@@ -130,6 +130,16 @@ annotation sidecars.
 
 ### Agent skill
 
+The executable and agent skill are separate artifacts. Installing the skill
+does not install or bundle the `md-viewer` binary. A working agent handoff has
+two setup steps:
+
+1. Make the API client available by installing or building `md-viewer` and
+   placing it on `PATH`. When working in this source repository, agents can use
+   `go run ./cmd/md-viewer` instead.
+2. Make the `md-viewer-annotations` skill available to the agent, either through
+   repository-local discovery or installation with the Skills CLI.
+
 The repository includes the `md-viewer-annotations` skill under
 `.agents/skills/`. Agents working from this repository can discover it without
 installation. Use the Skills CLI to install it from a local checkout for the
@@ -152,9 +162,7 @@ without a checkout:
 npx skills add <owner>/<repository> --skill md-viewer-annotations -g -y
 ```
 
-The Skills CLI discovers the skill directly from `.agents/skills/`. The
-installed skill expects an `md-viewer` binary on `PATH`; repository-local use
-instead invokes `go run ./cmd/md-viewer` to exercise current source.
+The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 ## Documentation
 
