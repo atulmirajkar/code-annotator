@@ -1,17 +1,23 @@
 ---
 name: md-viewer-annotations
-description: Process annotations through a running md-viewer review server when asked to discover, implement, discuss, or report annotation work. Use the live HTTP API client and never write sidecars directly.
+description: Process md-viewer annotations when asked to discover, implement, discuss, or report review work. Use the live HTTP API whenever a review server is running; use offline commands only after confirming no server is active, and never write sidecars directly.
 ---
 
 # md-viewer annotations
 
-Require the user to provide the URL of the running review-mode viewer. From
-this repository use `go run ./cmd/md-viewer agent`; outside the source tree use
-an installed `md-viewer agent` command. This client talks only to the live HTTP
-API so browser and agent activity share the webserver's revision checks. Do not
-substitute the offline `annotations` command family while that server is live.
+Choose exactly one operating mode before reading or mutating annotations:
 
-## Process actionable work
+- If the user supplies a viewer URL or says a review server is running, use the
+  live HTTP workflow. Never substitute offline commands.
+- Use the offline workflow only when the user confirms no review server is
+  running. If server state is unclear, ask before accessing annotations.
+
+Never write annotation sidecars directly in either mode.
+
+## Live server workflow
+
+From this repository use `go run ./cmd/md-viewer agent`; outside the source
+tree use an installed `md-viewer agent` command.
 
 1. Load the cross-document queue:
 
@@ -59,10 +65,43 @@ go run ./cmd/md-viewer agent reply \
   --id <annotation-id> --author <agent-name> --message <question-or-context>
 ```
 
+## Offline workflow
+
+Use this only after confirming that no review server is running. From this
+repository use `go run ./cmd/md-viewer annotations`; outside the source tree use
+an installed `md-viewer annotations` command.
+
+Discover actionable work with:
+
+```sh
+go run ./cmd/md-viewer annotations export \
+  --root <content-root> --status open,needs_changes
+```
+
+Use `annotations resolve` and `annotations reply` with the same lifecycle rules
+as the live workflow. Supply `--root`, the stable annotation `--id`, and any
+explicit `--annotations-dir` used by the reviewer. The offline commands load a
+sidecar revision immediately before saving and reject concurrent changes. If a
+conflict occurs, export again and reconsider the action instead of retrying
+blindly.
+
+For example, acknowledge before editing and then report completed work:
+
+```sh
+go run ./cmd/md-viewer annotations resolve \
+  --root <content-root> --id <annotation-id> \
+  --status acknowledged --role agent --author <agent-name>
+
+go run ./cmd/md-viewer annotations resolve \
+  --root <content-root> --id <annotation-id> \
+  --status applied --role agent --author <agent-name> \
+  --summary <completed-work> [--commit <commit>]
+```
+
 ## Preserve the review contract
 
-- Never edit `.md-viewer` JSON sidecars directly and never use offline mutation
-  commands while the review server is running.
+- Never edit `.md-viewer` JSON sidecars directly and never use offline reads or
+  mutations while the review server is running.
 - Never create a replacement annotation for a retry. Continue with the same ID
   and read the reviewer's latest `needs_changes` message before acknowledging.
 - Do not close annotations. Only a reviewer may move `applied` to `closed` or
@@ -73,5 +112,5 @@ go run ./cmd/md-viewer agent reply \
   supplied loopback viewer page and keeps it internal.
 - Report processed annotation IDs and final states to the user.
 
-Offline `md-viewer annotations` commands are maintenance tools for times when
-no review server is running; they are not the live agent handoff contract.
+Offline `md-viewer annotations` commands are the agent handoff only when no
+review server is running; the live HTTP API remains authoritative otherwise.

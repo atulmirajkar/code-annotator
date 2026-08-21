@@ -1,4 +1,4 @@
 interface:
   display_name: "md-viewer Annotations"
-  short_description: "Process live Markdown review annotations safely"
-  default_prompt: "Use the running md-viewer API to process actionable annotations in this repository."
+  short_description: "Process Markdown review annotations safely"
+  default_prompt: "Process actionable md-viewer annotations using the live API when a server runs, or offline commands only when it is stopped."

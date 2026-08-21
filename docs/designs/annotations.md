@@ -525,7 +525,11 @@ server is not coordinating an active review session.
 
 ## Offline annotation tooling
 
-The CLI provides maintenance and inspection when the server is not running:
+The CLI provides maintenance, inspection, and agent handoff only when the
+review server is not running. Agents must not use offline reads or mutations
+while a live server is coordinating browser review; doing so bypasses the one
+HTTP revision flow intended to order browser and agent decisions. If server
+state is unknown, the agent must ask before choosing this mode.
 
 ```sh
 md-viewer annotations list --root ./docs --status open,needs_changes --format json
