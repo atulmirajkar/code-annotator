@@ -385,6 +385,41 @@ catalog. Base, current, and patch must be UTF-8 text without NUL bytes; binary
 markers and oversized inputs make Changes unavailable while File view remains
 usable.
 
+Git emits the patch in unified diff format. File metadata precedes a sequence
+of hunk headers and line records:
+
+```diff
+diff --git a/main.go b/main.go
+index 12ab34c..56de78f 100644
+--- a/main.go
++++ b/main.go
+@@ -2 +2 @@
+-old value
++new value
+@@ -10,0 +11,2 @@
++first added line
++second added line
+```
+
+The patch contains every textual hunk for the selected file relative to
+`BaseCommit`. Changes separated by unchanged lines normally produce separate
+hunks. It does not contain the whole file: with `--unified=0`, unchanged regions
+are omitted and reconstructed from the separately loaded base and current
+sources. File headers such as `diff --git`, `index`, `---`, and `+++` describe
+the file but do not consume source lines.
+
+Each hunk begins with:
+
+```text
+@@ -oldStart,oldCount +newStart,newCount @@ optional section text
+```
+
+Within a hunk, a leading space is unchanged context, `-` consumes one base
+line, and `+` consumes one current line. Counts omitted from the header default
+to one. A zero count describes an insertion or deletion boundary. Git may add a
+`\ No newline at end of file` marker after an affected line; the marker is
+metadata and consumes neither source.
+
 The parser does not use a general-purpose line-diff algorithm after Git has
 already produced hunks. It treats hunk coordinates as the change boundaries,
 verifies hunk text against both source snapshots, and reconstructs the complete

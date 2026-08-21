@@ -52,12 +52,25 @@ type sourceLine struct {
 }
 
 type hunkRange struct {
+	// oldStart and oldCount are the -start,count range from a hunk header.
 	oldStart int
 	oldCount int
+	// newStart and newCount are the +start,count range from a hunk header.
 	newStart int
 	newCount int
 }
 
+// Unified patches contain optional file headers followed by every changed
+// region as a hunk. A hunk has this shape:
+//
+//	@@ -oldStart,oldCount +newStart,newCount @@ optional section
+//	 unchanged context
+//	-deleted base line
+//	+added current line
+//	\ No newline at end of file
+//
+// Counts default to one when omitted. With --unified=0, Git normally emits no
+// context records, so unchanged regions between hunks are absent from the patch.
 var hunkHeaderPattern = regexp.MustCompile(`^@@ -([0-9]+)(?:,([0-9]+))? \+([0-9]+)(?:,([0-9]+))? @@(?: .*)?$`)
 
 // ParsePatch verifies a bounded textual unified patch against exact base and
@@ -89,8 +102,10 @@ func ParsePatch(documentPath, baseCommit string, base, current, patch []byte) (F
 	return FileDiff{Path: documentPath, BasePath: documentPath, BaseCommit: strings.ToLower(baseCommit), Rows: rows}, nil
 }
 
-// alignPatch consumes each hunk exactly once and fills omitted unchanged lines
-// from the verified source arrays rather than trusting patch context.
+// alignPatch skips non-consuming file headers, consumes all hunks exactly once,
+// and fills omitted unchanged lines from verified base/current source arrays.
+// A patch need not contain the whole file, but it must contain every textual
+// change; otherwise unchanged-region or final source validation fails.
 func alignPatch(base, current []sourceLine, patch string) ([]Row, int, error) {
 	patchLines := strings.Split(strings.TrimSuffix(patch, "\n"), "\n")
 	if patch == "" {
