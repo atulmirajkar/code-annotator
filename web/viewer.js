@@ -2,6 +2,8 @@
   "use strict";
 
   const changedOnlyStorageKey = "md-viewer.changed-only";
+  const sourceModeStorageKey = "md-viewer.source-mode";
+  const panelStoragePrefix = "md-viewer.panel-collapsed.";
   const layout = document.querySelector(".layout");
   if (!layout) return;
 
@@ -17,18 +19,52 @@
     collapsedClass: "review-collapsed",
     name: "annotations",
   });
+  bindSourceModePreference();
   bindDocumentSearch();
 
   // bindPanelToggle keeps the visual state, accessible state, and grid layout
   // synchronized for one optional viewer panel.
   function bindPanelToggle({ button, panel, collapsedClass, name }) {
     if (!button || !panel) return;
+    setPanelCollapsed(readBooleanPreference(`${panelStoragePrefix}${name}`));
     button.addEventListener("click", () => {
       const collapsed = !panel.hidden;
+      setPanelCollapsed(collapsed);
+      writeBooleanPreference(`${panelStoragePrefix}${name}`, collapsed);
+    });
+
+    // setPanelCollapsed restores and updates all representations of one panel
+    // choice so navigation never briefly leaves the grid in a stale state.
+    function setPanelCollapsed(collapsed) {
       panel.hidden = collapsed;
       layout.classList.toggle(collapsedClass, collapsed);
       button.setAttribute("aria-expanded", String(!collapsed));
       button.textContent = `${collapsed ? "Show" : "Hide"} ${name}`;
+    }
+  }
+
+  // Source mode is a reviewer preference across code-document navigation. It
+  // changes only when a File or Changes tab is activated, then rewrites code
+  // links without applying diff mode to Markdown documents.
+  function bindSourceModePreference() {
+    const tabs = document.querySelector(".source-mode-tabs");
+    const activeTab = tabs?.querySelector('a[aria-current="page"]');
+    if (activeTab) {
+      const activeMode = new URL(activeTab.href).searchParams.get("mode") === "diff" ? "diff" : "file";
+      writePreference(sourceModeStorageKey, activeMode);
+      tabs.querySelectorAll("a").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          const mode = new URL(tab.href).searchParams.get("mode") === "diff" ? "diff" : "file";
+          writePreference(sourceModeStorageKey, mode);
+        });
+      });
+    }
+
+    if (readPreference(sourceModeStorageKey) !== "diff") return;
+    document.querySelectorAll('.documents li[data-kind="code"] a').forEach((link) => {
+      const target = new URL(link.href);
+      target.searchParams.set("mode", "diff");
+      link.href = target.pathname + target.search;
     });
   }
 
@@ -89,18 +125,34 @@
   // Session storage keeps an explicit reviewer choice across document
   // navigation in one tab without turning it into a server-wide preference.
   function readChangedOnlyPreference() {
-    try {
-      return sessionStorage.getItem(changedOnlyStorageKey) === "true";
-    } catch (_) {
-      return false;
-    }
+    return readBooleanPreference(changedOnlyStorageKey);
   }
 
   function writeChangedOnlyPreference(enabled) {
+    writeBooleanPreference(changedOnlyStorageKey, enabled);
+  }
+
+  function readBooleanPreference(key) {
+    return readPreference(key) === "true";
+  }
+
+  function writeBooleanPreference(key, enabled) {
+    writePreference(key, String(enabled));
+  }
+
+  function readPreference(key) {
     try {
-      sessionStorage.setItem(changedOnlyStorageKey, String(enabled));
+      return sessionStorage.getItem(key);
     } catch (_) {
-      // Filtering still works for this page when storage is unavailable.
+      return null;
+    }
+  }
+
+  function writePreference(key, value) {
+    try {
+      sessionStorage.setItem(key, value);
+    } catch (_) {
+      // The current-page interaction still works when storage is unavailable.
     }
   }
 })();

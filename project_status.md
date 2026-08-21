@@ -129,8 +129,12 @@ release verification is reviewed.
   previews while preserving source blank lines.
 - [x] Support selection endpoints on empty current-file lines using zero-length
   source anchors in File and Changes views.
-- [ ] Complete diff-specific browser coverage for File/Changes tab navigation,
-  narrow layouts, and light/dark themes.
+- [x] Preserve the reviewer-selected File/Changes mode across code-document
+  navigation without applying diff mode to Markdown documents.
+- [x] Preserve collapsed document and annotation sidebars across navigation in
+  the current browser tab.
+- [ ] Complete diff-specific browser coverage for narrow layouts and light/dark
+  themes.
 - [ ] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.
 

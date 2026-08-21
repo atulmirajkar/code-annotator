@@ -637,6 +637,13 @@ The File/Changes links preserve the selected path. Annotation mutations retain
 the existing origin token, review token, content type, body limit, document
 digest, and `If-Match` sidecar revision requirements.
 
+The browser stores the reviewer-selected File or Changes mode in session
+storage and rewrites only code-document sidebar links accordingly. Selecting a
+tab changes the preference; ordinary document rendering does not invent a new
+mode. Collapsed document and annotation panels are stored independently in the
+same tab-scoped storage and restored after navigation. Markdown links never
+receive `mode=diff`.
+
 ## Browser selection and highlighting
 
 Current code lines use the existing `.source-text` contract. The browser needs
@@ -821,8 +828,8 @@ Status as of 2026-08-21:
 
 The next session should continue with small commits in this order:
 
-1. Cover File/Changes navigation, narrow viewport behavior, and both color
-   schemes; fix only defects exposed by those tests.
+1. Cover narrow viewport behavior and both color schemes; fix only defects
+   exposed by those tests.
 2. Reconcile README, architecture, build instructions, and this milestone with
    the implemented behavior; run release verification and rebuild `dist/`.
 3. Stop for maintainer review. Do not begin live reload until that review is

@@ -33,7 +33,7 @@
       <p class="document-search-status" role="status" aria-live="polite" hidden></p>
       <ul class="documents">
         {{range .Documents}}
-        <li data-changed="{{.Changed}}">
+        <li data-changed="{{.Changed}}" data-kind="{{.Kind}}">
           <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
             {{if .Directory}}<span class="directory">{{.Directory}}/</span>{{end}}{{.Name}}
             {{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}

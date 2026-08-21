@@ -71,6 +71,29 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".document-search-status")).toHaveText(/changed document/);
   });
 
+  test("preserves diff mode and collapsed annotations across code navigation", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await expect(page.getByRole("link", { name: "Changes" })).toHaveAttribute("aria-current", "page");
+    await page.getByRole("button", { name: "Hide annotations" }).click();
+
+    const nextCode = page.locator('.documents li[data-kind="code"] a', { hasText: "code-annotation.go" });
+    await expect(nextCode).toHaveAttribute("href", "/view/code-annotation.go?mode=diff");
+    await nextCode.click();
+    await expect(page).toHaveURL(/\/view\/code-annotation\.go\?mode=diff$/);
+    await expect(page.getByRole("link", { name: "Changes" })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator("#annotation-sidebar")).toBeHidden();
+    await expect(page.getByRole("button", { name: "Show annotations" })).toHaveAttribute("aria-expanded", "false");
+
+    await page.getByRole("link", { name: "File" }).click();
+    await expect(page).toHaveURL(/\/view\/code-annotation\.go$/);
+    const otherCode = page.locator('.documents li[data-kind="code"] a', { hasText: "diff-layout.go" });
+    await expect(otherCode).toHaveAttribute("href", "/view/diff-layout.go");
+    await otherCode.click();
+    await expect(page).toHaveURL(/\/view\/diff-layout\.go$/);
+    await expect(page.getByRole("link", { name: "File" })).toHaveAttribute("aria-current", "page");
+    await expect(page.locator("#annotation-sidebar")).toBeHidden();
+  });
+
   test("keeps panel controls usable without horizontal page overflow on mobile", async ({ page, viewerURL }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto(`${viewerURL}view/valid.md`);
