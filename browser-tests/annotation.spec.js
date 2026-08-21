@@ -41,6 +41,11 @@ test.describe("annotation review interactions", () => {
     await page.goto(`${viewerURL}view/code-annotation.go`);
     await expect(page.locator(".source-view")).toBeVisible();
     await expect(page.locator("#annotation-sidebar")).toBeVisible();
+    await expect.poll(() => page.locator(".source-view").evaluate((source) => {
+      const documentBounds = source.closest("main").getBoundingClientRect();
+      const sourceBounds = source.getBoundingClientRect();
+      return Math.max(sourceBounds.left - documentBounds.left, documentBounds.right - sourceBounds.right);
+    })).toBeLessThanOrEqual(9);
 
     await selectText(page, "left < right");
     await expect(page.locator(".selection-preview")).toContainText("left < right");

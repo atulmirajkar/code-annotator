@@ -39,7 +39,7 @@
       <p class="empty-nav">No reviewable documents found.</p>
       {{end}}
     </nav>
-    <main class="document">
+    <main class="document{{if .IsCode}} code-document{{end}}">
       {{if .Empty}}
       <section class="empty-state">
         <h1>No reviewable documents found</h1>

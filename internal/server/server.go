@@ -109,6 +109,7 @@ type pageData struct {
 	ReviewToken    string
 	DocumentSHA256 string
 	HasMermaid     bool
+	IsCode         bool
 }
 
 type documentView struct {
@@ -400,7 +401,11 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 
 func (s *Server) renderPage(response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string) {
 	documents := make([]documentView, 0, len(index.Documents))
+	isCode := false
 	for _, document := range index.Documents {
+		if document.Path == selected && document.Kind == content.KindCode {
+			isCode = true
+		}
 		documents = append(documents, documentView{
 			Name:      document.Name,
 			Directory: document.Directory,
@@ -426,6 +431,7 @@ func (s *Server) renderPage(response http.ResponseWriter, index content.Index, s
 		Empty:          len(index.Documents) == 0,
 		DocumentSHA256: documentSHA256,
 		HasMermaid:     hasMermaid,
+		IsCode:         isCode,
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

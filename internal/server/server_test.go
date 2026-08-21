@@ -146,7 +146,7 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 		wantStatus int
 		contains   []string
 	}{
-		{name: "source page has review metadata", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="source-text" data-source-start="0" data-source-end="12"`, `name="md-viewer-review-token"`, `id="annotation-sidebar"`}},
+		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `class="source-text" data-source-start="0" data-source-end="12"`, `name="md-viewer-review-token"`, `id="annotation-sidebar"`}},
 		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"annotations":[]`}},
 		{name: "uncataloged asset has no annotation endpoint", path: "/api/annotations?document=notes.txt", wantStatus: http.StatusNotFound},
 	}
