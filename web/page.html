@@ -10,10 +10,14 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/">md-viewer</a>
+    <div class="panel-controls" aria-label="Viewer panels">
+      <button type="button" class="panel-toggle documents-toggle" aria-controls="documents-sidebar" aria-expanded="true">Hide documents</button>
+      {{if .ReviewToken}}<button type="button" class="panel-toggle review-toggle" aria-controls="annotation-sidebar" aria-expanded="true">Hide annotations</button>{{end}}
+    </div>
     <span class="root" title="{{.Root}}">{{.Root}}</span>
   </header>
   <div class="layout{{if .ReviewToken}} review-layout{{end}}">
-    <nav class="sidebar" aria-label="Markdown documents">
+    <nav class="sidebar" id="documents-sidebar" aria-label="Markdown documents">
       <h2>Documents</h2>
       {{if .Documents}}
       <ul class="documents">
@@ -40,7 +44,7 @@
       {{end}}
     </main>
     {{if .ReviewToken}}
-    <aside class="review-panel" data-document="{{.Selected}}" aria-labelledby="review-heading">
+    <aside class="review-panel" id="annotation-sidebar" data-document="{{.Selected}}" aria-labelledby="review-heading">
       <div class="review-heading-row">
         <h2 id="review-heading">Annotations</h2>
         <span class="annotation-count" aria-live="polite"></span>
@@ -86,6 +90,7 @@
     </aside>
     {{end}}
   </div>
+  <script src="/static/viewer.js" defer></script>
   {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
   <script src="/static/mermaid.js" defer></script>{{end}}
   {{if .ReviewToken}}<script src="/static/review.js" defer></script>{{end}}

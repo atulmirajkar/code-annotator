@@ -1122,6 +1122,9 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if body := response.Body.String(); !strings.Contains(body, `<link rel="stylesheet" href="/static/styles.css">`) || strings.Contains(body, "<style>") {
 				t.Fatalf("page does not use only the external viewer stylesheet:\n%s", body)
 			}
+			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `src="/static/viewer.js"`) {
+				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
+			}
 			hasToken := strings.Contains(response.Body.String(), `name="md-viewer-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
@@ -1129,6 +1132,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `class="show-inactive-annotations"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
 			if hasPanel != test.wantPanel {
 				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
+			}
+			hasReviewToggle := strings.Contains(response.Body.String(), `class="panel-toggle review-toggle"`)
+			if hasReviewToggle != test.wantPanel {
+				t.Fatalf("page contains annotation-panel toggle = %t, want %t", hasReviewToggle, test.wantPanel)
 			}
 			hasSource := strings.Contains(response.Body.String(), `class="source-text" data-source-start=`)
 			if hasSource != test.wantSource {
@@ -1155,6 +1162,7 @@ func TestStaticAssets(t *testing.T) {
 		wantContents []string
 	}{
 		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotation-summary", "annotation-actions", "submitAnnotation", "submitReattach", "submitReply", "submitLifecycle", "captureDiagramSelection", "diagramSelectionActive", "renderDiagramHighlights"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindPanelToggle", "documents-collapsed", "review-collapsed"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},

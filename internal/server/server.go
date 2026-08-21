@@ -51,6 +51,7 @@ type Server struct {
 	page        *template.Template
 	styles      []byte
 	reviewJS    []byte
+	viewerJS    []byte
 	mermaidJS   []byte
 	mermaidTiny []byte
 	handler     http.Handler
@@ -190,6 +191,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read review script: %w", err)
 	}
+	viewerJS, err := fs.ReadFile(web.Files, "viewer.js")
+	if err != nil {
+		return nil, fmt.Errorf("read viewer script: %w", err)
+	}
 	mermaidJS, err := fs.ReadFile(web.Files, "mermaid.js")
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
@@ -205,6 +210,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		page:        page,
 		styles:      styles,
 		reviewJS:    reviewJS,
+		viewerJS:    viewerJS,
 		mermaidJS:   mermaidJS,
 		mermaidTiny: mermaidTiny,
 	}
@@ -222,6 +228,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
+	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
@@ -244,6 +251,12 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.reviewJS)
+}
+
+// handleViewerScript serves shared navigation behavior on every viewer page.
+func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.viewerJS)
 }
 
 // handleStyles serves the embedded viewer stylesheet from the same origin so

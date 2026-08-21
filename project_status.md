@@ -90,7 +90,13 @@ release verification is reviewed.
 - [x] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
   integration tests.
 
-### 8. Live reload
+### 8. Viewer navigation polish
+
+- [x] Make the document and annotation sidebars independently collapsible.
+- [ ] Add case-insensitive document-path lookup in the document sidebar.
+- [ ] Add browser coverage for panel collapse, lookup, and navigation.
+
+### 9. Live reload
 
 - [ ] Watch the selected content directory for Markdown and asset changes.
 - [ ] Notify connected browser sessions using Server-Sent Events.
@@ -128,5 +134,5 @@ release verification is reviewed.
 
 ## Next milestone
 
-Review the verified browser coverage and refreshed distribution artifacts.
-Begin live-reload design and implementation only after maintainer approval.
+Complete viewer navigation polish, then stop for review before beginning live
+reload design or implementation.
