@@ -591,6 +591,11 @@ After a successful create it reloads the authoritative list and revision. A
 document or sidecar conflict keeps the comment in the form and asks the reviewer
 to refresh and select again.
 
+Each annotation card previews its persisted exact source quote and original
+line range. Stale annotations retain that original quote so the reviewer can see
+what disappeared or became ambiguous. Document-level annotations show a
+distinct whole-document label instead of an empty quote.
+
 ## Acceptance criteria
 
 - Normal viewer mode creates no files and exposes no mutation routes.

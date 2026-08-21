@@ -77,6 +77,10 @@ a { color: var(--accent); }
 .annotation-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }
 .annotation-badge { padding: .12rem .4rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: .7rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
 .annotation-badge.stale { background: #fff0d5; color: #8a4b08; }
+.annotation-source { margin: 0 0 .7rem; padding: .55rem .65rem; border-left: .2rem solid var(--accent); background: var(--surface); font-size: .8rem; }
+.annotation-source q { display: block; max-height: 7rem; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.annotation-source-lines { display: block; margin-top: .3rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .68rem; }
+.annotation-source.document-level { color: var(--muted); font-style: italic; }
 .annotation-comment { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .annotation-author { margin: .65rem 0 0; color: var(--muted); font-size: .75rem; }
 .annotation-thread { margin: .75rem 0 0; padding: .65rem 0 0 1rem; border-top: 1px solid var(--border); }

@@ -241,6 +241,22 @@
     }
     card.append(meta);
 
+    const source = element("div", "annotation-source");
+    if (annotation.source && annotation.source.selector) {
+      const quote = document.createElement("q");
+      quote.textContent = annotation.source.selector.exact || "";
+      source.append(quote);
+      const lines = element("span", "annotation-source-lines");
+      const startLine = annotation.source.selector.startLine;
+      const endLine = annotation.source.selector.endLine;
+      lines.textContent = startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
+      source.append(lines);
+    } else {
+      source.textContent = "Whole document";
+      source.classList.add("document-level");
+    }
+    card.append(source);
+
     const comment = element("p", "annotation-comment");
     comment.textContent = annotation.comment || "";
     card.append(comment);

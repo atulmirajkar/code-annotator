@@ -102,6 +102,9 @@ The browser creation form uses the revision from its latest annotation read,
 preserves a captured selection while focus moves into the panel, and reloads
 the authoritative list after a successful write. Conflicts retain the draft
 comment and require a refreshed document selection.
+Annotation cards render the persisted selector quote and line range with DOM
+text nodes. This preserves the original review context even when the separately
+derived current anchor state is stale.
 
 The reply route uses the same security and concurrency checks. It accepts only
 ordinary reply content; the server owns thread IDs, timestamps, and kinds, and

@@ -79,7 +79,8 @@ and stale-anchor warnings. Selections across formatting elements show their
 Markdown byte range and are bound to the rendered document revision. Highlights
 and reply/lifecycle browser controls are being delivered in subsequent
 milestone commits. The creation form can attach a new annotation to the current
-selection or the whole document. By default, sidecars are stored under
+selection or the whole document, and annotation cards preview their selected
+source and line range. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh
