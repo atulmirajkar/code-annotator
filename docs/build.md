@@ -80,6 +80,17 @@ lifecycle transitions, and stale-anchor reattachment are available through the A
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.
 
+List annotations without running the server:
+
+```sh
+./bin/md-viewer annotations list --root ./docs \
+  --status open,needs_changes --format json
+```
+
+Use `--annotations-dir ./reviews` when review mode used an external sidecar
+root. A missing annotation directory returns an empty JSON document list and is
+not created by this read-only command.
+
 ## Verify
 
 Format and test the code:

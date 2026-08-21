@@ -16,6 +16,7 @@ import (
 	"time"
 
 	annotationstore "atulm/md-viewer/internal/annotation/store"
+	"atulm/md-viewer/internal/commands"
 	"atulm/md-viewer/internal/content"
 	"atulm/md-viewer/internal/launch"
 	mdrender "atulm/md-viewer/internal/render"
@@ -41,6 +42,9 @@ func Run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 type urlLauncher func(string) error
 
 func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL urlLauncher) error {
+	if len(args) > 0 && args[0] == "annotations" {
+		return commands.RunAnnotations(args[1:], stdout, stderr)
+	}
 	configuration, err := parseConfig(args, stderr)
 	if err != nil {
 		return err

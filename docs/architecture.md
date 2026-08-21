@@ -45,12 +45,19 @@ internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
+internal/commands/          offline annotation list and export workflows
 web/                        embedded HTML, CSS, and review-panel JavaScript
 ```
 
 Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
+
+The `annotations` command family is dispatched before server flag parsing and
+never binds a listener or launches a browser. `annotations list` walks the
+content index in stable order, loads matching sidecars directly, derives current
+anchor state, and writes deterministic JSON. It checks for storage before
+opening the store so a read against a missing annotation root creates nothing.
 
 Read-only mode never opens or creates annotation storage. With `--review`, the
 application opens a separate symlink-resolved writable root. The default is

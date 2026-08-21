@@ -1,0 +1,163 @@
+package commands
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"atulm/md-viewer/internal/annotation"
+	annotationstore "atulm/md-viewer/internal/annotation/store"
+)
+
+func TestParseListConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		args       []string
+		wantRoot   string
+		wantStatus annotation.Status
+		wantErr    string
+	}{
+		{name: "defaults", args: []string{"--root", "./docs"}, wantRoot: "./docs"},
+		{name: "status filter", args: []string{"--root", "./docs", "--status", "open,needs_changes"}, wantRoot: "./docs", wantStatus: annotation.StatusNeedsChanges},
+		{name: "missing root", wantErr: "--root is required"},
+		{name: "invalid status", args: []string{"--root", "./docs", "--status", "unknown"}, wantErr: "invalid annotation status"},
+		{name: "invalid format", args: []string{"--root", "./docs", "--format", "yaml"}, wantErr: "unsupported list format"},
+		{name: "positional argument", args: []string{"--root", "./docs", "extra"}, wantErr: "does not accept positional"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			configuration, err := parseListConfig(test.args, io.Discard)
+			if test.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), test.wantErr) {
+					t.Fatalf("parseListConfig() error = %v, want containing %q", err, test.wantErr)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("parseListConfig() error = %v", err)
+			}
+			if configuration.rootPath != test.wantRoot {
+				t.Errorf("rootPath = %q, want %q", configuration.rootPath, test.wantRoot)
+			}
+			if test.wantStatus != "" {
+				if _, ok := configuration.statuses[test.wantStatus]; !ok {
+					t.Errorf("statuses = %#v, want %q", configuration.statuses, test.wantStatus)
+				}
+			}
+		})
+	}
+}
+
+func TestRunAnnotations(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name          string
+		statuses      string
+		missingStore  bool
+		wantDocuments int
+		wantFirst     string
+		wantStatus    annotation.Status
+		wantAnchor    annotation.AnchorState
+	}{
+		{name: "list all", wantDocuments: 2, wantFirst: "guide.md", wantStatus: annotation.StatusOpen, wantAnchor: annotation.AnchorExact},
+		{name: "filter status", statuses: "needs_changes", wantDocuments: 1, wantFirst: "guide.md", wantStatus: annotation.StatusNeedsChanges},
+		{name: "missing store is empty", missingStore: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeCommandFile(t, filepath.Join(rootPath, "README.md"), "Before selected after")
+			writeCommandFile(t, filepath.Join(rootPath, "guide.md"), "Guide text")
+			annotationsDir := filepath.Join(t.TempDir(), "annotations")
+			if !test.missingStore {
+				seedCommandAnnotations(t, annotationsDir)
+			} else {
+				annotationsDir = filepath.Join(t.TempDir(), "missing")
+			}
+
+			args := []string{"list", "--root", rootPath, "--annotations-dir", annotationsDir}
+			if test.statuses != "" {
+				args = append(args, "--status", test.statuses)
+			}
+			var output bytes.Buffer
+			if err := RunAnnotations(args, &output, io.Discard); err != nil {
+				t.Fatalf("RunAnnotations() error = %v", err)
+			}
+			var result listOutput
+			if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; output: %s", err, output.String())
+			}
+			if len(result.Documents) != test.wantDocuments {
+				t.Fatalf("documents = %#v, want count %d", result.Documents, test.wantDocuments)
+			}
+			if test.wantDocuments == 0 {
+				if _, err := os.Stat(annotationsDir); !os.IsNotExist(err) {
+					t.Fatalf("missing annotation directory was created: %v", err)
+				}
+				return
+			}
+			if result.Documents[0].Document != test.wantFirst {
+				t.Errorf("first document = %q, want %q", result.Documents[0].Document, test.wantFirst)
+			}
+			var item *listAnnotation
+			for documentIndex := range result.Documents {
+				for annotationIndex := range result.Documents[documentIndex].Annotations {
+					candidate := &result.Documents[documentIndex].Annotations[annotationIndex]
+					if candidate.Status == test.wantStatus {
+						item = candidate
+					}
+				}
+			}
+			if item == nil {
+				t.Fatalf("annotations = %#v, want status %q", result.Documents, test.wantStatus)
+			}
+			if test.wantAnchor != "" && (item.Anchor == nil || item.Anchor.State != test.wantAnchor) {
+				t.Errorf("anchor = %#v, want %q", item.Anchor, test.wantAnchor)
+			}
+		})
+	}
+}
+
+// seedCommandAnnotations creates two valid sidecars in deliberately reversed
+// save order so the list test verifies content-index ordering.
+func seedCommandAnnotations(t *testing.T, directory string) {
+	t.Helper()
+	store, err := annotationstore.Open(directory)
+	if err != nil {
+		t.Fatalf("annotationstore.Open() error = %v", err)
+	}
+	now := time.Date(2026, time.August, 20, 12, 0, 0, 0, time.UTC)
+	source, err := annotation.NewSource([]byte("Before selected after"), 7, 15)
+	if err != nil {
+		t.Fatalf("annotation.NewSource() error = %v", err)
+	}
+	sidecars := []annotation.Sidecar{
+		{SchemaVersion: annotation.SchemaVersion, Document: "guide.md", Annotations: []annotation.Annotation{{ID: "ann_guide", Intent: annotation.IntentQuestion, Status: annotation.StatusNeedsChanges, Comment: "Clarify", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Thread: []annotation.ThreadEntry{}}}},
+		{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{{ID: "ann_readme", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Update", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &source, Thread: []annotation.ThreadEntry{}}}},
+	}
+	for _, sidecar := range sidecars {
+		if _, err := store.Save(sidecar, ""); err != nil {
+			t.Fatalf("Store.Save(%q) error = %v", sidecar.Document, err)
+		}
+	}
+}
+
+// writeCommandFile creates one fixture beneath an existing temporary root.
+func writeCommandFile(t *testing.T, path, value string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(value), 0o644); err != nil {
+		t.Fatalf("os.WriteFile(%q) error = %v", path, err)
+	}
+}

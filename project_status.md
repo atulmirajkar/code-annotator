@@ -121,5 +121,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add the annotation list and export CLI commands as the next independently
-reviewable commit.
+Add agent-friendly Markdown export on top of the offline annotation list model
+as the next independently reviewable commit.

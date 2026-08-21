@@ -541,6 +541,11 @@ text, line range, comment, staleness, and annotation ID. Stable IDs allow a
 human to tell an agent, “process annotation `ann_...`,” without copying the full
 comment.
 
+The JSON `list` command is implemented first. It emits documents in content
+index order, omits documents with no matching annotations, includes derived
+anchor state, and supports comma-separated status filtering. It is read-only:
+a missing annotation directory produces an empty list without creating storage.
+
 An agent workflow is:
 
 1. List unresolved `question`, `suggestion`, and `change_request` annotations.
