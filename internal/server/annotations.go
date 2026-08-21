@@ -92,6 +92,20 @@ type transitionAnnotationResponse struct {
 	Revision   string         `json:"revision"`
 }
 
+// reattachAnnotationRequest identifies a new verified source range for an
+// annotation whose previous source anchor is stale.
+type reattachAnnotationRequest struct {
+	Document  string              `json:"document"`
+	Selection annotationSelection `json:"selection"`
+}
+
+// reattachAnnotationResponse returns the newly anchored annotation and sidecar
+// revision.
+type reattachAnnotationResponse struct {
+	Annotation annotationView `json:"annotation"`
+	Revision   string         `json:"revision"`
+}
+
 // handleAnnotations returns persisted annotations plus anchor locations derived
 // from the current Markdown bytes. It never mutates either root.
 func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.Request) {
@@ -398,6 +412,99 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 	response.Header().Set("ETag", strconv.Quote(string(revision)))
 	_ = json.NewEncoder(response).Encode(transitionAnnotationResponse{
 		Annotation: view,
+		Revision:   string(revision),
+	})
+}
+
+// handleReattachAnnotation replaces a stale text selector with a range verified
+// against the current Markdown source. It cannot convert document annotations.
+func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request *http.Request) {
+	expected, status, err := parseIfMatch(request)
+	if err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+
+	var input reattachAnnotationRequest
+	if status, err := decodeMutationJSON(request, &input); err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+	if err := annotation.ValidateDocumentPath(input.Document); err != nil {
+		http.Error(response, "Markdown document not found", http.StatusNotFound)
+		return
+	}
+	document, err := s.root.ReadFile(input.Document, maxDocumentBytes)
+	if err != nil {
+		s.writeAnnotationReadError(response, err)
+		return
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		http.Error(response, "could not read annotations", http.StatusInternalServerError)
+		return
+	}
+
+	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
+	if annotationIndex < 0 {
+		http.Error(response, "annotation not found", http.StatusNotFound)
+		return
+	}
+	updated := &sidecar.Annotations[annotationIndex]
+	if updated.Source == nil {
+		http.Error(response, "document-level annotation cannot be reattached", http.StatusConflict)
+		return
+	}
+	oldAnchor, err := annotation.ResolveAnchor(document, *updated.Source)
+	if err != nil {
+		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+		return
+	}
+	if oldAnchor.State != annotation.AnchorStale {
+		http.Error(response, "annotation anchor is not stale", http.StatusConflict)
+		return
+	}
+
+	replacement, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
+	if err != nil {
+		http.Error(response, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if replacement.Selector.Exact != input.Selection.Exact {
+		http.Error(response, "selected text no longer matches the Markdown source", http.StatusConflict)
+		return
+	}
+	newAnchor, err := annotation.ResolveAnchor(document, replacement)
+	if err != nil {
+		http.Error(response, "could not resolve replacement anchor", http.StatusInternalServerError)
+		return
+	}
+
+	now := time.Now().UTC()
+	if now.Before(updated.UpdatedAt) {
+		now = updated.UpdatedAt
+	}
+	updated.Source = &replacement
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		http.Error(response, "could not validate reattached annotation", http.StatusInternalServerError)
+		return
+	}
+	revision, err := s.annotations.Save(sidecar, expected)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			response.Header().Set("ETag", strconv.Quote(string(revision)))
+			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
+			return
+		}
+		http.Error(response, "could not save annotation reattachment", http.StatusInternalServerError)
+		return
+	}
+
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	_ = json.NewEncoder(response).Encode(reattachAnnotationResponse{
+		Annotation: annotationView{Annotation: *updated, Anchor: &newAnchor},
 		Revision:   string(revision),
 	})
 }

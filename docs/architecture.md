@@ -78,6 +78,7 @@ routes are not registered until their handlers use this guard.
 | `POST /api/annotations` | In a secured review session, create a verified text or document annotation. |
 | `PATCH /api/annotations/{id}` | Atomically transition lifecycle state and append its structured activity. |
 | `POST /api/annotations/{id}/replies` | Append an ordinary discussion reply without changing lifecycle state. |
+| `POST /api/annotations/{id}/reattach` | Replace a stale text anchor with a server-verified current selection. |
 
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
@@ -100,6 +101,11 @@ handler creates any required acknowledgement, resolution, review, or rejection
 activity and then a `status_change` entry before one atomic save. In particular,
 returning applied work to `needs_changes` cannot change status without retaining
 the reviewer's required message.
+
+Reattachment first derives the old anchor against the current document and
+accepts only `stale` text annotations. It verifies the replacement byte range
+and quote, regenerates the digest and context, and changes no review content,
+thread history, or lifecycle state.
 
 ## Key dependencies
 

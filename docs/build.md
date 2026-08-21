@@ -73,8 +73,8 @@ an alternate location when the content root should remain untouched:
 `--annotations-dir` is rejected without `--review`. Review mode initializes and
 reports the writable store and enables annotation reads and secured creation.
 The secured API also supports ordinary discussion replies. Browser controls
-and reattachment remain pending; actor-validated lifecycle transitions are
-available through the API.
+remain pending; actor-validated lifecycle transitions and stale-anchor
+reattachment are available through the API.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

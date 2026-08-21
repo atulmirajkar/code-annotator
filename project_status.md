@@ -62,7 +62,7 @@ embedded diagram rendering and live reload.
 - [x] Define CLI export commands for AI-agent consumption.
 - [x] Add an explicit writable review mode and annotation directory handling.
 - [x] Implement atomic sidecar persistence and stale-anchor detection.
-- [ ] Implement annotation HTTP APIs with origin and session-token protection.
+- [x] Implement annotation HTTP APIs with origin and session-token protection.
 - [ ] Add rendered-text selection, highlights, and the review panel.
 - [ ] Add annotation list, export, reply, and resolve CLI commands.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.

@@ -413,6 +413,16 @@ prior attempt on the next acknowledgement. Invalid actors, skipped states, and
 activity fields that do not belong to the target status are rejected without a
 write. Like other mutations, the request requires the current strong ETag.
 
+Reattachment is available only for a text annotation whose selector currently
+resolves to `stale`. The request supplies `document` and a replacement
+`selection` with byte offsets and exact quote. The server verifies the old stale
+state, recreates the full selector from current Markdown, and atomically replaces
+only `source` and `updatedAt`. The annotation ID, original comment, lifecycle
+status, and complete thread remain unchanged. Document-level annotations and
+selectors that still resolve as `exact` or `moved` return `409` rather than being
+silently relocated. The prior selector remains available through repository
+history rather than becoming a discussion event.
+
 ## Local write security
 
 Loopback does not by itself make mutation endpoints safe: a malicious website

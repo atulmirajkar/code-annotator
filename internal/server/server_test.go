@@ -630,6 +630,143 @@ func TestTransitionAnnotationAPI(t *testing.T) {
 	}
 }
 
+func TestReattachAnnotationAPI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	validBody := `{"document":"README.md","selection":{"startByte":7,"endByte":20,"exact":"new selection"}}`
+	tests := []struct {
+		name         string
+		annotationID string
+		body         string
+		sourceMode   string
+		useCurrent   bool
+		omitIfMatch  bool
+		wantStatus   int
+		wantConflict bool
+	}{
+		{name: "reattach stale anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusOK},
+		{name: "resolved anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "exact", useCurrent: true, wantStatus: http.StatusConflict},
+		{name: "document annotation", annotationID: "ann_reattach_test", body: validBody, sourceMode: "document", useCurrent: true, wantStatus: http.StatusConflict},
+		{name: "quote mismatch", annotationID: "ann_reattach_test", body: strings.Replace(validBody, "new selection", "old selection", 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusConflict},
+		{name: "invalid range", annotationID: "ann_reattach_test", body: strings.Replace(validBody, `"endByte":20`, `"endByte":200`, 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "annotation missing", annotationID: "ann_missing", body: validBody, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusNotFound},
+		{name: "unknown field", annotationID: "ann_reattach_test", body: strings.TrimSuffix(validBody, "}") + `,"reason":"moved"}`, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "missing revision", annotationID: "ann_reattach_test", body: validBody, sourceMode: "stale", omitIfMatch: true, wantStatus: http.StatusPreconditionRequired},
+		{name: "stale revision", annotationID: "ann_reattach_test", body: validBody, sourceMode: "stale", wantStatus: http.StatusConflict, wantConflict: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), "Before new selection after")
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			currentRevision := saveReattachAnnotation(t, store, test.sourceMode)
+			viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+
+			requestPath := "/api/annotations/" + test.annotationID + "/reattach"
+			request := httptest.NewRequest(http.MethodPost, requestPath, strings.NewReader(test.body))
+			request.Header.Set("Origin", origin)
+			request.Header.Set(reviewTokenHeader, token)
+			request.Header.Set("Content-Type", "application/json")
+			if !test.omitIfMatch {
+				revision := annotationstore.Revision("")
+				if test.useCurrent {
+					revision = currentRevision
+				}
+				request.Header.Set("If-Match", strconv.Quote(string(revision)))
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantConflict && response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
+				t.Fatalf("conflict ETag = %q, want current revision", response.Header().Get("ETag"))
+			}
+			if test.wantStatus != http.StatusOK {
+				return
+			}
+
+			var payload reattachAnnotationResponse
+			if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+			}
+			if payload.Annotation.Source == nil || payload.Annotation.Source.Selector.Exact != "new selection" || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorExact {
+				t.Fatalf("reattached annotation = %#v", payload.Annotation)
+			}
+			stored, revision, err := store.Load("README.md")
+			if err != nil {
+				t.Fatalf("Store.Load() error = %v", err)
+			}
+			if stored.Annotations[0].Source.Selector.Exact != "new selection" || string(revision) != payload.Revision {
+				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
+			}
+		})
+	}
+}
+
+// saveReattachAnnotation persists a text or document annotation for
+// reattachment API tests.
+func saveReattachAnnotation(t *testing.T, store *annotationstore.Store, sourceMode string) annotationstore.Revision {
+	t.Helper()
+	var source *annotation.Source
+	switch sourceMode {
+	case "stale":
+		created, err := annotation.NewSource([]byte("Before old selection after"), 7, 20)
+		if err != nil {
+			t.Fatalf("annotation.NewSource() error = %v", err)
+		}
+		source = &created
+	case "exact":
+		created, err := annotation.NewSource([]byte("Before new selection after"), 7, 20)
+		if err != nil {
+			t.Fatalf("annotation.NewSource() error = %v", err)
+		}
+		source = &created
+	case "document":
+	default:
+		t.Fatalf("unsupported source mode %q", sourceMode)
+	}
+	createdAt := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	sidecar := annotation.Sidecar{
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      "README.md",
+		Annotations: []annotation.Annotation{
+			{
+				ID:        "ann_reattach_test",
+				Intent:    annotation.IntentChangeRequest,
+				Status:    annotation.StatusOpen,
+				Comment:   "Update this selection.",
+				Author:    "reviewer",
+				CreatedAt: createdAt,
+				UpdatedAt: createdAt,
+				Source:    source,
+				Thread:    []annotation.ThreadEntry{},
+			},
+		},
+	}
+	revision, err := store.Save(sidecar, "")
+	if err != nil {
+		t.Fatalf("Store.Save() error = %v", err)
+	}
+	return revision
+}
+
 // saveTransitionAnnotation persists one document annotation in the requested
 // lifecycle state for transition API tests.
 func saveTransitionAnnotation(t *testing.T, store *annotationstore.Store, status annotation.Status) annotationstore.Revision {
