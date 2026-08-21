@@ -123,9 +123,10 @@ release verification is reviewed.
   lines cannot cross the divider or obscure change highlighting.
 - [x] Cover current-side diff annotation creation, restored highlights, and
   annotation-to-source navigation in the browser.
-- [ ] Complete diff-specific browser coverage for multi-line selection,
-  forbidden base/cross-pane selection, tab navigation, narrow layouts, and
-  light/dark themes.
+- [x] Cover current-side multi-line selection and reject base-side and
+  cross-pane selections in the browser.
+- [ ] Complete diff-specific browser coverage for File/Changes tab navigation,
+  narrow layouts, and light/dark themes.
 - [ ] Update user-facing build/run documentation and refresh distributions
   after the code-review milestone receives maintainer approval.
 

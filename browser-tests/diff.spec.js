@@ -16,6 +16,25 @@ async function selectCurrentText(page, text) {
   }, text);
 }
 
+// selectBetween builds a range between text in two explicit panes. It supports
+// both valid current-only coverage and intentionally invalid cross-pane cases.
+async function selectBetween(page, startSelector, startText, endSelector, endText) {
+  await page.evaluate(({ startSelector, startText, endSelector, endText }) => {
+    const startNode = Array.from(document.querySelectorAll(startSelector)).find((node) => node.textContent.includes(startText));
+    const endNode = Array.from(document.querySelectorAll(endSelector)).find((node) => node.textContent.includes(endText));
+    if (!startNode?.firstChild || !endNode?.firstChild) throw new Error("selection endpoint not found");
+    const start = startNode.textContent.indexOf(startText);
+    const end = endNode.textContent.indexOf(endText) + endText.length;
+    const range = document.createRange();
+    range.setStart(startNode.firstChild, start);
+    range.setEnd(endNode.firstChild, end);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+  }, { startSelector, startText, endSelector, endText });
+}
+
 // hasAnnotationHighlight inspects Chromium's native highlight registry after
 // annotations are loaded or restored.
 async function hasAnnotationHighlight(page, text) {
@@ -87,5 +106,65 @@ test.describe("side-by-side diff", () => {
     await restoredCard.locator(".annotation-summary").click();
     await expect(page.locator(".diff-current-pane .annotation-navigation-target")).toContainText(selectedText);
     await expect(restoredCard.locator(".annotation-navigation-status")).toBeEmpty();
+  });
+
+  test("creates an annotation across multiple current rows", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    await selectBetween(
+      page,
+      ".diff-current-pane .source-text",
+      "fixtures",
+      ".diff-current-pane .source-text",
+      "current-side replacement",
+    );
+
+    const preview = page.locator(".selection-preview");
+    await expect(preview).toBeVisible();
+    await expect(preview).toContainText("fixtures");
+    await expect(preview).toContainText("current-side replacement");
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Review this multi-line replacement context.");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card", { hasText: "Review this multi-line replacement context." });
+    await expect(card).toHaveCount(1);
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-source")).toContainText("fixtures");
+    await expect(card.locator(".annotation-source")).toContainText("current-side replacement");
+  });
+
+  test("rejects base-side and cross-pane selections", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    const preview = page.locator(".selection-preview");
+    const selectionScope = page.locator('input[name="scope"][value="selection"]');
+    const cases = [
+      {
+        name: "base only",
+        startSelector: ".diff-base-pane code",
+        startText: "base-side line",
+        endSelector: ".diff-base-pane code",
+        endText: "horizontal scrolling",
+      },
+      {
+        name: "base to current",
+        startSelector: ".diff-base-pane code",
+        startText: "base-side line",
+        endSelector: ".diff-current-pane .source-text",
+        endText: "current-side replacement",
+      },
+    ];
+
+    for (const selectionCase of cases) {
+      await test.step(selectionCase.name, async () => {
+        await selectBetween(
+          page,
+          selectionCase.startSelector,
+          selectionCase.startText,
+          selectionCase.endSelector,
+          selectionCase.endText,
+        );
+        await expect(preview).toBeHidden();
+        await expect(selectionScope).toBeDisabled();
+      });
+    }
   });
 });

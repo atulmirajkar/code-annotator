@@ -806,17 +806,16 @@ Status as of 2026-08-21:
 - Browser regressions verify that long lines stay inside their pane, both panes
   scroll independently, and the current-side change background covers its
   complete line. They also verify current-side annotation creation, restored
-  highlights after reload, and annotation-to-source navigation.
+  highlights after reload, annotation-to-source navigation, multi-line current
+  selection, and rejection of base-side or cross-pane ranges.
 
 The next session should continue with small commits in this order:
 
-1. Add browser coverage for current-side multi-line selection.
-2. Add browser tests proving base-side and cross-pane selections are rejected.
-3. Cover File/Changes navigation, narrow viewport behavior, and both color
+1. Cover File/Changes navigation, narrow viewport behavior, and both color
    schemes; fix only defects exposed by those tests.
-4. Reconcile README, architecture, build instructions, and this milestone with
+2. Reconcile README, architecture, build instructions, and this milestone with
    the implemented behavior; run release verification and rebuild `dist/`.
-5. Stop for maintainer review. Do not begin live reload until that review is
+3. Stop for maintainer review. Do not begin live reload until that review is
    explicitly approved.
 
 The relevant implementation commits immediately preceding this handoff are
