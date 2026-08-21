@@ -66,6 +66,7 @@ a { color: var(--accent); }
 .source-mode-tabs { display: flex; gap: .3rem; margin-bottom: .5rem; border-bottom: 1px solid var(--border); }
 .source-mode-tabs a { padding: .35rem .65rem; border-bottom: .15rem solid transparent; color: var(--muted); font-size: .8rem; font-weight: 700; text-decoration: none; }
 .source-mode-tabs a[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
+.diff-comparison { min-width: 0; margin-left: auto; padding: .35rem .65rem; overflow: hidden; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .72rem; text-overflow: ellipsis; white-space: nowrap; }
 .markdown-body h1, .markdown-body h2 { padding-bottom: .35em; border-bottom: 1px solid var(--border); line-height: 1.25; }
 .markdown-body h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -.035em; }
 .markdown-body h2 { margin-top: 2em; }

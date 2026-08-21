@@ -52,6 +52,10 @@ test.describe("side-by-side diff", () => {
     const currentPane = page.locator(".diff-current-pane");
     await expect(basePane).toBeVisible();
     await expect(currentPane).toBeVisible();
+    const fullCommit = await page.locator('meta[name="md-viewer-diff-commit"]').getAttribute("content");
+    const comparison = page.locator(".diff-comparison");
+    await expect(comparison).toHaveText(`Base: HEAD (${fullCommit.slice(0, 12)})`);
+    await expect(comparison).toHaveAttribute("title", `Frozen Git base ${fullCommit}`);
 
     const geometry = await page.locator(".diff-panes").evaluate((panes) => {
       const base = panes.querySelector(".diff-base-pane");

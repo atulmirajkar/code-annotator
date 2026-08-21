@@ -104,23 +104,24 @@ func WithReviewSession(store *annotationstore.Store, origin, token string) Optio
 }
 
 type pageData struct {
-	Root           string
-	Selected       string
-	Documents      []documentView
-	Content        template.HTML
-	Empty          bool
-	ReviewToken    string
-	DocumentSHA256 string
-	HasMermaid     bool
-	IsCode         bool
-	DiffBase       string
-	DiffCommit     string
-	ChangedReady   bool
-	ChangedError   bool
-	DiffMode       bool
-	DiffAvailable  bool
-	FileURL        string
-	ChangesURL     string
+	Root            string
+	Selected        string
+	Documents       []documentView
+	Content         template.HTML
+	Empty           bool
+	ReviewToken     string
+	DocumentSHA256  string
+	HasMermaid      bool
+	IsCode          bool
+	DiffBase        string
+	DiffCommit      string
+	DiffCommitShort string
+	ChangedReady    bool
+	ChangedError    bool
+	DiffMode        bool
+	DiffAvailable   bool
+	FileURL         string
+	ChangesURL      string
 }
 
 type documentView struct {
@@ -500,6 +501,7 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 	if s.comparison != nil {
 		data.DiffBase = s.comparison.RequestedBase
 		data.DiffCommit = s.comparison.BaseCommit
+		data.DiffCommitShort = abbreviatedCommit(s.comparison.BaseCommit)
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token
@@ -509,6 +511,16 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		// tests and terminal diagnostics until structured logging is added.
 		http.Error(response, "could not render viewer page", http.StatusInternalServerError)
 	}
+}
+
+// abbreviatedCommit keeps the visible comparison identity compact while the
+// complete immutable object ID remains available in metadata and hover text.
+func abbreviatedCommit(commit string) string {
+	const displayLength = 12
+	if len(commit) <= displayLength {
+		return commit
+	}
+	return commit[:displayLength]
 }
 
 // containsPath reports changed-set membership without exposing the mutable map

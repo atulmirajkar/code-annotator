@@ -222,6 +222,27 @@ func TestGitComparisonMetadata(t *testing.T) {
 	}
 }
 
+func TestAbbreviatedCommit(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name   string
+		commit string
+		want   string
+	}{
+		{name: "full object ID", commit: strings.Repeat("a", 40), want: strings.Repeat("a", 12)},
+		{name: "already short", commit: "abc123", want: "abc123"},
+		{name: "empty", want: ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := abbreviatedCommit(test.commit); got != test.want {
+				t.Fatalf("abbreviatedCommit(%q) = %q, want %q", test.commit, got, test.want)
+			}
+		})
+	}
+}
+
 func TestCodeDiffRoute(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

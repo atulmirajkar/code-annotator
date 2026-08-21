@@ -133,6 +133,8 @@ release verification is reviewed.
   navigation without applying diff mode to Markdown documents.
 - [x] Preserve collapsed document and annotation sidebars across navigation in
   the current browser tab.
+- [x] Display the requested Git base and frozen abbreviated commit beside the
+  File/Changes controls, with the full commit available as hover text.
 - [ ] Complete diff-specific browser coverage for narrow layouts and light/dark
   themes.
 - [ ] Update user-facing build/run documentation and refresh distributions
@@ -147,6 +149,13 @@ release verification is reviewed.
 - [ ] Refresh changed images and assets without stale browser-cache results.
 - [ ] Debounce duplicate filesystem events and recover when the watcher fails.
 - [ ] Add watcher, SSE, reconnection, and end-to-end live-reload tests.
+
+### Future Git comparison controls
+
+- [ ] Add an authenticated “Refresh Git base” action that re-resolves only the
+  originally configured revision and atomically retains the old base on error.
+- [ ] Consider a separately designed commit/ref selector after refresh behavior
+  is implemented and reviewed; do not expose arbitrary Git command arguments.
 
 ### 12. Source syntax highlighting
 

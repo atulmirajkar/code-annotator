@@ -644,6 +644,13 @@ mode. Collapsed document and annotation panels are stored independently in the
 same tab-scoped storage and restored after navigation. Markdown links never
 receive `mode=diff`.
 
+The source toolbar visibly identifies the comparison as `Base: <requested>
+(<12-character commit>)`; its title exposes the complete commit ID. The commit
+is frozen for the server lifetime. Reloading the browser does not re-resolve a
+moving name such as `HEAD`, which prevents an agent commit from silently
+changing review semantics. Re-resolving the configured base without restarting
+the server and selecting other commits are explicitly deferred future work.
+
 ## Browser selection and highlighting
 
 Current code lines use the existing `.source-text` contract. The browser needs
