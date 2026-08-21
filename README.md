@@ -84,7 +84,8 @@ a new annotation to the current selection or the whole document, and annotation
 cards preview their selected source and line range. Resolved selections are highlighted in the document;
 stale and document-level annotations remain panel-only. Closed and rejected
 annotations and their highlights are hidden by default and can be restored with
-the panel's history toggle. By default, sidecars are stored under
+the panel's history toggle. A stale text annotation can be reattached by
+selecting its replacement text and using the action on its card. By default, sidecars are stored under
 `<content-root>/.md-viewer/annotations/`. To select another location:
 
 ```sh

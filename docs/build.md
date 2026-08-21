@@ -77,7 +77,8 @@ across formatting elements, and creates selection- or document-level
 annotations. Annotation cards expose only lifecycle transitions valid for their
 current status and collect the required resolution summary or review message.
 Inline replies append discussion without changing lifecycle state. Stale-anchor
-reattachment is also available through the API.
+reattachment uses the current document selection from the stale annotation's
+card and is also available through the API.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

@@ -640,6 +640,15 @@ append reloads the complete authoritative thread. A concurrent-write conflict
 reloads the latest thread before the reviewer retries, preventing an older
 browser view from overwriting agent activity.
 
+A stale text annotation displays a reattachment action that is disabled until
+the browser has captured a valid current-document selection. All stale cards
+share that selection, and the button on the chosen card identifies which
+annotation to reattach. The request contains only the verified byte range and
+document digest; the server reconstructs the selector and preserves the ID,
+comment, thread, and lifecycle status. Success clears the captured selection.
+A document or sidecar conflict reloads annotations and requires a fresh
+selection so an outdated range cannot be applied silently.
+
 Closed and rejected annotations are complete or declined work, so the default
 document view excludes both their cards and their source highlights. The panel
 reports active and total counts and offers an explicit history toggle that

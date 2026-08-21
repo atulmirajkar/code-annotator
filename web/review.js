@@ -88,6 +88,7 @@
     previewQuote.textContent = exact;
     previewRange.textContent = `bytes ${startByte}–${endByte}`;
     preview.hidden = false;
+    updateReattachControls();
   }
 
   function sourceSpan(node) {
@@ -146,6 +147,7 @@
     pendingSelection = null;
     selectionScope.disabled = true;
     documentScope.checked = true;
+    updateReattachControls();
   }
 
   async function loadAnnotations() {
@@ -215,6 +217,7 @@
     previewRange.textContent = "";
     selectionScope.disabled = true;
     documentScope.checked = true;
+    updateReattachControls();
   }
 
   function setFormStatus(message, error = false) {
@@ -405,10 +408,89 @@
       });
       card.append(thread);
     }
+    if (annotation.anchor && annotation.anchor.state === "stale") {
+      card.append(createReattachForm(annotation));
+    }
     card.append(createReplyForm(annotation));
     const lifecycle = createLifecycleForm(annotation);
     if (lifecycle) card.append(lifecycle);
     return card;
+  }
+
+  // A stale annotation can be rebound only to a currently verified selection.
+  // The API rebuilds the selector from source bytes and preserves all review
+  // content, so the browser sends no replacement quote or thread data.
+  function createReattachForm(annotation) {
+    const reattach = element("form", "annotation-reattach");
+    const help = element("p", "reattach-help");
+    help.textContent = pendingSelection
+      ? "Use the current selection as the replacement anchor."
+      : "Select replacement text in the document to enable reattachment.";
+    const status = element("p", "reattach-status");
+    status.setAttribute("role", "status");
+    const button = document.createElement("button");
+    button.type = "submit";
+    button.textContent = "Reattach selection";
+    button.disabled = !pendingSelection;
+    reattach.append(help, status, button);
+    reattach.addEventListener("submit", (event) => submitReattach(event, annotation.id));
+    return reattach;
+  }
+
+  // Keep every visible stale card synchronized with the one shared document
+  // selection. The user chooses the target annotation by its card button.
+  function updateReattachControls() {
+    list.querySelectorAll(".annotation-reattach").forEach((reattach) => {
+      const button = reattach.querySelector('button[type="submit"]');
+      const help = reattach.querySelector(".reattach-help");
+      button.disabled = !pendingSelection;
+      help.textContent = pendingSelection
+        ? "Use the current selection as the replacement anchor."
+        : "Select replacement text in the document to enable reattachment.";
+    });
+  }
+
+  async function submitReattach(event, annotationID) {
+    event.preventDefault();
+    const reattach = event.currentTarget;
+    const button = reattach.querySelector('button[type="submit"]');
+    const status = reattach.querySelector(".reattach-status");
+    if (!pendingSelection) {
+      status.textContent = "Select replacement text first.";
+      status.classList.add("error");
+      return;
+    }
+
+    const selection = { ...pendingSelection };
+    status.textContent = "Saving…";
+    status.classList.remove("error");
+    button.disabled = true;
+    try {
+      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}/reattach`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": JSON.stringify(currentRevision),
+          "X-MD-Viewer-Token": reviewToken,
+        },
+        body: JSON.stringify({ document: documentPath, selection }),
+      });
+      if (!response.ok) {
+        if (response.status === 409) {
+          await loadAnnotations();
+          setFormStatus("The document or annotations changed. Refresh and select again.", true);
+          return;
+        }
+        throw new Error((await response.text()).trim() || `Could not reattach annotation (${response.status}).`);
+      }
+      window.getSelection()?.removeAllRanges();
+      forceClearSelectionPreview();
+      await loadAnnotations();
+    } catch (error) {
+      status.textContent = error.message || "Could not reattach annotation.";
+      status.classList.add("error");
+      button.disabled = false;
+    }
   }
 
   // Ordinary replies extend the discussion thread without implying that the

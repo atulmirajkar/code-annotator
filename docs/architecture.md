@@ -160,7 +160,10 @@ the reviewer's required message.
 Reattachment first derives the old anchor against the current document and
 accepts only `stale` text annotations. It verifies the replacement document
 digest and byte range, regenerates the quote and context, and changes no review content,
-thread history, or lifecycle state.
+thread history, or lifecycle state. In the browser, every visible stale card
+shares the current verified document selection but has its own reattach action,
+making the target annotation explicit. Success clears the selection and reloads
+the authoritative annotation view; conflicts require a fresh selection.
 
 ## Key dependencies
 

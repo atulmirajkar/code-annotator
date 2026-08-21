@@ -68,6 +68,7 @@ rendering and live reload follow annotation review.
 - [x] Add actor-aware annotation lifecycle controls to the browser panel.
 - [x] Hide closed and rejected cards and highlights behind a history toggle.
 - [x] Add ordinary inline discussion replies to annotation cards.
+- [x] Add browser controls for reattaching stale text anchors.
 - [ ] Add storage, API, UI, security, and agent-handoff tests.
 
 ### 7. Mermaid and sequence diagrams
@@ -124,5 +125,5 @@ rendering and live reload follow annotation review.
 
 ## Next milestone
 
-Add browser reattachment controls for stale annotation anchors as the next
-independently reviewable commit.
+Complete focused browser interaction coverage for annotation mutation controls
+as the next independently reviewable commit.
