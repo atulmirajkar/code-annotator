@@ -310,7 +310,12 @@ func (s *Server) renderDocument(response http.ResponseWriter, index content.Inde
 		return
 	}
 
-	fragment, err := s.renderer.Render(source, documentPath)
+	var fragment []byte
+	if s.review != nil {
+		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
+	} else {
+		fragment, err = s.renderer.Render(source, documentPath)
+	}
 	if err != nil {
 		http.Error(response, "could not render Markdown document", http.StatusInternalServerError)
 		return

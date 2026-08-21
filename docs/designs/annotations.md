@@ -272,6 +272,15 @@ containers from goldmark AST segments. The browser sends source offsets and a
 quoted selector, and the server verifies them against the current file before
 persisting.
 
+The first mapping implementation wraps eligible goldmark text segments with
+their start and exclusive end byte offsets in review mode only. A selection is
+accepted only when both DOM endpoints are inside the same segment. The browser
+converts UTF-16 DOM offsets to UTF-8 byte lengths and exposes the resulting
+range for the creation form. Segments whose rendered text differs from their
+Markdown bytes, such as backslash escapes and entities, are not marked. This
+conservative boundary rejects cross-format selections instead of silently
+including invisible Markdown delimiters in the quoted selector.
+
 ## Persistence and concurrency
 
 ### Store behavior

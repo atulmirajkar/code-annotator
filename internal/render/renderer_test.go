@@ -117,3 +117,63 @@ func TestRenderReadsFreshSource(t *testing.T) {
 		t.Fatalf("Render() reused stale output: first %q, second %q", first, second)
 	}
 }
+
+func TestRenderSourcePositionMetadata(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		source   string
+		contains []string
+		excludes []string
+	}{
+		{
+			name:   "plain UTF-8 text",
+			source: "# Plain café\n",
+			contains: []string{
+				`data-source-start="2" data-source-end="7">Plain</span>`,
+				`data-source-start="7" data-source-end="13"> café</span>`,
+			},
+		},
+		{
+			name:   "formatted text has independent segments",
+			source: "Before **bold** after\n",
+			contains: []string{
+				`data-source-start="0" data-source-end="7">Before </span>`,
+				`data-source-start="9" data-source-end="13">bold</span>`,
+				`data-source-start="15" data-source-end="21"> after</span>`,
+			},
+		},
+		{
+			name:     "escaped text is not mapped",
+			source:   `Escaped \* marker`,
+			excludes: []string{`data-source-start="0"`},
+		},
+		{
+			name:     "entity text is not mapped",
+			source:   `Copyright &copy;`,
+			excludes: []string{`data-source-start="10"`},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			output, err := New().RenderWithSourcePositions([]byte(test.source), "README.md")
+			if err != nil {
+				t.Fatalf("Render() error = %v", err)
+			}
+			html := string(output)
+			for _, want := range test.contains {
+				if !strings.Contains(html, want) {
+					t.Errorf("Render() output missing %q:\n%s", want, html)
+				}
+			}
+			for _, unwanted := range test.excludes {
+				if strings.Contains(html, unwanted) {
+					t.Errorf("Render() output contains %q:\n%s", unwanted, html)
+				}
+			}
+		})
+	}
+}

@@ -58,6 +58,10 @@ a { color: var(--accent); }
 .review-heading-row { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin: 0 .25rem 1rem; }
 .review-heading-row h2 { margin: 0; font-size: .8rem; letter-spacing: .08em; text-transform: uppercase; }
 .annotation-count, .review-message { color: var(--muted); font-size: .8rem; }
+.selection-preview { margin-bottom: 1rem; padding: .75rem; border: 1px solid var(--accent); border-radius: .55rem; background: var(--accent-soft); }
+.selection-label { display: block; margin-bottom: .35rem; color: var(--accent); font-size: .7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+.selection-quote { display: block; max-height: 6rem; overflow-y: auto; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.selection-range { display: block; margin-top: .35rem; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: .7rem; }
 .annotation-list { display: grid; gap: .75rem; }
 .annotation-card { padding: .85rem; border: 1px solid var(--border); border-radius: .55rem; background: var(--background); }
 .annotation-meta { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .6rem; }

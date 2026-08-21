@@ -6,6 +6,10 @@
 
   const list = panel.querySelector(".annotation-list");
   const count = panel.querySelector(".annotation-count");
+  const preview = panel.querySelector(".selection-preview");
+  const previewQuote = panel.querySelector(".selection-quote");
+  const previewRange = panel.querySelector(".selection-range");
+  const markdown = document.querySelector(".markdown-body");
   const documentPath = panel.dataset.document;
   if (!documentPath) {
     showMessage("Open a Markdown document to review annotations.");
@@ -21,6 +25,83 @@
     })
     .then(renderAnnotations)
     .catch(() => showMessage("Could not load annotations. Refresh to try again."));
+
+  if (markdown) {
+    markdown.addEventListener("mouseup", updateSelectionPreview);
+    markdown.addEventListener("keyup", updateSelectionPreview);
+  }
+
+  // Map a selection only when both endpoints belong to one annotated source
+  // span. Crossing spans could include invisible Markdown delimiters and is
+  // intentionally deferred until the mapping can remain exact.
+  function updateSelectionPreview() {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
+      clearSelectionPreview();
+      return;
+    }
+    const range = selection.getRangeAt(0);
+    const startSpan = sourceSpan(range.startContainer);
+    const endSpan = sourceSpan(range.endContainer);
+    if (!startSpan || startSpan !== endSpan || !markdown.contains(startSpan)) {
+      clearSelectionPreview();
+      return;
+    }
+
+    const sourceStart = Number.parseInt(startSpan.dataset.sourceStart, 10);
+    const sourceEnd = Number.parseInt(startSpan.dataset.sourceEnd, 10);
+    const spanText = startSpan.textContent || "";
+    const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
+    const endOffset = textOffset(startSpan, range.endContainer, range.endOffset);
+    const exact = range.toString();
+    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || startOffset < 0 || endOffset <= startOffset || !exact) {
+      clearSelectionPreview();
+      return;
+    }
+
+    const startByte = sourceStart + utf8Length(spanText.slice(0, startOffset));
+    const endByte = sourceStart + utf8Length(spanText.slice(0, endOffset));
+    if (endByte > sourceEnd) {
+      clearSelectionPreview();
+      return;
+    }
+    preview.dataset.startByte = String(startByte);
+    preview.dataset.endByte = String(endByte);
+    preview.dataset.exact = exact;
+    previewQuote.textContent = exact;
+    previewRange.textContent = `bytes ${startByte}–${endByte}`;
+    preview.hidden = false;
+  }
+
+  function sourceSpan(node) {
+    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    return element ? element.closest(".source-text") : null;
+  }
+
+  // Convert a DOM boundary into a UTF-16 text offset within its source span.
+  function textOffset(span, boundaryNode, boundaryOffset) {
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    try {
+      range.setEnd(boundaryNode, boundaryOffset);
+    } catch (_) {
+      return -1;
+    }
+    return range.toString().length;
+  }
+
+  function utf8Length(value) {
+    return new TextEncoder().encode(value).length;
+  }
+
+  function clearSelectionPreview() {
+    preview.hidden = true;
+    delete preview.dataset.startByte;
+    delete preview.dataset.endByte;
+    delete preview.dataset.exact;
+    previewQuote.textContent = "";
+    previewRange.textContent = "";
+  }
 
   // Render user-controlled content with textContent so comments and author
   // names can never become executable markup.

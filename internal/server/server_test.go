@@ -906,13 +906,14 @@ func TestReviewPageEmbedding(t *testing.T) {
 
 	token := strings.Repeat("t", 32)
 	tests := []struct {
-		name      string
-		review    bool
-		wantToken bool
-		wantPanel bool
+		name       string
+		review     bool
+		wantToken  bool
+		wantPanel  bool
+		wantSource bool
 	}{
 		{name: "read-only page omits token"},
-		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true},
+		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true},
 	}
 
 	for _, test := range tests {
@@ -944,6 +945,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
 			if hasPanel != test.wantPanel {
 				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
+			}
+			hasSource := strings.Contains(response.Body.String(), `class="source-text" data-source-start=`)
+			if hasSource != test.wantSource {
+				t.Fatalf("page contains source metadata = %t, want %t", hasSource, test.wantSource)
 			}
 		})
 	}

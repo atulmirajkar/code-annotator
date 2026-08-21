@@ -121,5 +121,5 @@ follow annotation review.
 
 ## Next milestone
 
-Add rendered-text selection and source-range mapping as the next independently
-reviewable annotation UI commit.
+Add the browser annotation creation form as the next independently reviewable
+annotation UI commit.
