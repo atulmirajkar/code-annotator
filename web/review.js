@@ -27,8 +27,9 @@
     .catch(() => showMessage("Could not load annotations. Refresh to try again."));
 
   if (markdown) {
-    markdown.addEventListener("mouseup", updateSelectionPreview);
-    markdown.addEventListener("keyup", updateSelectionPreview);
+    // selectionchange covers mouse, touch, and keyboard expansion regardless
+    // of which element owns focus or where a drag gesture ends.
+    document.addEventListener("selectionchange", updateSelectionPreview);
   }
 
   // Map a selection across one or more source-contiguous spans. A byte gap
