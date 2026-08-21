@@ -22,7 +22,7 @@ const (
 	KindCode     Kind = "code"
 )
 
-var defaultCodeExtensions = []string{".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj"}
+var defaultCodeExtensions = []string{".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj", ".html", ".css", ".scss"}
 var defaultExcludedDirectories = []string{"node_modules", "vendor", "bin", "obj"}
 
 // DefaultCodeExtensions returns a copy of the initial opt-in source catalog.
@@ -220,7 +220,7 @@ func languageForExtension(extension string) string {
 	languages := map[string]string{
 		".md": "markdown", ".go": "go", ".cs": "csharp", ".js": "javascript",
 		".jsx": "javascript", ".mjs": "javascript", ".cjs": "javascript",
-		".ts": "typescript", ".tsx": "typescript", ".json": "json", ".csproj": "msbuild",
+		".ts": "typescript", ".tsx": "typescript", ".json": "json", ".csproj": "msbuild", ".html": "html", ".css": "css", ".scss": "scss",
 	}
 	if language := languages[extension]; language != "" {
 		return language
