@@ -44,6 +44,7 @@ type comparisonSnapshot struct {
 // always leaves the previous snapshot usable.
 type comparisonController struct {
 	configured gitdiff.Config
+	origin     string
 	token      string
 	mu         sync.RWMutex
 	current    comparisonSnapshot
@@ -51,7 +52,8 @@ type comparisonController struct {
 
 // newComparisonController seeds the initial snapshot from the startup-resolved
 // base. Options may be empty until the first refresh; diffs use only the base.
-func newComparisonController(configured gitdiff.Config, options []gitdiff.RevisionOption, token string) (*comparisonController, error) {
+// A non-empty origin and token enable authenticated refresh and selection.
+func newComparisonController(configured gitdiff.Config, options []gitdiff.RevisionOption, origin, token string) (*comparisonController, error) {
 	if configured.RepositoryRoot == "" || configured.RequestedBase == "" || configured.BaseCommit == "" {
 		return nil, errors.New("configure Git comparison: incomplete configuration")
 	}
@@ -61,6 +63,7 @@ func newComparisonController(configured gitdiff.Config, options []gitdiff.Revisi
 	}
 	return &comparisonController{
 		configured: configured,
+		origin:     origin,
 		token:      token,
 		current: comparisonSnapshot{
 			config:           configured,
@@ -84,9 +87,13 @@ func (c *comparisonController) snapshot() comparisonSnapshot {
 // refresh performs a fresh bounded option lookup. When the moving configured
 // revision is active it also re-resolves and adopts that revision's new tip;
 // when a pinned commit is active it keeps that commit and only updates options.
-// The previous snapshot remains active if any Git step fails.
-func (c *comparisonController) refresh(ctx context.Context) (comparisonSnapshot, error) {
+// The previous snapshot remains active if any Git step fails. ifMatch must equal
+// the active state revision so a stale tab cannot silently reconcile the base.
+func (c *comparisonController) refresh(ctx context.Context, ifMatch string) (comparisonSnapshot, error) {
 	previous := c.snapshot()
+	if ifMatch != previous.revision {
+		return comparisonSnapshot{}, errStaleComparison
+	}
 	resolved, options, err := c.rebuild(ctx)
 	if err != nil {
 		return comparisonSnapshot{}, err

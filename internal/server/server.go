@@ -110,6 +110,7 @@ type pageData struct {
 	Content         template.HTML
 	Empty           bool
 	ReviewToken     string
+	ComparisonToken string
 	DocumentSHA256  string
 	HasMermaid      bool
 	IsCode          bool
@@ -141,11 +142,24 @@ func WithIndexOptions(options content.IndexOptions) Option {
 	}
 }
 
-// WithGitComparison exposes one startup-resolved comparison identity. Per-file
-// patch generation is added separately and cannot replace this frozen base.
-func WithGitComparison(configuration gitdiff.Config) Option {
+// WithGitComparison exposes one startup-resolved comparison identity and seeds
+// the bounded selector options shown on first load. A non-empty loopback origin
+// and control token enable authenticated refresh and selection mutations; both
+// empty leaves the comparison read-only.
+func WithGitComparison(configuration gitdiff.Config, options []gitdiff.RevisionOption, origin, token string) Option {
 	return func(server *Server) error {
-		controller, err := newComparisonController(configuration, nil, "")
+		normalizedOrigin := ""
+		if origin != "" || token != "" {
+			validated, err := validateLoopbackOrigin(origin)
+			if err != nil {
+				return fmt.Errorf("configure Git comparison control: %w", err)
+			}
+			if len(token) < 32 {
+				return errors.New("configure Git comparison control: token must contain at least 32 characters")
+			}
+			normalizedOrigin = validated
+		}
+		controller, err := newComparisonController(configuration, options, normalizedOrigin, token)
 		if err != nil {
 			return err
 		}
@@ -168,16 +182,27 @@ func (s *Server) comparisonSnapshot() *comparisonSnapshot {
 // validateReviewOrigin accepts only an HTTP origin with a loopback IP host and
 // no path, query, user information, or fragment.
 func validateReviewOrigin(origin string) (string, error) {
+	normalized, err := validateLoopbackOrigin(origin)
+	if err != nil {
+		return "", fmt.Errorf("configure review session: %w", err)
+	}
+	return normalized, nil
+}
+
+// validateLoopbackOrigin normalizes an HTTP origin to scheme://host and rejects
+// anything that is not a bare loopback-IP origin, so browser mutation checks
+// can compare the Origin header by exact string equality.
+func validateLoopbackOrigin(origin string) (string, error) {
 	parsed, err := url.Parse(origin)
 	if err != nil {
-		return "", errors.New("configure review session: invalid origin")
+		return "", errors.New("invalid origin")
 	}
 	if parsed.Scheme != "http" || parsed.Host == "" || parsed.User != nil || parsed.RawQuery != "" || parsed.Fragment != "" || (parsed.Path != "" && parsed.Path != "/") {
-		return "", errors.New("configure review session: invalid origin")
+		return "", errors.New("invalid origin")
 	}
 	address := net.ParseIP(parsed.Hostname())
 	if address == nil || !address.IsLoopback() {
-		return "", errors.New("configure review session: origin must use a loopback IP address")
+		return "", errors.New("origin must use a loopback IP address")
 	}
 	return parsed.Scheme + "://" + parsed.Host, nil
 }
@@ -288,6 +313,12 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		mux.Handle("PATCH /api/annotations/{id}", server.protectReviewMutation(http.HandlerFunc(server.handleTransitionAnnotation)))
 		mux.Handle("POST /api/annotations/{id}/replies", server.protectReviewMutation(http.HandlerFunc(server.handleReplyAnnotation)))
 		mux.Handle("POST /api/annotations/{id}/reattach", server.protectReviewMutation(http.HandlerFunc(server.handleReattachAnnotation)))
+	}
+	if server.comparison != nil {
+		mux.HandleFunc("GET /api/git-comparison", server.handleComparisonState)
+	}
+	if server.comparisonControlEnabled() {
+		mux.Handle("POST /api/git-comparison", server.protectComparisonMutation(http.HandlerFunc(server.handleComparisonMutate)))
 	}
 	server.handler = securityHeaders(mux)
 
@@ -515,6 +546,9 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		data.DiffBase = snapshot.config.RequestedBase
 		data.DiffCommit = snapshot.config.BaseCommit
 		data.DiffCommitShort = abbreviatedCommit(snapshot.config.BaseCommit)
+	}
+	if s.comparisonControlEnabled() {
+		data.ComparisonToken = s.comparison.token
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

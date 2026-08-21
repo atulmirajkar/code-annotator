@@ -6,6 +6,7 @@
   {{if .ReviewToken}}<meta name="md-viewer-review-token" content="{{.ReviewToken}}">{{end}}
   {{if .DiffCommit}}<meta name="md-viewer-diff-base" content="{{.DiffBase}}">
   <meta name="md-viewer-diff-commit" content="{{.DiffCommit}}">{{end}}
+  {{if .ComparisonToken}}<meta name="md-viewer-comparison-token" content="{{.ComparisonToken}}">{{end}}
   <title>{{if .Selected}}{{.Selected}} · {{end}}md-viewer</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>

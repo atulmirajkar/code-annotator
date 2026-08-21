@@ -31,7 +31,7 @@ func newComparisonRepository(t *testing.T) (*comparisonController, string, strin
 	if err != nil {
 		t.Fatalf("gitdiff.Open() error = %v", err)
 	}
-	controller, err := newComparisonController(configuration, nil, "")
+	controller, err := newComparisonController(configuration, nil, "", "")
 	if err != nil {
 		t.Fatalf("newComparisonController() error = %v", err)
 	}
@@ -68,7 +68,7 @@ func TestComparisonRefreshAdoptsMovingTip(t *testing.T) {
 	newTip := revParse(t, repository, "HEAD")
 
 	before := controller.snapshot()
-	refreshed, err := controller.refresh(context.Background())
+	refreshed, err := controller.refresh(context.Background(), before.revision)
 	if err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
@@ -90,7 +90,7 @@ func TestComparisonSelectPinsCommitAndRefreshRetainsIt(t *testing.T) {
 	t.Parallel()
 	controller, initial, _ := newComparisonRepository(t)
 
-	seeded, err := controller.refresh(context.Background())
+	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
 	if err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
@@ -109,7 +109,7 @@ func TestComparisonSelectPinsCommitAndRefreshRetainsIt(t *testing.T) {
 	}
 
 	// A refresh must retain the pinned commit while still updating options.
-	refreshed, err := controller.refresh(context.Background())
+	refreshed, err := controller.refresh(context.Background(), selected.revision)
 	if err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
@@ -122,7 +122,7 @@ func TestComparisonSelectConfiguredCommitReturnsToMoving(t *testing.T) {
 	t.Parallel()
 	controller, initial, tip := newComparisonRepository(t)
 
-	seeded, err := controller.refresh(context.Background())
+	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
 	if err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
@@ -146,11 +146,14 @@ func TestComparisonSelectConfiguredCommitReturnsToMoving(t *testing.T) {
 func TestComparisonSelectRejectsStaleAndUnknown(t *testing.T) {
 	t.Parallel()
 	controller, initial, _ := newComparisonRepository(t)
-	seeded, err := controller.refresh(context.Background())
+	seeded, err := controller.refresh(context.Background(), controller.snapshot().revision)
 	if err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
 
+	if _, err := controller.refresh(context.Background(), "stale-revision"); !errors.Is(err, errStaleComparison) {
+		t.Fatalf("refresh() stale error = %v, want errStaleComparison", err)
+	}
 	if _, err := controller.selectCommit(context.Background(), "stale-revision", initial); !errors.Is(err, errStaleComparison) {
 		t.Fatalf("selectCommit() stale error = %v, want errStaleComparison", err)
 	}
@@ -162,7 +165,7 @@ func TestComparisonSelectRejectsStaleAndUnknown(t *testing.T) {
 func TestComparisonConcurrentMutationsStaySafe(t *testing.T) {
 	t.Parallel()
 	controller, initial, tip := newComparisonRepository(t)
-	if _, err := controller.refresh(context.Background()); err != nil {
+	if _, err := controller.refresh(context.Background(), controller.snapshot().revision); err != nil {
 		t.Fatalf("refresh() error = %v", err)
 	}
 
@@ -175,7 +178,7 @@ func TestComparisonConcurrentMutationsStaySafe(t *testing.T) {
 				current := controller.snapshot()
 				switch worker % 3 {
 				case 0:
-					_, _ = controller.refresh(context.Background())
+					_, _ = controller.refresh(context.Background(), current.revision)
 				case 1:
 					_, _ = controller.selectCommit(context.Background(), current.revision, initial)
 				default:

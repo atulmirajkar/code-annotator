@@ -86,10 +86,17 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	}
 	serverOptions = append(serverOptions, server.WithIndexOptions(indexOptions))
 	if comparison != nil {
-		serverOptions = append(serverOptions, server.WithGitComparison(*comparison))
+		// Seed the selector best-effort; a failed lookup still serves the frozen
+		// base and the browser recovers the option list with an explicit refresh.
+		options, _ := comparison.RecentCommits(ctx)
+		comparisonToken, err := newControlToken()
+		if err != nil {
+			return err
+		}
+		serverOptions = append(serverOptions, server.WithGitComparison(*comparison, options, viewerURL, comparisonToken))
 	}
 	if annotations != nil {
-		token, err := newReviewToken()
+		token, err := newControlToken()
 		if err != nil {
 			return err
 		}
@@ -142,12 +149,13 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	}
 }
 
-// newReviewToken returns 256 bits of URL-safe random session authority. The
-// token is embedded in review pages but never written to terminal output.
-func newReviewToken() (string, error) {
+// newControlToken returns 256 bits of URL-safe random browser authority. The
+// token is embedded in pages that expose mutations but never written to
+// terminal output. Review and Git comparison each receive an independent token.
+func newControlToken() (string, error) {
 	random := make([]byte, 32)
 	if _, err := rand.Read(random); err != nil {
-		return "", fmt.Errorf("generate review session token: %w", err)
+		return "", fmt.Errorf("generate control token: %w", err)
 	}
 	return base64.RawURLEncoding.EncodeToString(random), nil
 }
