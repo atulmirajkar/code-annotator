@@ -268,10 +268,27 @@ func TestCodeDiffRoute(t *testing.T) {
 				`href="/view/main.go"`,
 				`href="/view/main.go?mode=diff" aria-current="page"`,
 				`class="diff-view"`,
+				`class="diff-comparison"`,
 				`<code>package main</code>`,
 				`<code>package changed</code>`,
 			},
 			excludes: []string{`class="source-view"`},
+		},
+		{
+			name: "File view hides the comparison base control",
+			path: "/view/main.go",
+			configure: func(t *testing.T, rootPath string) *gitdiff.Config {
+				comparison := changedCatalogRepository(t, rootPath)
+				return &comparison
+			},
+			requiresGit: true,
+			wantStatus:  http.StatusOK,
+			contains: []string{
+				`class="source-mode-tabs"`,
+				`href="/view/main.go"`,
+				`href="/view/main.go?mode=diff"`,
+			},
+			excludes: []string{`class="diff-comparison"`, `class="diff-comparison-control"`},
 		},
 		{
 			name:       "unconfigured changes view",
@@ -289,14 +306,21 @@ func TestCodeDiffRoute(t *testing.T) {
 			contains:   []string{`href="/view/main.go"`, "Changes unavailable", "File view remains available."},
 		},
 		{
-			name: "Markdown has no changes view",
+			name: "Markdown has changes view",
 			path: "/view/README.md?mode=diff",
 			configure: func(t *testing.T, rootPath string) *gitdiff.Config {
 				comparison := changedCatalogRepository(t, rootPath)
 				return &comparison
 			},
 			requiresGit: true,
-			wantStatus:  http.StatusNotFound,
+			wantStatus:  http.StatusOK,
+			contains: []string{
+				`class="source-mode-tabs"`,
+				`href="/view/README.md?mode=diff" aria-current="page"`,
+				`class="diff-view"`,
+				`<code># Home</code>`,
+			},
+			excludes: []string{`<h1>`, `class="source-view"`},
 		},
 		{name: "unknown view mode", path: "/view/main.go?mode=split", wantStatus: http.StatusBadRequest, contains: []string{"unsupported document mode"}},
 	}

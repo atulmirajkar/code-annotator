@@ -59,9 +59,8 @@ a { color: var(--accent); }
 .directory { color: var(--muted); }
 .document-kind { margin-left: .35rem; color: var(--muted); font-size: .65rem; text-transform: uppercase; }
 .empty-nav { padding: 0 .5rem; color: var(--muted); font-size: .9rem; }
-.document { min-width: 0; padding: clamp(1.5rem, 5vw, 4rem); }
+.document { min-width: 0; padding: .5rem; }
 .markdown-body { max-width: 54rem; margin: 0 auto; line-height: 1.7; }
-.code-document { padding: .5rem; }
 .code-document .markdown-body { max-width: none; }
 .source-mode-tabs { position: sticky; top: 3.5rem; z-index: 1; display: flex; align-items: center; gap: .3rem; margin-bottom: .5rem; padding-top: .3rem; background: var(--background); border-bottom: 1px solid var(--border); }
 .source-mode-tabs a { padding: .35rem .65rem; border-bottom: .15rem solid transparent; color: var(--muted); font-size: .8rem; font-weight: 700; text-decoration: none; }

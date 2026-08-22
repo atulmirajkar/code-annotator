@@ -46,17 +46,17 @@
       <p class="empty-nav">No reviewable documents found.</p>
       {{end}}
     </nav>
-    <main class="document{{if .IsCode}} code-document{{end}}">
+    <main class="document{{if or .IsCode .DiffMode}} code-document{{end}}">
       {{if .Empty}}
       <section class="empty-state">
         <h1>No reviewable documents found</h1>
         <p>Add a Markdown file or enable supported source files, then refresh the page.</p>
       </section>
       {{else}}
-      {{if .IsCode}}<nav class="source-mode-tabs" aria-label="Source view">
+      {{if or .IsCode .DiffAvailable}}<nav class="source-mode-tabs" aria-label="Source view">
         <a href="{{.FileURL}}"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
         {{if .DiffAvailable}}<a href="{{.ChangesURL}}"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
-        {{if .DiffAvailable}}{{if .ComparisonToken}}<div class="diff-comparison-control" data-active-commit="{{.DiffCommit}}">
+        {{if and .DiffAvailable .DiffMode}}{{if .ComparisonToken}}<div class="diff-comparison-control" data-active-commit="{{.DiffCommit}}">
           <select class="revision-selector" aria-label="Comparison base" disabled>
             <option value="{{.DiffCommit}}" selected>{{.DiffBase}} ({{.DiffCommitShort}})</option>
           </select>

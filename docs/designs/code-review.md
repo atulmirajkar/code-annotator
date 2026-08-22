@@ -648,11 +648,13 @@ the existing origin token, review token, content type, body limit, document
 digest, and `If-Match` sidecar revision requirements.
 
 The browser stores the reviewer-selected File or Changes mode in session
-storage and rewrites only code-document sidebar links accordingly. Selecting a
-tab changes the preference; ordinary document rendering does not invent a new
-mode. Collapsed document and annotation panels are stored independently in the
-same tab-scoped storage and restored after navigation. Markdown links never
-receive `mode=diff`.
+storage and rewrites all sidebar document links accordingly, regardless of
+document kind. Selecting a tab changes the preference; ordinary document
+rendering does not invent a new mode. Collapsed document and annotation panels
+are stored independently in the same tab-scoped storage and restored after
+navigation. Changes view is available for any cataloged document kind once a
+Git comparison is configured; Markdown diffs render as plain escaped text,
+identically to code diffs, and never invoke the Markdown renderer.
 
 The source toolbar's revision selector visibly identifies the active
 comparison. Reloading the browser re-lists the bounded options but never changes
@@ -676,7 +678,7 @@ The selector lists at most 50 recent local repository commits, each labeled with
 an abbreviated ID and a subject truncated to 72 characters.
 Subjects are display-only untrusted text and remain HTML-escaped. Selecting a
 listed commit changes the server-wide comparison base and reloads the current
-page in its existing File/Changes mode. Markdown links remain unaffected.
+page in its existing File/Changes mode, for any document kind.
 
 The option list is fetched fresh on every page load, so newly created commits
 appear after a reload. There is no separate refresh action: because selecting a

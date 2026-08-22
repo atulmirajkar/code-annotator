@@ -22,7 +22,7 @@ const (
 	KindCode     Kind = "code"
 )
 
-var defaultCodeExtensions = []string{".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj", ".html", ".css", ".scss"}
+var defaultCodeExtensions = []string{".md", ".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj", ".html", ".css", ".scss"}
 var defaultExcludedDirectories = []string{"node_modules", "vendor", "bin", "obj"}
 
 // DefaultCodeExtensions returns a copy of the initial opt-in source catalog.

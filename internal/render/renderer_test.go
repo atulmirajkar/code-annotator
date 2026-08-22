@@ -101,6 +101,15 @@ func TestRenderDiff(t *testing.T) {
 			contains: []string{`data-source-start="0" data-source-end="1">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code><span class="source-text" data-source-start="3" data-source-end="3"></span></code>`},
 		},
 		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-pane diff-base-pane"></div>`, `<div class="diff-pane diff-current-pane"></div>`}},
+		{
+			name:    "markdown source never renders through goldmark",
+			current: []byte("## Heading"),
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowModified, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 10, BaseText: "# Heading"},
+			}},
+			contains: []string{`<code># Heading</code>`, `<code>## Heading</code>`},
+			excludes: []string{`<h1>`, `<h2>`},
+		},
 		{name: "invalid UTF-8", current: []byte{0xff}, wantErr: ErrUnsupportedText},
 		{name: "invalid row kind", current: []byte("a"), diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: "mystery", OldLine: 1, NewLine: 1, CurrentEnd: 1}}}, wantErr: ErrInvalidDiff},
 		{name: "invalid current offset", current: []byte("a\nb"), diff: gitdiff.FileDiff{Rows: []gitdiff.Row{{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 2, BaseText: "a"}}}, wantErr: ErrInvalidDiff},

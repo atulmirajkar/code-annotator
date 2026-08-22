@@ -450,7 +450,7 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		return
 	}
 
-	if diffMode && (document.Kind != content.KindCode || active == nil) {
+	if diffMode && active == nil {
 		http.Error(response, "Changes view is unavailable", http.StatusNotFound)
 		return
 	}
@@ -538,7 +538,7 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		ChangedReady:   changedReady,
 		ChangedError:   changedError,
 		DiffMode:       diffMode,
-		DiffAvailable:  isCode && active != nil,
+		DiffAvailable:  active != nil,
 		FileURL:        routeURL("/view/", selected),
 		ChangesURL:     routeURL("/view/", selected) + "?mode=diff",
 	}

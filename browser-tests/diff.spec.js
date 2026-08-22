@@ -316,4 +316,28 @@ test.describe("side-by-side diff", () => {
       expect(colors.added).not.toBe(colors.deleted);
     });
   }
+
+  test("renders a plain text diff for Markdown documents, never rendered HTML", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/diff-layout.md`);
+    const tabs = page.locator(".source-mode-tabs");
+    await expect(tabs).toBeVisible();
+    const filePadding = await page.locator("main.document").evaluate((main) => getComputedStyle(main).padding);
+
+    await tabs.getByRole("link", { name: "Changes" }).click();
+    await expect(page).toHaveURL(`${viewerURL}view/diff-layout.md?mode=diff`);
+
+    const basePane = page.locator(".diff-base-pane");
+    const currentPane = page.locator(".diff-current-pane");
+    await expect(basePane).toBeVisible();
+    await expect(currentPane).toBeVisible();
+    await expect(currentPane).toContainText("# Diff Layout Fixture");
+    await expect(page.locator(".diff-view h1")).toHaveCount(0);
+    await expect(page.locator(".diff-view h2")).toHaveCount(0);
+
+    // File and Changes always share the same tight document padding,
+    // matching the code document experience.
+    const diffPadding = await page.locator("main.document").evaluate((main) => getComputedStyle(main).padding);
+    expect(diffPadding).toBe("8px");
+    expect(diffPadding).toBe(filePadding);
+  });
 });

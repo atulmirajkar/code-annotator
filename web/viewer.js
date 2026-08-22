@@ -51,9 +51,10 @@
     }
   }
 
-  // Source mode is a reviewer preference across code-document navigation. It
-  // changes only when a File or Changes tab is activated, then rewrites code
-  // links without applying diff mode to Markdown documents.
+  // Source mode is a reviewer preference across document navigation. It
+  // changes only when a File or Changes tab is activated, then rewrites
+  // sidebar links to match, for any document kind, since Changes view is no
+  // longer code-only.
   function bindSourceModePreference() {
     const tabs = document.querySelector(".source-mode-tabs");
     const activeTab = tabs?.querySelector('a[aria-current="page"]');
@@ -69,7 +70,7 @@
     }
 
     if (readPreference(sourceModeStorageKey) !== "diff") return;
-    document.querySelectorAll('.documents li[data-kind="code"] a').forEach((link) => {
+    document.querySelectorAll('.documents li a').forEach((link) => {
       const target = new URL(link.href);
       target.searchParams.set("mode", "diff");
       link.href = target.pathname + target.search;

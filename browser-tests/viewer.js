@@ -66,6 +66,10 @@ const layoutMessage = "This current-side replacement is also deliberately long s
 
 var afterSelection = true
 `);
+  await writeFile(path.join(contentRoot, "diff-layout.md"), `# Diff Layout Fixture
+
+This paragraph describes the current line after edits were applied.
+`);
 }
 
 // waitForViewerURL resolves startup output while retaining stderr for useful
