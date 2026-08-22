@@ -1,6 +1,6 @@
 # Code review and Git diff design
 
-**Status:** Proposed
+**Status:** Implemented
 
 **Target:** Post-Mermaid review milestone, before live reload
 
@@ -904,19 +904,32 @@ Status as of 2026-08-21:
   complete line. They also verify current-side annotation creation, restored
   highlights after reload, annotation-to-source navigation, multi-line current
   selection, and rejection of base-side or cross-pane ranges.
+- Bounded recent-commit discovery, protected comparison state/select/refresh
+  routes, and the re-pinnable revision selector are complete, with unit,
+  handler, concurrency, and browser coverage.
+- Narrow-viewport and light/dark color-scheme coverage for the diff view is
+  complete. Closing this out surfaced three real bugs with no prior browser
+  coverage, all now fixed and regression-tested:
+  - The revision-selector dropdown had no `min-width: 0`, so it refused to
+    shrink below its content width and forced page-level horizontal overflow
+    at phone widths.
+  - The `@media (max-width: 720px)` single-column override lost the CSS
+    specificity battle against `.layout.review-layout` (and its collapsed
+    variants), so the desktop multi-column grid stayed active on narrow
+    viewports whenever the documents sidebar was visible in review mode,
+    severely squeezing the diff panes.
+  - `.sidebar` itself had no `min-width: 0` either, so once it became a plain
+    single-column grid item at narrow widths, its default content-based
+    minimum let the horizontal-scrolling document-pill row grow the sidebar
+    (and the whole page) past the viewport whenever enough cataloged files
+    were listed — the existing mobile-overflow coverage never had enough
+    fixture files to reach that threshold.
+  User-facing docs and distribution binaries are refreshed.
 
-The next implementation should continue with small commits in this order:
-
-1. Add bounded, table-tested recent-commit discovery.
-2. Add concurrency-tested comparison snapshots and atomic selection/refresh.
-3. Add protected state/select/refresh handlers with conflict coverage.
-4. Add the selector, subject display, refresh control, and browser coverage.
-5. Finish narrow viewport and color-scheme coverage, then reconcile user docs
-   and rebuild distributions.
-6. Stop for maintainer review. Do not begin live reload until that review is
-   explicitly approved.
+Milestone 10 is complete. Stopped here for maintainer review; live reload
+(milestone 11) should not begin until that review is explicitly approved.
 
 The relevant implementation commits immediately preceding this handoff are
 `12990aa` (bounded retrieval), `bdac319` (side-by-side renderer), and `fe2db24`
-(Changes route and UI). The pane-overflow correction and its browser regression
-belong to the handoff commit containing this section.
+(Changes route and UI). The narrow-viewport/color-scheme fixes and their
+browser regressions belong to the handoff commit containing this section.

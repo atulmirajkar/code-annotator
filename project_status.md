@@ -4,9 +4,9 @@ Last updated: 2026-08-21
 
 ## Current state
 
-**Phase:** Code review and Git diff milestone documented and distributed;
-narrow-layout and light/dark theme browser coverage remains before live
-reload.
+**Phase:** Code review and Git diff milestone complete, including
+diff-specific narrow-layout and light/dark theme browser coverage. Stopped
+for maintainer review before live reload begins.
 
 The manual-refresh MVP, annotation review workflow, and code review with
 side-by-side Git diff comparison are implemented, including selection mapping,
@@ -15,8 +15,14 @@ repository-owned agent skill, a re-pinnable revision selector, and a
 draggable, keyboard-resizable diff divider. Focused browser interaction
 coverage and embedded diagram rendering are complete. User-facing
 documentation and distribution binaries are refreshed for the current feature
-set. Live reload remains deferred until the remaining diff browser coverage
-and release verification are reviewed.
+set. Closing out milestone 10 also fixed three narrow-viewport CSS bugs in the
+diff view that had no prior browser coverage: an unshrinkable
+revision-selector dropdown, a media-query specificity gap that kept the
+desktop multi-column layout active on phone widths whenever the documents
+sidebar was visible in review mode, and a missing `min-width: 0` on the
+sidebar itself that let a long document list widen the whole page once
+enough files were cataloged. Live reload remains deferred until release
+verification is reviewed.
 
 ## Milestones
 
@@ -141,7 +147,7 @@ and release verification are reviewed.
   the current browser tab.
 - [x] Display the requested Git base and frozen abbreviated commit beside the
   File/Changes controls, with the full commit available as hover text.
-- [ ] Complete diff-specific browser coverage for narrow layouts and light/dark
+- [x] Complete diff-specific browser coverage for narrow layouts and light/dark
   themes.
 - [x] Design a bounded revision selector that re-pins an always-explicit
   server-wide comparison base validated against a live commit listing.
@@ -218,9 +224,10 @@ See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md).
 
 ## Next milestone
 
-Finish the remaining diff-specific browser scenario listed under milestone 10:
-narrow-layout and light/dark theme coverage. The side-by-side renderer, Git
-retrieval, route, File/Changes tabs, independent pane scrolling, resizable
-divider, and re-pinnable revision selector are implemented, and user-facing
-docs and distribution binaries are refreshed. Stop for maintainer review, and
-only afterward begin the separately reviewed live-reload milestone.
+Milestone 10 (Code review and Git diff) is complete: the side-by-side
+renderer, Git retrieval, route, File/Changes tabs, independent pane
+scrolling, resizable divider, re-pinnable revision selector, and
+diff-specific narrow-layout/light-dark browser coverage are all implemented,
+and user-facing docs and distribution binaries are refreshed. Stopped here
+for maintainer review; only afterward should the separately reviewed
+live-reload milestone (11) begin.

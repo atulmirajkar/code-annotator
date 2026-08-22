@@ -1,3 +1,5 @@
+const { writeFile } = require("node:fs/promises");
+const path = require("node:path");
 const { test, expect, openAnnotations } = require("./viewer");
 
 // selectCurrentText creates a native range inside the source-backed current
@@ -235,4 +237,83 @@ test.describe("side-by-side diff", () => {
       });
     }
   });
+
+  test("stays side-by-side without page overflow on a narrow viewport with the documents sidebar shown", async ({ page, viewerURL }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+    // The documents sidebar is visible by default, unlike the general-viewer
+    // mobile-overflow test which collapses it first; this reproduces a
+    // reviewer opening a diff on a phone without touching that toggle.
+    await expect(page.getByRole("button", { name: "Hide documents" })).toBeVisible();
+
+    const basePane = page.locator(".diff-base-pane");
+    const currentPane = page.locator(".diff-current-pane");
+    await expect(basePane).toBeVisible();
+    await expect(currentPane).toBeVisible();
+
+    const viewport = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+
+    // Panes must stay side by side rather than stacking or swapping order.
+    const geometry = await page.locator(".diff-panes").evaluate((panes) => {
+      const base = panes.querySelector(".diff-base-pane");
+      const current = panes.querySelector(".diff-current-pane");
+      return {
+        baseRight: base.getBoundingClientRect().right,
+        currentLeft: current.getBoundingClientRect().left,
+      };
+    });
+    expect(geometry.baseRight).toBeLessThanOrEqual(geometry.currentLeft + 1);
+
+    const selectorBox = await page.locator(".revision-selector").boundingBox();
+    expect(selectorBox.x + selectorBox.width).toBeLessThanOrEqual(viewport.clientWidth + 1);
+  });
+
+  test("keeps a long unfiltered document list from widening the page on a narrow viewport", async ({ page, viewer }) => {
+    // A single-row flex layout with no width constraint of its own grows to
+    // fit every item before its overflow-x:auto can clip anything, so this
+    // needs enough cataloged files to actually exceed the viewport.
+    for (let index = 0; index < 40; index += 1) {
+      await writeFile(
+        path.join(viewer.contentRoot, `narrow-layout-fixture-${index}.go`),
+        `package narrowlayoutfixture${index}\n`,
+      );
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${viewer.url}view/diff-layout.go?mode=diff`);
+    await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
+    expect(await page.locator(".documents li").count()).toBeGreaterThan(40);
+
+    const viewport = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+
+    const documentsList = page.locator(".documents");
+    const listBox = await documentsList.boundingBox();
+    expect(listBox.width).toBeLessThanOrEqual(viewport.clientWidth + 1);
+    await expect.poll(() => documentsList.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+  });
+
+  for (const colorScheme of ["light", "dark"]) {
+    test(`renders distinguishable added and deleted colors in ${colorScheme} mode`, async ({ page, viewerURL }) => {
+      await page.emulateMedia({ colorScheme });
+      await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
+
+      const bodyColorScheme = await page.locator("body").evaluate((body) => getComputedStyle(body).colorScheme);
+      expect(bodyColorScheme).toContain(colorScheme);
+
+      const colors = await page.evaluate(() => ({
+        added: getComputedStyle(document.querySelector(".diff-current.diff-modified")).backgroundColor,
+        deleted: getComputedStyle(document.querySelector(".diff-base.diff-modified")).backgroundColor,
+      }));
+      expect(colors.added).not.toBe("rgba(0, 0, 0, 0)");
+      expect(colors.deleted).not.toBe("rgba(0, 0, 0, 0)");
+      expect(colors.added).not.toBe(colors.deleted);
+    });
+  }
 });
