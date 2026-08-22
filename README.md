@@ -77,7 +77,10 @@ Regenerate every platform binary after a source update with:
 See [`dist/README.md`](dist/README.md) for the release layout and build details.
 
 To install a single binary directly from the remote repository without a full
-checkout, download it from `dist/` on GitHub and make it executable:
+checkout, download it from `dist/` on GitHub and make it executable. Use the
+`raw.githubusercontent.com` host, not a `github.com/.../blob/...` page: the
+`blob` URL is GitHub's HTML file viewer, not the raw binary, and downloading
+it produces an unrunnable HTML file instead of an executable.
 
 ```sh
 curl -LO https://raw.githubusercontent.com/atulmirajkar/code-annotator/main/dist/darwin-arm64/code-annotator
@@ -86,6 +89,19 @@ chmod +x code-annotator
 ```
 
 Again, substitute the platform path for your own from the table above.
+
+Verify the download against [`dist/SHA256SUMS`](dist/SHA256SUMS) before
+running it:
+
+```sh
+curl -s https://raw.githubusercontent.com/atulmirajkar/code-annotator/main/dist/SHA256SUMS | grep darwin-arm64/code-annotator
+shasum -a 256 code-annotator
+```
+
+The two hashes must match. If they do not, or if the download is small and
+`file code-annotator` reports `HTML document` instead of an executable
+format, the `blob` URL was used by mistake; re-download with the `curl`
+command above.
 
 The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
