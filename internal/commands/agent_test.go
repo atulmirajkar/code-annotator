@@ -182,6 +182,70 @@ func TestRunAgent(t *testing.T) {
 	}
 }
 
+func TestRunAgentQueueETag(t *testing.T) {
+	t.Parallel()
+
+	const currentETag = `"current-etag-value"`
+	newFakeQueueServer := func(t *testing.T) *httptest.Server {
+		t.Helper()
+		server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/api/annotations" {
+				response.WriteHeader(http.StatusNotFound)
+				return
+			}
+			response.Header().Set("ETag", currentETag)
+			if request.Header.Get("If-None-Match") == currentETag {
+				response.WriteHeader(http.StatusNotModified)
+				return
+			}
+			response.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(response, `{"schemaVersion":1,"documents":[]}`)
+		}))
+		t.Cleanup(server.Close)
+		return server
+	}
+
+	t.Run("no --etag keeps today's raw output", func(t *testing.T) {
+		t.Parallel()
+		server := newFakeQueueServer(t)
+
+		var output bytes.Buffer
+		if err := RunAgent([]string{"queue", "--url", server.URL}, &output, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		if got, want := output.String(), "{\"schemaVersion\":1,\"documents\":[]}\n"; got != want {
+			t.Fatalf("output = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("matching --etag returns modified:false with no queue field", func(t *testing.T) {
+		t.Parallel()
+		server := newFakeQueueServer(t)
+
+		var output bytes.Buffer
+		if err := RunAgent([]string{"queue", "--url", server.URL, "--etag", "current-etag-value"}, &output, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		if got, want := output.String(), `{"etag":"current-etag-value","modified":false}`+"\n"; got != want {
+			t.Fatalf("output = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("stale --etag returns modified:true with the fresh body nested inside", func(t *testing.T) {
+		t.Parallel()
+		server := newFakeQueueServer(t)
+
+		var output bytes.Buffer
+		if err := RunAgent([]string{"queue", "--url", server.URL, "--etag", "stale-value"}, &output, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		want := `{"etag":"current-etag-value","modified":true,"queue":{"schemaVersion":1,"documents":[]}}` + "\n"
+		if got := output.String(); got != want {
+			t.Fatalf("output = %q, want %q", got, want)
+		}
+	})
+}
+
 func TestParseAgentConfig(t *testing.T) {
 	t.Parallel()
 

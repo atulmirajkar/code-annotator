@@ -194,6 +194,20 @@ See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md).
 - [x] Add discovery, command, and end-to-end lifecycle tests.
 - [x] Update user-facing documentation.
 
+Cheap queue polling follow-up, see
+[`docs/designs/queue-etag.md`](docs/designs/queue-etag.md):
+
+- [x] Add `ETag`/`If-None-Match` support to `GET /api/annotations`, splitting
+  the handler into a cheap candidate-collection phase and an expensive
+  anchor-resolution phase so a matching poll skips the latter entirely.
+- [x] Add `--etag` to `agent queue`, with output unchanged when omitted and a
+  small `{"etag","modified","queue"}` envelope when passed.
+- [x] Add server-side ETag/304 tests and CLI `--etag` tests.
+- [x] Update the agent skill and `server-discovery.md` to explain that
+  establishing a polling loop is the caller's own runtime/orchestration
+  concern (a scheduled wakeup, `/loop`, a cron job); this project only makes
+  each individual poll cheap.
+
 ## Decisions
 
 | Decision | Status |

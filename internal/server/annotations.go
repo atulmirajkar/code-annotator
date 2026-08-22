@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -159,11 +160,23 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 	}
 }
 
+// queueCandidate is a document with at least one status-matching annotation,
+// known cheaply from its sidecar alone before paying for a source read and
+// anchor resolution.
+type queueCandidate struct {
+	document content.Document
+	sidecar  annotation.Sidecar
+	revision annotationstore.Revision
+}
+
 // handleAnnotationQueue returns annotations across the stable content index.
-// Unlike a document response, the queue has no single ETag: every document
-// carries the revision required for mutations against its own sidecar.
+// It supports conditional GET: the ETag is derived from the cheap candidate
+// list below, so a matching If-None-Match short-circuits before any document
+// source is read or any anchor is resolved, not just before the response is
+// written.
 func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *http.Request) {
-	statuses, err := parseAnnotationStatuses(request.URL.Query().Get("status"))
+	rawStatus := request.URL.Query().Get("status")
+	statuses, err := parseAnnotationStatuses(rawStatus)
 	if err != nil {
 		http.Error(response, err.Error(), http.StatusBadRequest)
 		return
@@ -174,23 +187,35 @@ func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *ht
 		return
 	}
 
-	payload := annotationQueueResponse{SchemaVersion: annotation.SchemaVersion, Documents: []annotationListResponse{}}
+	var candidates []queueCandidate
 	for _, document := range index.Documents {
 		sidecar, revision, err := s.annotations.Load(document.Path)
 		if err != nil {
 			http.Error(response, "could not read annotations", http.StatusInternalServerError)
 			return
 		}
-		if len(sidecar.Annotations) == 0 {
+		if !hasMatchingStatus(sidecar.Annotations, statuses) {
 			continue
 		}
-		source, err := s.root.ReadFile(document.Path, maxDocumentBytes)
+		candidates = append(candidates, queueCandidate{document: document, sidecar: sidecar, revision: revision})
+	}
+
+	etag := queueETag(rawStatus, candidates)
+	response.Header().Set("ETag", strconv.Quote(etag))
+	if matched, ok := parseIfNoneMatch(request); ok && matched == etag {
+		response.WriteHeader(http.StatusNotModified)
+		return
+	}
+
+	payload := annotationQueueResponse{SchemaVersion: annotation.SchemaVersion, Documents: []annotationListResponse{}}
+	for _, candidate := range candidates {
+		source, err := s.root.ReadFile(candidate.document.Path, maxDocumentBytes)
 		if err != nil {
 			s.writeAnnotationReadError(response, err)
 			return
 		}
-		views := make([]annotationView, 0, len(sidecar.Annotations))
-		for _, item := range sidecar.Annotations {
+		views := make([]annotationView, 0, len(candidate.sidecar.Annotations))
+		for _, item := range candidate.sidecar.Annotations {
 			if len(statuses) > 0 {
 				if _, wanted := statuses[item.Status]; !wanted {
 					continue
@@ -207,17 +232,68 @@ func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *ht
 			continue
 		}
 		payload.Documents = append(payload.Documents, annotationListResponse{
-			SchemaVersion: sidecar.SchemaVersion,
-			Document:      sidecar.Document,
-			Kind:          document.Kind,
-			Language:      document.Language,
-			Revision:      string(revision),
+			SchemaVersion: candidate.sidecar.SchemaVersion,
+			Document:      candidate.sidecar.Document,
+			Kind:          candidate.document.Kind,
+			Language:      candidate.document.Language,
+			Revision:      string(candidate.revision),
 			Annotations:   views,
 		})
 	}
 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_ = json.NewEncoder(response).Encode(payload)
+}
+
+// hasMatchingStatus reports whether any annotation qualifies for the queue
+// filter, without touching document source or anchors.
+func hasMatchingStatus(annotations []annotation.Annotation, statuses map[annotation.Status]struct{}) bool {
+	if len(statuses) == 0 {
+		return len(annotations) > 0
+	}
+	for _, item := range annotations {
+		if _, wanted := statuses[item.Status]; wanted {
+			return true
+		}
+	}
+	return false
+}
+
+// queueETag summarizes exactly the state a matching If-None-Match needs to
+// reproduce: the status filter plus every candidate document's own revision.
+// Sidecar content and anchors never factor in directly, since a per-document
+// revision already changes whenever its sidecar does.
+func queueETag(rawStatus string, candidates []queueCandidate) string {
+	hash := sha256.New()
+	hash.Write([]byte(rawStatus))
+	hash.Write([]byte{0})
+	for _, candidate := range candidates {
+		hash.Write([]byte(candidate.document.Path))
+		hash.Write([]byte{0})
+		hash.Write([]byte(candidate.revision))
+		hash.Write([]byte{'\n'})
+	}
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+// parseIfNoneMatch reads an optional single strong ETag for conditional GET.
+// Unlike parseIfMatch, malformed input is not an error: If-None-Match is an
+// optimization, not a required mutation precondition, so anything that isn't
+// a clean match just falls through to an ordinary response.
+func parseIfNoneMatch(request *http.Request) (string, bool) {
+	values := request.Header.Values("If-None-Match")
+	if len(values) != 1 || strings.Contains(values[0], ",") || strings.HasPrefix(strings.TrimSpace(values[0]), "W/") {
+		return "", false
+	}
+	decoded, err := strconv.Unquote(strings.TrimSpace(values[0]))
+	if err != nil {
+		return "", false
+	}
+	digest, err := hex.DecodeString(decoded)
+	if err != nil || len(digest) != sha256.Size || decoded != strings.ToLower(decoded) {
+		return "", false
+	}
+	return decoded, true
 }
 
 // parseAnnotationStatuses validates the optional comma-separated queue filter.

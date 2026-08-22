@@ -194,14 +194,20 @@ change, or get replied to afterward — there is no push channel here, and
 `agent queue` call always costs a full JSON payload even when nothing
 changed.
 
-Today, noticing new or changed annotations without a human re-invoking the
-agent is a client-side concern, not something this design or the server
-provides: schedule `agent discover` (or a known `--url`) plus
-`agent queue --status open,needs_changes` on an interval, and diff the
-returned annotation IDs against the last poll. Making that polling cheap — an
-`ETag` on the queue response so an unchanged poll costs a `304` with no body
-— is a natural follow-up, but it is server-side queue behavior, not
-discovery, so it is deliberately out of scope here rather than folded in.
+Noticing new or changed annotations without a human re-invoking the agent is
+a client-side concern, not something this design or the server provides:
+schedule `agent discover` (or a known `--url`) plus `agent queue` on an
+interval. That scheduling is deliberately out of scope here — a skill
+document or CLI cannot make an agent wake itself up; that has to come from
+the agent's own runtime or orchestration (a scheduled wakeup, `/loop`, a cron
+job, a shell loop). This design only ever answers "where is the server,"
+once, at the moment an agent starts working.
+
+Making each individual poll cheap once such a loop exists — an `ETag` on the
+queue response so an unchanged poll costs a `304` with no body — is
+server-side queue behavior, not discovery, so it was deliberately kept out of
+scope here and designed separately in
+[`queue-etag.md`](queue-etag.md).
 
 ## Security
 

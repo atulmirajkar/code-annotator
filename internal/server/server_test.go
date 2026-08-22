@@ -665,6 +665,163 @@ func TestAnnotationQueueAPI(t *testing.T) {
 	}
 }
 
+func TestAnnotationQueueETag(t *testing.T) {
+	t.Parallel()
+
+	newViewer := func(t *testing.T) (*Server, *annotationstore.Store) {
+		t.Helper()
+		rootPath := t.TempDir()
+		writeTestFile(t, filepath.Join(rootPath, "a.md"), "Before selected after")
+		writeTestFile(t, filepath.Join(rootPath, "b.md"), "Before selected after")
+		root, err := content.Open(rootPath)
+		if err != nil {
+			t.Fatalf("content.Open() error = %v", err)
+		}
+		store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+		if err != nil {
+			t.Fatalf("annotationstore.Open() error = %v", err)
+		}
+		viewer, err := New(root, mdrender.New(), WithAnnotationStore(store))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		return viewer, store
+	}
+
+	get := func(t *testing.T, viewer *Server, status, ifNoneMatch string) *httptest.ResponseRecorder {
+		t.Helper()
+		requestPath := "/api/annotations"
+		if status != "" {
+			requestPath += "?status=" + url.QueryEscape(status)
+		}
+		request := httptest.NewRequest(http.MethodGet, requestPath, nil)
+		if ifNoneMatch != "" {
+			request.Header.Set("If-None-Match", ifNoneMatch)
+		}
+		response := httptest.NewRecorder()
+		viewer.Handler().ServeHTTP(response, request)
+		return response
+	}
+
+	t.Run("matching If-None-Match returns 304 with no body", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		saveTestAnnotation(t, store, "a.md", "Before selected after")
+
+		first := get(t, viewer, "", "")
+		etag := first.Header().Get("ETag")
+		if etag == "" {
+			t.Fatal("first response has no ETag")
+		}
+
+		second := get(t, viewer, "", etag)
+		if second.Code != http.StatusNotModified {
+			t.Fatalf("status = %d, want %d; body: %s", second.Code, http.StatusNotModified, second.Body.String())
+		}
+		if second.Body.Len() != 0 {
+			t.Fatalf("body = %q, want empty", second.Body.String())
+		}
+		if got := second.Header().Get("ETag"); got != etag {
+			t.Fatalf("ETag = %q, want %q", got, etag)
+		}
+		if got := second.Header().Get("Cache-Control"); got != "no-store" {
+			t.Fatalf("Cache-Control = %q, want no-store", got)
+		}
+	})
+
+	t.Run("stale If-None-Match returns a fresh body and ETag", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		saveTestAnnotation(t, store, "a.md", "Before selected after")
+
+		stale := `"0000000000000000000000000000000000000000000000000000000000000000"`
+		response := get(t, viewer, "", stale)
+		if response.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", response.Code, http.StatusOK, response.Body.String())
+		}
+		var payload annotationQueueResponse
+		if err := json.Unmarshal(response.Body.Bytes(), &payload); err != nil {
+			t.Fatalf("json.Unmarshal() error = %v; body: %s", err, response.Body.String())
+		}
+		if len(payload.Documents) != 1 {
+			t.Fatalf("queue = %#v, want 1 document", payload)
+		}
+		if response.Header().Get("ETag") == "" {
+			t.Fatal("response has no ETag")
+		}
+	})
+
+	t.Run("malformed If-None-Match falls through to a normal response", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		saveTestAnnotation(t, store, "a.md", "Before selected after")
+
+		response := get(t, viewer, "", "not-a-valid-etag")
+		if response.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body: %s", response.Code, http.StatusOK, response.Body.String())
+		}
+	})
+
+	t.Run("ETag changes when a matching annotation's status changes", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		revision := saveTestAnnotation(t, store, "a.md", "Before selected after")
+
+		first := get(t, viewer, "open,needs_changes", "")
+		etag := first.Header().Get("ETag")
+
+		sidecar, _, err := store.Load("a.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		sidecar.Annotations[0].Status = annotation.StatusNeedsChanges
+		sidecar.Annotations[0].UpdatedAt = time.Now().UTC().Truncate(time.Second)
+		if _, err := store.Save(sidecar, revision); err != nil {
+			t.Fatalf("Store.Save() error = %v", err)
+		}
+
+		second := get(t, viewer, "open,needs_changes", etag)
+		if second.Code != http.StatusOK {
+			t.Fatalf("stale-etag status = %d, want %d (annotation changed)", second.Code, http.StatusOK)
+		}
+		if got := second.Header().Get("ETag"); got == etag {
+			t.Fatalf("ETag = %q, want different from %q after a matching status change", got, etag)
+		}
+	})
+
+	t.Run("ETag is unchanged by an unrelated document outside the filter", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		saveTestAnnotation(t, store, "a.md", "Before selected after")
+		bRevision := saveTestAnnotation(t, store, "b.md", "Before selected after")
+		bSidecar, _, err := store.Load("b.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		bSidecar.Annotations[0].Status = annotation.StatusClosed
+		if _, err := store.Save(bSidecar, bRevision); err != nil {
+			t.Fatalf("Store.Save() error = %v", err)
+		}
+
+		first := get(t, viewer, "open", "")
+		etag := first.Header().Get("ETag")
+
+		bSidecar, currentRevision, err := store.Load("b.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		bSidecar.Annotations[0].Status = annotation.StatusRejected
+		if _, err := store.Save(bSidecar, currentRevision); err != nil {
+			t.Fatalf("Store.Save() error = %v", err)
+		}
+
+		second := get(t, viewer, "open", etag)
+		if second.Code != http.StatusNotModified {
+			t.Fatalf("status = %d, want %d (b.md is outside the open filter)", second.Code, http.StatusNotModified)
+		}
+	})
+}
+
 func TestLiveAgentHandoffAPI(t *testing.T) {
 	t.Parallel()
 

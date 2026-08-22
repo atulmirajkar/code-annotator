@@ -84,6 +84,32 @@ go run ./cmd/code-annotator agent reply \
   --id <annotation-id> --author <agent-name> --message <question-or-context>
 ```
 
+## Watching for new work
+
+Nothing in this skill, the CLI, or the server makes an agent poll on its own.
+A skill document is instructions read while already running; it cannot
+schedule its own future invocation. If new or changed annotations should be
+noticed without a human re-invoking this skill, that loop has to come from
+the agent's own runtime or orchestration — a scheduled wakeup, `/loop`, a
+cron job, a shell loop — calling `agent queue` on whatever interval the
+caller chooses. This skill's job is only to make each individual check cheap,
+never to decide whether or how often one happens.
+
+Once such a loop exists, poll cheaply with `--etag`:
+
+```sh
+go run ./cmd/code-annotator agent queue \
+  --url <viewer-url> --status open,needs_changes --etag <etag-from-last-poll>
+```
+
+The response is always `{"etag": "...", "modified": <bool>, "queue": {...}}`.
+`modified: false` means nothing changed; do nothing else this tick, and carry
+the same `etag` into the next call. `modified: true` means the `queue` field
+holds a fresh response — proceed to step 2 of the live workflow using it, and
+carry forward the new `etag`. Omit `--etag` on the first call of a new loop,
+or whenever `--etag` is dropped, output reverts to the plain unwrapped queue
+response used elsewhere in this document.
+
 ## Offline workflow
 
 Use this only after confirming that no review server is running. From this

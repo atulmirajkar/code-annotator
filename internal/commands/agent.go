@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ type agentConfig struct {
 	summary  string
 	commit   string
 	root     string
+	etag     string
 }
 
 // RunAgent executes live-server annotation operations without opening sidecar
@@ -53,8 +55,7 @@ func RunAgent(args []string, stdout, stderr io.Writer) error {
 		return runAgentDiscover(client, configuration, stdout)
 	}
 	if configuration.command == "queue" {
-		query := url.Values{"status": []string{configuration.status}}.Encode()
-		return sendAgentRequest(client, configuration, http.MethodGet, "/api/annotations?"+query, nil, "", stdout)
+		return runAgentQueue(client, configuration, stdout)
 	}
 
 	token, err := fetchReviewToken(client, configuration.origin)
@@ -102,6 +103,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	summary := flags.String("summary", "", "applied-work summary")
 	commit := flags.String("commit", "", "optional applied-work commit")
 	root := flags.String("root", "", "content root to disambiguate multiple discovered servers")
+	etag := flags.String("etag", "", "queue etag from a previous poll; a match returns 304 with no body")
 	if err := flags.Parse(args[1:]); err != nil {
 		return agentConfig{}, err
 	}
@@ -124,6 +126,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 		if configuration.status == "" {
 			configuration.status = "open,needs_changes"
 		}
+		configuration.etag = *etag
 	case "reply", "resolve":
 		required := []struct{ name, value string }{
 			{name: "--document", value: *document},
@@ -247,6 +250,86 @@ func sendAgentRequest(client *http.Client, configuration agentConfig, method, pa
 		_, err = io.WriteString(output, "\n")
 	}
 	return err
+}
+
+// queuePollEnvelope wraps a queue response with the ETag needed for the next
+// poll, only ever emitted when the caller opted in with --etag: the default
+// "agent queue" output stays byte-identical to the raw server response.
+type queuePollEnvelope struct {
+	ETag     string          `json:"etag"`
+	Modified bool            `json:"modified"`
+	Queue    json.RawMessage `json:"queue,omitempty"`
+}
+
+// runAgentQueue polls the annotation queue, optionally as a conditional GET.
+// A caller that never passes --etag sees exactly today's raw response; a
+// caller that does gets a small envelope carrying the current ETag either
+// way, so a polling loop never needs a second request to learn it.
+func runAgentQueue(client *http.Client, configuration agentConfig, output io.Writer) error {
+	query := url.Values{"status": []string{configuration.status}}.Encode()
+	request, err := http.NewRequest(http.MethodGet, configuration.origin+"/api/annotations?"+query, nil)
+	if err != nil {
+		return fmt.Errorf("create annotation request: %w", err)
+	}
+	request.Header.Set("Accept", "application/json")
+	if configuration.etag != "" {
+		request.Header.Set("If-None-Match", strconv.Quote(configuration.etag))
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return fmt.Errorf("call annotation API: %w", err)
+	}
+	defer response.Body.Close()
+	responseBody, err := readAgentResponse(response.Body)
+	if err != nil {
+		return fmt.Errorf("read annotation API response: %w", err)
+	}
+
+	if response.StatusCode == http.StatusNotModified {
+		return writeQueueEnvelope(output, unquoteETag(response.Header.Get("ETag")), false, nil)
+	}
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("annotation API returned HTTP %d: %s", response.StatusCode, strings.TrimSpace(string(responseBody)))
+	}
+	if !json.Valid(responseBody) {
+		return errors.New("annotation API returned invalid JSON")
+	}
+	if configuration.etag == "" {
+		if _, err := output.Write(responseBody); err != nil {
+			return fmt.Errorf("write annotation API response: %w", err)
+		}
+		if len(responseBody) == 0 || responseBody[len(responseBody)-1] != '\n' {
+			_, err = io.WriteString(output, "\n")
+		}
+		return err
+	}
+	return writeQueueEnvelope(output, unquoteETag(response.Header.Get("ETag")), true, responseBody)
+}
+
+// writeQueueEnvelope emits the --etag output contract as one JSON object.
+func writeQueueEnvelope(output io.Writer, etag string, modified bool, queueBody []byte) error {
+	envelope := queuePollEnvelope{ETag: etag, Modified: modified}
+	if modified {
+		envelope.Queue = json.RawMessage(queueBody)
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return fmt.Errorf("encode queue poll envelope: %w", err)
+	}
+	if _, err := output.Write(append(encoded, '\n')); err != nil {
+		return fmt.Errorf("write queue poll envelope: %w", err)
+	}
+	return nil
+}
+
+// unquoteETag strips the quoting an HTTP ETag header carries on the wire, so
+// the value round-trips cleanly back into --etag on the next call.
+func unquoteETag(header string) string {
+	value, err := strconv.Unquote(header)
+	if err != nil {
+		return header
+	}
+	return value
 }
 
 // discoveredServer is the JSON shape returned by "agent discover" for a

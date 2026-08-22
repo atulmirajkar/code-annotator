@@ -160,5 +160,9 @@ func atomicWrite(target string, data []byte) (returnErr error) {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
+	// os.Rename replaces an existing target on every platform Go supports
+	// except Plan 9 (Windows included, via MoveFileEx/MOVEFILE_REPLACE_EXISTING),
+	// and temporary and target share a directory, so this never crosses a
+	// drive boundary. No platform-specific fallback is needed here.
 	return os.Rename(temporaryPath, target)
 }
