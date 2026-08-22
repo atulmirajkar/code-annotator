@@ -19,6 +19,7 @@ import (
 	annotationstore "atulm/code-annotator/internal/annotation/store"
 	"atulm/code-annotator/internal/commands"
 	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/discovery"
 	"atulm/code-annotator/internal/gitdiff"
 	"atulm/code-annotator/internal/launch"
 	mdrender "atulm/code-annotator/internal/render"
@@ -107,6 +108,11 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer, openURL u
 	fmt.Fprintf(stdout, "Serving %s at %s\n", root.Path(), viewerURL)
 	if annotations != nil {
 		fmt.Fprintf(stdout, "Review mode enabled; annotations: %s\n", annotations.Root())
+		if cleanup, err := discovery.Register(root.Path(), viewerURL); err != nil {
+			fmt.Fprintf(stderr, "Could not register server for agent discovery: %v\n", err)
+		} else {
+			defer cleanup()
+		}
 	}
 	if comparison != nil {
 		fmt.Fprintf(stdout, "Git comparison: %s (%s)\n", comparison.RequestedBase, comparison.BaseCommit)

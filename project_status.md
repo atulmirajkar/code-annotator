@@ -172,6 +172,22 @@ and release verification are reviewed.
 - [ ] Add light/dark themes without runtime network dependencies.
 - [ ] Add rendering, selection, CSP, and browser regression coverage.
 
+### 13. Agent server discovery
+
+See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md).
+
+- [x] Define the discovery registry format, location, and security boundary.
+- [x] Implement the discovery package (register, list, remove, state-dir
+  resolution, `CODE_ANNOTATOR_STATE_DIR` override).
+- [x] Register review-mode servers on startup and deregister on clean
+  shutdown.
+- [x] Add the `agent discover` CLI subcommand with `/healthz` liveness
+  verification and `--root` disambiguation.
+- [x] Self-heal stale registry entries left behind by an unclean exit.
+- [x] Update the agent skill to try discovery before asking a human for a URL.
+- [x] Add discovery, command, and end-to-end lifecycle tests.
+- [x] Update user-facing documentation.
+
 ## Decisions
 
 | Decision | Status |
@@ -187,6 +203,8 @@ and release verification are reviewed.
 | Mermaid uses strict security and no runtime CDN or browser automation | Approved |
 | Live reload deferred until after annotation and diagram milestones | Approved |
 | Editing and network sharing deferred | Approved |
+| Agent discovery registers via a cooperative per-user registry file, never a port scan | Approved |
+| Discovery registry never stores the review mutation token | Approved |
 
 ## Known risks
 

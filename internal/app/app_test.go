@@ -23,6 +23,7 @@ import (
 	annotationstore "atulm/code-annotator/internal/annotation/store"
 	"atulm/code-annotator/internal/commands"
 	"atulm/code-annotator/internal/content"
+	"atulm/code-annotator/internal/discovery"
 )
 
 func TestParseConfig(t *testing.T) {
@@ -351,6 +352,87 @@ func TestRunLaunchesReadyServerAndToleratesFailure(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("Run() did not shut down after browser launch failure")
+	}
+}
+
+func TestRunRegistersAndDeregistersForDiscovery(t *testing.T) {
+	// Not t.Parallel(): t.Setenv panics if an ancestor has called t.Parallel.
+	t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+	rootPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rootPath, "README.md"), []byte("# Running"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stdout := newSyncBuffer()
+	result := make(chan error, 1)
+	go func() {
+		result <- run(ctx, []string{"--review", "--no-open", rootPath}, stdout, io.Discard, func(string) error { return nil })
+	}()
+	viewerURL := waitForViewerURL(t, stdout)
+
+	entries, err := discovery.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(entries) != 1 || entries[0].URL != viewerURL {
+		t.Fatalf("List() = %+v, want one entry for %q", entries, viewerURL)
+	}
+
+	cancel()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run() did not shut down after cancellation")
+	}
+
+	entries, err = discovery.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("List() after shutdown = %+v, want no entries", entries)
+	}
+}
+
+func TestRunDoesNotRegisterWithoutReviewMode(t *testing.T) {
+	t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+	rootPath := t.TempDir()
+	if err := os.WriteFile(filepath.Join(rootPath, "README.md"), []byte("# Running"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	stdout := newSyncBuffer()
+	result := make(chan error, 1)
+	go func() {
+		result <- run(ctx, []string{"--no-open", rootPath}, stdout, io.Discard, func(string) error { return nil })
+	}()
+	waitForViewerURL(t, stdout)
+
+	entries, err := discovery.List()
+	if err != nil {
+		t.Fatalf("List() error = %v", err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("List() = %+v, want no entries for a non-review server", entries)
+	}
+
+	cancel()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatalf("Run() error = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run() did not shut down after cancellation")
 	}
 }
 

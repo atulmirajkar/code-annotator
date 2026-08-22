@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -10,10 +11,16 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
+
+	"atulm/code-annotator/internal/discovery"
 )
+
+const discoveryHealthTimeout = 500 * time.Millisecond
 
 const maxAgentResponseBytes int64 = 8 << 20
 
@@ -31,6 +38,7 @@ type agentConfig struct {
 	message  string
 	summary  string
 	commit   string
+	root     string
 }
 
 // RunAgent executes live-server annotation operations without opening sidecar
@@ -41,6 +49,9 @@ func RunAgent(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 	client := &http.Client{Timeout: 10 * time.Second}
+	if configuration.command == "discover" {
+		return runAgentDiscover(client, configuration, stdout)
+	}
 	if configuration.command == "queue" {
 		query := url.Values{"status": []string{configuration.status}}.Encode()
 		return sendAgentRequest(client, configuration, http.MethodGet, "/api/annotations?"+query, nil, "", stdout)
@@ -75,7 +86,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 		return agentConfig{}, errors.New("agent subcommand is required")
 	}
 	configuration := agentConfig{command: args[0]}
-	if configuration.command != "queue" && configuration.command != "reply" && configuration.command != "resolve" {
+	if configuration.command != "queue" && configuration.command != "reply" && configuration.command != "resolve" && configuration.command != "discover" {
 		return agentConfig{}, fmt.Errorf("unknown agent subcommand %q", configuration.command)
 	}
 	flags := flag.NewFlagSet("code-annotator agent "+configuration.command, flag.ContinueOnError)
@@ -90,11 +101,16 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	message := flags.String("message", "", "discussion or rejection message")
 	summary := flags.String("summary", "", "applied-work summary")
 	commit := flags.String("commit", "", "optional applied-work commit")
+	root := flags.String("root", "", "content root to disambiguate multiple discovered servers")
 	if err := flags.Parse(args[1:]); err != nil {
 		return agentConfig{}, err
 	}
 	if flags.NArg() != 0 {
 		return agentConfig{}, fmt.Errorf("agent %s does not accept positional arguments", configuration.command)
+	}
+	if configuration.command == "discover" {
+		configuration.root = *root
+		return configuration, nil
 	}
 	origin, err := agentOrigin(*viewerURL)
 	if err != nil {
@@ -231,6 +247,124 @@ func sendAgentRequest(client *http.Client, configuration agentConfig, method, pa
 		_, err = io.WriteString(output, "\n")
 	}
 	return err
+}
+
+// discoveredServer is the JSON shape returned by "agent discover" for a
+// single unambiguous match.
+type discoveredServer struct {
+	URL  string `json:"url"`
+	Root string `json:"root"`
+	PID  int    `json:"pid"`
+}
+
+// runAgentDiscover finds a running review-mode server without requiring the
+// caller to already know its URL. It verifies each registry entry against
+// the server's own /healthz route rather than scanning ports, and prunes
+// entries that fail that check, since those were left behind by a server
+// that exited without cleaning up after itself.
+func runAgentDiscover(client *http.Client, configuration agentConfig, output io.Writer) error {
+	entries, err := discovery.List()
+	if err != nil {
+		return fmt.Errorf("list discovery entries: %w", err)
+	}
+	var wantRoot string
+	if configuration.root != "" {
+		absolute, err := filepath.Abs(configuration.root)
+		if err != nil {
+			return fmt.Errorf("resolve --root: %w", err)
+		}
+		// Registered roots are symlink-resolved (see content.Open), so the
+		// filter must resolve the same way or it silently matches nothing.
+		wantRoot, err = filepath.EvalSymlinks(absolute)
+		if err != nil {
+			return fmt.Errorf("resolve --root: %w", err)
+		}
+	}
+	var live []discovery.Entry
+	for _, entry := range entries {
+		if !isServerLive(client, entry.URL) {
+			_ = discovery.Remove(entry.PID)
+			continue
+		}
+		if wantRoot != "" && entry.Root != wantRoot {
+			continue
+		}
+		live = append(live, entry)
+	}
+
+	// Without an explicit --root, prefer the one candidate whose content
+	// root contains the caller's own working directory, since an agent is
+	// almost always invoked from inside the project it should be discussing.
+	if wantRoot == "" && len(live) > 1 {
+		if narrowed := narrowByWorkingDirectory(live); len(narrowed) == 1 {
+			live = narrowed
+		}
+	}
+
+	switch len(live) {
+	case 0:
+		return errors.New("no running review server found; start one with --review or supply --url directly")
+	case 1:
+		encoded, err := json.Marshal(discoveredServer{URL: live[0].URL, Root: live[0].Root, PID: live[0].PID})
+		if err != nil {
+			return fmt.Errorf("encode discovered server: %w", err)
+		}
+		if _, err := output.Write(append(encoded, '\n')); err != nil {
+			return fmt.Errorf("write discovered server: %w", err)
+		}
+		return nil
+	default:
+		var candidates strings.Builder
+		for _, entry := range live {
+			fmt.Fprintf(&candidates, "\n  %s (root: %s)", entry.URL, entry.Root)
+		}
+		return fmt.Errorf("multiple running review servers found; pass --root to disambiguate or supply --url directly:%s", candidates.String())
+	}
+}
+
+// isServerLive issues a bounded request to a single, already-known loopback
+// address recorded by the server itself. This is not a port scan: discovery
+// only ever probes addresses a server registered, never guesses at one.
+func isServerLive(client *http.Client, serverURL string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), discoveryHealthTimeout)
+	defer cancel()
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, strings.TrimRight(serverURL, "/")+"/healthz", nil)
+	if err != nil {
+		return false
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, response.Body)
+	return response.StatusCode == http.StatusOK
+}
+
+// narrowByWorkingDirectory prefers whichever candidates contain the caller's
+// own working directory. If that yields no match or more than one, the
+// original candidate list is returned unchanged so the ordinary zero/many
+// selection logic still applies; this narrowing only ever helps disambiguate,
+// it never introduces a false positive by itself.
+func narrowByWorkingDirectory(candidates []discovery.Entry) []discovery.Entry {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return candidates
+	}
+	resolvedCwd, err := filepath.EvalSymlinks(cwd)
+	if err != nil {
+		return candidates
+	}
+	var narrowed []discovery.Entry
+	for _, entry := range candidates {
+		if entry.Root == resolvedCwd || strings.HasPrefix(resolvedCwd, entry.Root+string(filepath.Separator)) {
+			narrowed = append(narrowed, entry)
+		}
+	}
+	if len(narrowed) == 0 {
+		return candidates
+	}
+	return narrowed
 }
 
 // readAgentResponse bounds local HTTP responses before retaining them in

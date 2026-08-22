@@ -9,8 +9,11 @@ Choose exactly one operating mode before reading or mutating annotations:
 
 - If the user supplies a viewer URL or says a review server is running, use the
   live HTTP workflow. Never substitute offline commands.
+- If server state is unclear and no URL was given, run `agent discover` (see
+  below) before asking. Only ask the user when discovery itself cannot
+  resolve to exactly one server.
 - Use the offline workflow only when the user confirms no review server is
-  running. If server state is unclear, ask before accessing annotations.
+  running, or `agent discover` reports none.
 
 Never write annotation sidecars directly in either mode.
 
@@ -19,6 +22,21 @@ Never write annotation sidecars directly in either mode.
 From this repository use `go run ./cmd/code-annotator agent`; outside the source
 tree use an installed `code-annotator agent` command.
 
+0. If no viewer URL is already known, discover one instead of asking first:
+
+   ```sh
+   go run ./cmd/code-annotator agent discover [--root <content-root>]
+   ```
+
+   A single match prints `{"url":...}`; use that URL for every step below. If
+   multiple servers are running, discovery first tries to auto-select the one
+   whose content root contains the current working directory before giving
+   up. Zero or multiple matches then exit non-zero: zero means no review
+   server is running (fall back to the offline workflow or ask); multiple
+   means more than one is running and neither working directory nor
+   `--root` disambiguated it (ask the user which one, or add `--root`). This
+   only ever probes a URL the server itself
+   registered; it does not scan ports.
 1. Load the cross-document queue:
 
    ```sh

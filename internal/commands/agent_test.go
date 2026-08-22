@@ -6,8 +6,14 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+
+	"atulm/code-annotator/internal/discovery"
 )
 
 func TestAgentOrigin(t *testing.T) {
@@ -206,6 +212,194 @@ func TestParseAgentConfig(t *testing.T) {
 				t.Fatalf("parseAgentConfig() error = %v", err)
 			}
 		})
+	}
+}
+
+func TestRunAgentDiscover(t *testing.T) {
+	t.Run("single match", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+		live := newHealthzServer(t)
+		cleanup, err := discovery.Register("/content/live", live.URL+"/")
+		if err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		defer cleanup()
+
+		var output bytes.Buffer
+		if err := RunAgent([]string{"discover"}, &output, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		if !strings.Contains(output.String(), live.URL) {
+			t.Fatalf("output = %q, want containing %q", output.String(), live.URL)
+		}
+	})
+
+	t.Run("zero match", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+		var output bytes.Buffer
+		err := RunAgent([]string{"discover"}, &output, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "no running review server found") {
+			t.Fatalf("RunAgent() error = %v, want containing %q", err, "no running review server found")
+		}
+	})
+
+	t.Run("multiple matches disambiguated by root", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+		rootA := resolvedTempDir(t)
+		rootB := resolvedTempDir(t)
+		serverA := newHealthzServer(t)
+		serverB := newHealthzServer(t)
+		// Register keys entries by PID, which is correct for real distinct
+		// server processes but collides within a single test process, so the
+		// second "server" is seeded as a fabricated entry with a different PID.
+		cleanupA, err := discovery.Register(rootA, serverA.URL+"/")
+		if err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		defer cleanupA()
+		registerFakeEntry(t, 999999, rootB, serverB.URL+"/")
+
+		var ambiguous bytes.Buffer
+		err = RunAgent([]string{"discover"}, &ambiguous, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "multiple running review servers") {
+			t.Fatalf("RunAgent() error = %v, want containing %q", err, "multiple running review servers")
+		}
+
+		var resolved bytes.Buffer
+		if err := RunAgent([]string{"discover", "--root", rootA}, &resolved, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		if !strings.Contains(resolved.String(), serverA.URL) {
+			t.Fatalf("output = %q, want containing %q", resolved.String(), serverA.URL)
+		}
+	})
+
+	t.Run("multiple matches auto-selected by working directory", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+		insideRoot := resolvedTempDir(t)
+		outsideRoot := resolvedTempDir(t)
+		insideServer := newHealthzServer(t)
+		outsideServer := newHealthzServer(t)
+		cleanup, err := discovery.Register(insideRoot, insideServer.URL+"/")
+		if err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		defer cleanup()
+		registerFakeEntry(t, 888888, outsideRoot, outsideServer.URL+"/")
+
+		nested := filepath.Join(insideRoot, "nested")
+		if err := os.MkdirAll(nested, 0o700); err != nil {
+			t.Fatalf("MkdirAll() error = %v", err)
+		}
+		t.Chdir(nested)
+
+		var output bytes.Buffer
+		if err := RunAgent([]string{"discover"}, &output, io.Discard); err != nil {
+			t.Fatalf("RunAgent() error = %v", err)
+		}
+		if !strings.Contains(output.String(), insideServer.URL) {
+			t.Fatalf("output = %q, want containing %q (auto-selected by cwd)", output.String(), insideServer.URL)
+		}
+	})
+
+	t.Run("multiple matches outside every root stay ambiguous", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+		rootA := resolvedTempDir(t)
+		rootB := resolvedTempDir(t)
+		serverA := newHealthzServer(t)
+		serverB := newHealthzServer(t)
+		cleanup, err := discovery.Register(rootA, serverA.URL+"/")
+		if err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		defer cleanup()
+		registerFakeEntry(t, 666666, rootB, serverB.URL+"/")
+
+		t.Chdir(resolvedTempDir(t))
+
+		var output bytes.Buffer
+		err = RunAgent([]string{"discover"}, &output, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "multiple running review servers") {
+			t.Fatalf("RunAgent() error = %v, want containing %q", err, "multiple running review servers")
+		}
+	})
+
+	t.Run("stale entry is pruned", func(t *testing.T) {
+		t.Setenv("CODE_ANNOTATOR_STATE_DIR", t.TempDir())
+
+		dead := newHealthzServer(t)
+		if _, err := discovery.Register("/content/dead", dead.URL+"/"); err != nil {
+			t.Fatalf("Register() error = %v", err)
+		}
+		dead.Close()
+
+		var output bytes.Buffer
+		err := RunAgent([]string{"discover"}, &output, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "no running review server found") {
+			t.Fatalf("RunAgent() error = %v, want containing %q", err, "no running review server found")
+		}
+
+		entries, err := discovery.List()
+		if err != nil {
+			t.Fatalf("List() error = %v", err)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("List() = %v, want the stale entry pruned", entries)
+		}
+	})
+}
+
+// newHealthzServer fakes just enough of the review server for a discovery
+// liveness probe: a 200 response on /healthz.
+func newHealthzServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/healthz" {
+			response.WriteHeader(http.StatusNotFound)
+			return
+		}
+		response.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(response, "ok\n")
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// resolvedTempDir returns a symlink-resolved temp directory, matching what
+// content.Open (and therefore discovery.Register in production) stores.
+func resolvedTempDir(t *testing.T) string {
+	t.Helper()
+	resolved, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatalf("EvalSymlinks() error = %v", err)
+	}
+	return resolved
+}
+
+// registerFakeEntry writes a registry entry directly under a fabricated PID,
+// simulating a second server process without colliding with the real
+// discovery.Register call already made by the current test process.
+func registerFakeEntry(t *testing.T, pid int, root, url string) {
+	t.Helper()
+	directory, err := discovery.StateDir()
+	if err != nil {
+		t.Fatalf("StateDir() error = %v", err)
+	}
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	entry := discovery.Entry{SchemaVersion: 1, PID: pid, URL: url, Root: root, StartedAt: time.Now().UTC()}
+	data, err := json.Marshal(entry)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	path := filepath.Join(directory, strconv.Itoa(pid)+".json")
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
 	}
 }
 

@@ -58,11 +58,14 @@ Prebuilt binaries are available under [`dist/`](dist/):
 | Windows  | arm64                 | [`dist/windows-arm64/code-annotator.exe`](dist/windows-arm64/code-annotator.exe) |
 | Windows  | amd64                 | [`dist/windows-amd64/code-annotator.exe`](dist/windows-amd64/code-annotator.exe) |
 
-On macOS or Linux, make the selected binary executable if needed, then run it:
+On macOS or Linux, make the selected binary executable if needed, then run it
+with a directory argument exactly like the source and `bin/` examples above.
+The example below uses `darwin-arm64`; substitute the path for the row that
+matches your platform from the table:
 
 ```sh
 chmod +x dist/darwin-arm64/code-annotator
-./dist/darwin-arm64/code-annotator ./docs
+./dist/darwin-arm64/code-annotator .
 ```
 
 Regenerate every platform binary after a source update with:
@@ -72,6 +75,17 @@ Regenerate every platform binary after a source update with:
 ```
 
 See [`dist/README.md`](dist/README.md) for the release layout and build details.
+
+To install a single binary directly from the remote repository without a full
+checkout, download it from `dist/` on GitHub and make it executable:
+
+```sh
+curl -LO https://raw.githubusercontent.com/atulmirajkar/code-annotator/main/dist/darwin-arm64/code-annotator
+chmod +x code-annotator
+./code-annotator .
+```
+
+Again, substitute the platform path for your own from the table above.
 
 The server will listen on an available loopback port and open the resulting URL
 in the default browser. If the browser cannot be opened, the URL will remain
@@ -183,6 +197,33 @@ The client accepts only a loopback viewer URL, obtains the temporary review
 token from that viewer, sends the required `If-Match` revision, and never opens
 annotation sidecars.
 
+An agent that does not already have a URL can discover a running `--review`
+server instead of asking a human for one:
+
+```sh
+code-annotator agent discover
+code-annotator agent discover --root ./docs
+```
+
+A single running, matching server prints its URL as JSON and exits `0`. If
+multiple servers are running and `--root` was not given, discovery prefers
+whichever one's content root contains the caller's own working directory;
+zero matches, or multiple matches working directory can't resolve, exit
+non-zero with a message explaining why, so the caller can retry with `--root`
+or fall back to asking. Discovery verifies each candidate against its own
+`/healthz` route rather than scanning ports, and prunes entries left behind
+by a server that exited without cleaning up after itself (for example, a hard
+kill). Only `--review` servers register.
+
+A `--review` server advertises itself by writing one file per running
+instance at `<state-dir>/servers/<pid>.json`, removed on clean shutdown.
+`<state-dir>` defaults to a per-user configuration directory and can be
+overridden with `CODE_ANNOTATOR_STATE_DIR`. The registry file records only
+the URL, content root, process ID, and start time; it never contains the
+review mutation token, which remains readable only from the served loopback
+page. See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md)
+for the full design.
+
 ### Browser regression tests
 
 Install the pinned development dependency and run the real-browser suite with
@@ -239,6 +280,7 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 - [MVP design](docs/designs/mvp.md)
 - [Annotation review design](docs/designs/annotations.md)
 - [Code review and Git diff design](docs/designs/code-review.md)
+- [Agent server discovery design](docs/designs/server-discovery.md)
 - [Architecture](docs/architecture.md)
 - [Build and run](docs/build.md)
 - [Project status](project_status.md)
