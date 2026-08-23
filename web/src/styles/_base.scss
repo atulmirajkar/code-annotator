@@ -1,0 +1,92 @@
+@use "tokens" as *;
+
+:root {
+  --topbar-height: 3.5rem;
+  color-scheme: light dark;
+  --background: #f6f7f9;
+  --surface: #ffffff;
+  --border: #d8dee7;
+  --text: #202630;
+  --muted: #667085;
+  --accent: #3157d5;
+  --accent-soft: #e9edff;
+  --waiting-bg: #fff0d5;
+  --waiting-text: #8a4b08;
+  --code: #eef1f5;
+  --diff-added: #e8f5e9;
+  --diff-deleted: #fdebec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #101318;
+    --surface: #171b22;
+    --border: #303744;
+    --text: #e8ecf2;
+    --muted: #9da7b5;
+    --accent: #91a7ff;
+    --accent-soft: #242d52;
+    --waiting-bg: #4a3511;
+    --waiting-text: #ffd08a;
+    --code: #252b34;
+    --diff-added: #183b2a;
+    --diff-deleted: #482428;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+html {
+  font-family: $font-sans;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--text);
+}
+a {
+  color: var(--accent);
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  backdrop-filter: blur(10px);
+  .brand {
+    color: var(--text);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+}
+.panel-controls {
+  display: flex;
+  gap: 0.4rem;
+}
+.panel-toggle {
+  @include control-surface;
+  padding: $control-padding-y $control-padding-x;
+  font-size: 0.75rem;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+.root {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-family: $font-mono;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

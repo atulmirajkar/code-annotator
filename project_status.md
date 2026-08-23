@@ -1,10 +1,23 @@
 # Project status
 
-Last updated: 2026-08-21
+Last updated: 2026-08-23
 
 ## Current state
 
-**Phase:** Code review and Git diff milestone complete, including
+**Phase:** TypeScript frontend migration is implemented and verified.
+The authored browser modules now compile under strict TypeScript into
+checked-in generated assets while preserving the existing Go `go:embed`
+workflow and `/static/*.js` runtime URLs. The full Playwright suite passes with
+Microsoft Edge. The long-file navigation regression now scrolls the desktop
+document pane, which is the actual scroll container, instead of asserting on
+the window scroll position. The shared sticky topbar now uses an opaque
+background, publishes its measured height to responsive sticky offsets, and
+the document pane no longer has top padding above its sticky tabs, so document
+content cannot appear above them in either File or Changes view.
+Sass now owns the stylesheet source and emits the embedded CSS asset through
+the same frontend build pipeline.
+
+The code review and Git diff milestone is complete, including
 diff-specific narrow-layout and light/dark theme browser coverage. Stopped
 for maintainer review before live reload begins.
 
@@ -194,6 +207,27 @@ See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md).
 - [x] Add discovery, command, and end-to-end lifecycle tests.
 - [x] Update user-facing documentation.
 
+### 14. TypeScript frontend migration
+
+Design: [`docs/designs/typescript-migration.md`](docs/designs/typescript-migration.md).
+
+- [x] Add TypeScript compiler configuration and npm scripts.
+- [x] Add Sass source partials, compile, and watch commands for the stylesheet.
+- [x] Add a TypeScript watch command for save-time frontend development.
+- [x] Add the `web/src` authored-source and `web/generated` generated-asset
+  layout.
+- [x] Define shared browser API and annotation types.
+- [x] Convert review leaf modules and the API boundary.
+- [x] Convert review controllers, rendering, selection, and navigation.
+- [x] Convert standalone viewer and Mermaid integration scripts.
+- [x] Embed generated assets while preserving existing `/static/*.js` routes.
+- [x] Keep generated assets reproducible and verify them locally with a clean
+  generated-output check.
+- [ ] Add a CI workflow check for generated-asset reproducibility.
+- [x] Run typecheck, Go tests, vet, and race checks.
+- [x] Run browser regression tests with a working Edge process.
+- [x] Update build and architecture documentation.
+
 Cheap queue polling follow-up, see
 [`docs/designs/queue-etag.md`](docs/designs/queue-etag.md):
 
@@ -225,6 +259,8 @@ Cheap queue polling follow-up, see
 | Editing and network sharing deferred | Approved |
 | Agent discovery registers via a cooperative per-user registry file, never a port scan | Approved |
 | Discovery registry never stores the review mutation token | Approved |
+| TypeScript source compiles to checked-in generated browser assets | Approved |
+| Existing browser module boundaries and `/static/*.js` URLs remain stable | Approved |
 
 ## Known risks
 
@@ -238,10 +274,9 @@ Cheap queue polling follow-up, see
 
 ## Next milestone
 
-Milestone 10 (Code review and Git diff) is complete: the side-by-side
-renderer, Git retrieval, route, File/Changes tabs, independent pane
-scrolling, resizable divider, re-pinnable revision selector, and
-diff-specific narrow-layout/light-dark browser coverage are all implemented,
-and user-facing docs and distribution binaries are refreshed. Stopped here
-for maintainer review; only afterward should the separately reviewed
-live-reload milestone (11) begin.
+Milestone 14 (TypeScript frontend migration) is implemented and verified.
+Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
+35 Playwright Edge tests pass. The only unchecked item in this milestone is a
+CI workflow check for generated-asset reproducibility; this repository has no
+existing CI workflow yet. Live reload and source syntax highlighting remain
+separately scoped milestones.

@@ -265,55 +265,55 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("parse page template: %w", err)
 	}
-	styles, err := fs.ReadFile(web.Files, "styles.css")
+	styles, err := fs.ReadFile(web.Files, "generated/styles.css")
 	if err != nil {
 		return nil, fmt.Errorf("read viewer styles: %w", err)
 	}
-	reviewJS, err := fs.ReadFile(web.Files, "review.js")
+	reviewJS, err := fs.ReadFile(web.Files, "generated/review.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review script: %w", err)
 	}
-	reviewActionsJS, err := fs.ReadFile(web.Files, "review-actions.js")
+	reviewActionsJS, err := fs.ReadFile(web.Files, "generated/review-actions.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review actions script: %w", err)
 	}
-	reviewAPIJS, err := fs.ReadFile(web.Files, "review-api.js")
+	reviewAPIJS, err := fs.ReadFile(web.Files, "generated/review-api.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review API script: %w", err)
 	}
-	reviewDOMJS, err := fs.ReadFile(web.Files, "review-dom.js")
+	reviewDOMJS, err := fs.ReadFile(web.Files, "generated/review-dom.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review DOM script: %w", err)
 	}
-	reviewHLJS, err := fs.ReadFile(web.Files, "review-highlights.js")
+	reviewHLJS, err := fs.ReadFile(web.Files, "generated/review-highlights.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review highlights script: %w", err)
 	}
-	reviewNavJS, err := fs.ReadFile(web.Files, "review-navigation.js")
+	reviewNavJS, err := fs.ReadFile(web.Files, "generated/review-navigation.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review navigation script: %w", err)
 	}
-	reviewPanelJS, err := fs.ReadFile(web.Files, "review-panel.js")
+	reviewPanelJS, err := fs.ReadFile(web.Files, "generated/review-panel.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review panel script: %w", err)
 	}
-	reviewRenderJS, err := fs.ReadFile(web.Files, "review-render.js")
+	reviewRenderJS, err := fs.ReadFile(web.Files, "generated/review-render.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review render script: %w", err)
 	}
-	reviewSelectJS, err := fs.ReadFile(web.Files, "review-selection.js")
+	reviewSelectJS, err := fs.ReadFile(web.Files, "generated/review-selection.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review selection script: %w", err)
 	}
-	reviewThreadJS, err := fs.ReadFile(web.Files, "review-thread.js")
+	reviewThreadJS, err := fs.ReadFile(web.Files, "generated/review-thread.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review thread script: %w", err)
 	}
-	viewerJS, err := fs.ReadFile(web.Files, "viewer.js")
+	viewerJS, err := fs.ReadFile(web.Files, "generated/viewer.js")
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
 	}
-	mermaidJS, err := fs.ReadFile(web.Files, "mermaid.js")
+	mermaidJS, err := fs.ReadFile(web.Files, "generated/mermaid.js")
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
 	}

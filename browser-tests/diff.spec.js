@@ -344,10 +344,10 @@ test.describe("side-by-side diff", () => {
     await expect(page.locator(".diff-view h1")).toHaveCount(0);
     await expect(page.locator(".diff-view h2")).toHaveCount(0);
 
-    // File and Changes always share the same tight document padding,
-    // matching the code document experience.
+    // File and Changes share the same tight document padding, with no top
+    // padding so sticky source tabs have no scrollable gap above them.
     const diffPadding = await page.locator("main.document").evaluate((main) => getComputedStyle(main).padding);
-    expect(diffPadding).toBe("8px");
+    expect(diffPadding).toBe("0px 8px 8px");
     expect(diffPadding).toBe(filePadding);
   });
 });

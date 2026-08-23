@@ -43,9 +43,57 @@ go run ./cmd/code-annotator ./docs
 Or build and run the binary:
 
 ```sh
+npm ci
+npm run check:web
 go build -o bin/code-annotator ./cmd/code-annotator
 ./bin/code-annotator ./docs
 ```
+
+`npm run check:web` typechecks the authored TypeScript and compiles the Sass
+under `web/src/`, then regenerates the checked-in browser assets under
+`web/generated/`. Node.js and
+npm are required for source and release builds, but are not runtime
+dependencies of the compiled binary.
+
+### Frontend development commands
+
+The repository uses npm for the TypeScript frontend and browser regression
+tests:
+
+| Command | Purpose | When to use it |
+| --- | --- | --- |
+| `npm ci` | Removes `node_modules` and installs the exact versions from `package-lock.json`. | Clean local setup, CI, or before a reproducible build. |
+| `npm install` | Resolves dependencies and updates `package-lock.json` when dependencies change. | Adding or intentionally updating a package. |
+| `npm run typecheck` | Checks all TypeScript without writing generated files. | Fast feedback while editing frontend code. |
+| `npm run build:styles` | Compiles `web/src/styles.scss` and its partials into `web/generated/styles.css`. | Regenerating the embedded stylesheet. |
+| `npm run build:web` | Compiles TypeScript and Sass into `web/generated/`. | Regenerating all embedded browser assets. |
+| `npm run format:styles` | Formats the Sass entrypoint and partials with Prettier. | Normalizing stylesheet source before review. |
+| `npm run watch:web` | Continuously compiles TypeScript when source files change. | Frontend development while the Go viewer is running. |
+| `npm run watch:styles` | Continuously compiles Sass when stylesheet files change. | Styling development while the Go viewer is running. |
+| `npm run check:web` | Runs `typecheck`, then `build:web`. | Standard frontend validation before Go builds or commits. |
+| `npm run test:browser` | Runs the Playwright browser regression suite. | Verifying UI behavior with Microsoft Edge available. |
+
+After changing TypeScript, use:
+
+```sh
+npm run check:web
+go test ./...
+```
+
+`go build` does not invoke npm automatically. The release script runs
+`npm run check:web` before testing and building the distribution binaries.
+
+For frontend development, run the TypeScript and Sass watchers in separate
+terminals, with the Go viewer in a third:
+
+```sh
+npm run watch:web
+npm run watch:styles
+go run ./cmd/code-annotator ./docs
+```
+
+The Go server reads generated assets at startup, so restart the Go process after
+a frontend change before refreshing the browser.
 
 Prebuilt binaries are available under [`dist/`](dist/):
 
@@ -242,13 +290,17 @@ for the full design.
 
 ### Browser regression tests
 
-Install the pinned development dependency and run the real-browser suite with
-Google Chrome:
+Install the pinned development dependencies, compile the frontend, and run the
+real-browser suite with Microsoft Edge:
 
 ```sh
 npm ci
+npm run check:web
 npm run test:browser
 ```
+
+The suite defaults to the `msedge` Playwright channel. Override it with
+`CODE_ANNOTATOR_BROWSER_CHANNEL` when testing another installed browser.
 
 These tests start an isolated review server and cover Mermaid rendering,
 diagram selection, annotation mutation workflows, stale-anchor reattachment,

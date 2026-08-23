@@ -1,5 +1,18 @@
 import { badge, element } from "./review-dom.js";
 import { annotationTurnBadge, showThreadEntry, threadKind, threadText } from "./review-thread.js";
+import type { Annotation, AnnotationPayload } from "./types.js";
+
+interface AnnotationRendererOptions {
+  list: HTMLElement;
+  count: HTMLElement;
+  showInactive: HTMLInputElement;
+  renderAnnotationHighlights: (annotations: Annotation[]) => void;
+  navigateFromAnnotation: (event: MouseEvent, card: HTMLDetailsElement, annotation: Annotation) => void;
+  createQuickClose: (annotation: Annotation) => HTMLButtonElement;
+  createReattachForm: (annotation: Annotation) => HTMLFormElement;
+  createReplyForm: (annotation: Annotation) => HTMLFormElement;
+  createLifecycleForm: (annotation: Annotation) => HTMLFormElement | null;
+}
 
 export function createAnnotationRenderer({
   list,
@@ -11,12 +24,12 @@ export function createAnnotationRenderer({
   createReattachForm,
   createReplyForm,
   createLifecycleForm,
-}) {
-  let annotationPayload = null;
+}: AnnotationRendererOptions) {
+  let annotationPayload: AnnotationPayload | null = null;
 
   // Render user-controlled content with textContent so comments and author
   // names can never become executable markup.
-  function renderAnnotations(payload) {
+  function renderAnnotations(payload: AnnotationPayload): void {
     annotationPayload = payload;
     list.replaceChildren();
     const annotations = Array.isArray(payload.annotations) ? payload.annotations : [];
@@ -36,11 +49,11 @@ export function createAnnotationRenderer({
   // Closed and rejected annotations retain their history in storage but are
   // inactive for the current review, so they do not appear or highlight text
   // unless the reviewer explicitly asks to inspect them.
-  function isInactive(annotation) {
+  function isInactive(annotation: Annotation): boolean {
     return annotation.status === "closed" || annotation.status === "rejected";
   }
 
-  function createCard(annotation) {
+  function createCard(annotation: Annotation): HTMLDetailsElement {
     const card = element("details", "annotation-card");
     card.dataset.annotationId = annotation.id || "";
 
@@ -135,7 +148,7 @@ export function createAnnotationRenderer({
     return card;
   }
 
-  function showMessage(message) {
+  function showMessage(message: string): void {
     list.replaceChildren();
     const item = element("p", "review-message");
     item.textContent = message;
@@ -143,7 +156,7 @@ export function createAnnotationRenderer({
     count.textContent = "";
   }
 
-  function currentPayload() {
+  function currentPayload(): AnnotationPayload | null {
     return annotationPayload;
   }
 

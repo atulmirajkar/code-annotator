@@ -8,8 +8,9 @@ content root for the lifetime of the process. The application indexes Markdown
 and explicitly enabled source files, renders requested documents to safe HTML,
 and serves referenced local assets.
 
-The MVP is a single Go binary with embedded page templates and static styling.
-It has no database, client-side framework, or external service.
+The MVP is a single Go binary with embedded page templates, generated
+TypeScript browser modules, and static styling. It has no database,
+client-side framework, or external service.
 
 ## System flow
 
@@ -48,12 +49,20 @@ internal/gitdiff/           bounded Git commands, aligned diffs, revision state
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
 internal/commands/          offline annotation tools and live HTTP agent client
-web/                        embedded HTML, CSS, and review-panel JavaScript
+web/                        authored TypeScript/Sass, generated browser assets, HTML, and vendor files
 ```
 
 Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
+
+The browser source is authored under `web/src/` and compiled into the checked-in
+`web/generated/` directory with `npm run build:web`. Sass is organized under
+`web/src/styles/` and emits `web/generated/styles.css`. The generated modules keep
+the existing `/static/*.js` URLs and native ES-module import structure, while
+`web/embed.go` embeds only the generated runtime assets. See
+[`docs/designs/typescript-migration.md`](designs/typescript-migration.md) for
+the frontend dependency graph, typing rules, and compiler configuration.
 
 `internal/server` owns the concurrency-safe active Git comparison base: a
 single explicit commit behind a mutex, seeded at startup from the resolved

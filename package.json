@@ -2,9 +2,19 @@
   "name": "code-annotator-browser-tests",
   "private": true,
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build:styles": "sass web/src/styles.scss web/generated/styles.css --style=expanded --no-source-map",
+    "build:web": "tsc && npm run build:styles",
+    "format:styles": "prettier --write web/src/styles.scss web/src/styles/*.scss",
+    "watch:web": "tsc --watch",
+    "watch:styles": "sass --watch web/src/styles.scss:web/generated/styles.css --no-source-map",
+    "check:web": "npm run typecheck && npm run build:web",
     "test:browser": "playwright test"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1"
+    "@playwright/test": "1.62.1",
+    "prettier": "3.6.2",
+    "sass": "1.89.2",
+    "typescript": "5.9.2"
   }
 }

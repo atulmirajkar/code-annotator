@@ -5,9 +5,9 @@
 - Go `1.26.5` or a compatible newer Go release, matching `go.mod`.
 - A graphical environment with a default browser, unless using `--no-open`.
 
-The optional browser regression suite additionally requires Node.js, npm, and
-Google Chrome. These tools are used only for development tests and are not
-runtime dependencies of `code-annotator`.
+The frontend build and optional browser regression suite additionally require
+Node.js, npm, and Microsoft Edge. Node and npm are development-only tools; they
+are not runtime dependencies of `code-annotator`.
 
 The Go toolchain downloads declared module dependencies during the first build.
 
@@ -29,6 +29,34 @@ The application prints the selected content root and local URL. By default, it
 opens that URL through `github.com/pkg/browser`.
 
 ## Build
+
+Compile and typecheck the authored TypeScript frontend before building the Go
+binary:
+
+```sh
+npm ci
+npm run check:web
+```
+
+The TypeScript compiler writes browser JavaScript and Sass writes CSS to
+`web/generated/`. Those generated files are embedded into the Go binary, so a
+Go build itself does not need Node or npm. Generated assets are checked in and
+CI verifies that the frontend build does not leave a diff.
+
+During frontend development, use the compiler watcher in one terminal and the
+Sass watcher in another:
+
+```sh
+npm run watch:web
+# In another terminal:
+npm run watch:styles
+```
+
+Run the Go viewer in another terminal. The server reads generated assets when it
+starts, so restart it after a TypeScript or Sass change before refreshing the
+browser.
+
+Then build the binary:
 
 ```sh
 go build -o bin/code-annotator ./cmd/code-annotator
@@ -186,14 +214,13 @@ go test -race ./...
 Install the pinned browser-test dependency and run the Playwright suite:
 
 ```sh
-npm ci
 npm run test:browser
 ```
 
 The suite starts an isolated review server, writes annotations only beneath a
-temporary directory, and uses the installed Chrome browser in headless mode.
-Set `CODE_ANNOTATOR_BROWSER_CHANNEL` to another Playwright browser channel when
-needed. Browser traces and reports are ignored build artifacts.
+temporary directory, and uses the installed Microsoft Edge browser in headless
+mode. Set `CODE_ANNOTATOR_BROWSER_CHANNEL` to another Playwright browser channel
+when needed. Browser traces and reports are ignored build artifacts.
 
 A minimal manual check is:
 

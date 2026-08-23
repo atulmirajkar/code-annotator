@@ -1,8 +1,25 @@
+interface MermaidRenderResult {
+  svg: string;
+  bindFunctions?: (element: HTMLElement) => void;
+}
+
+interface MermaidApi {
+  initialize(options: Record<string, unknown>): void;
+  render(id: string, definition: string): Promise<MermaidRenderResult>;
+}
+
+declare const mermaid: MermaidApi;
+
 (() => {
   "use strict";
 
+  function requiredElement<T extends Element>(value: T | null, label: string): T {
+    if (!value) throw new Error(`Missing ${label} in Mermaid template`);
+    return value;
+  }
+
   const maxDiagramCharacters = 100000;
-  const diagrams = document.querySelectorAll(".mermaid-diagram");
+  const diagrams = document.querySelectorAll<HTMLElement>(".mermaid-diagram");
   if (diagrams.length === 0) {
     return;
   }
@@ -15,9 +32,9 @@
   });
 
   diagrams.forEach(async (diagram, index) => {
-    const source = diagram.querySelector(".mermaid-source code");
-    const output = diagram.querySelector(".mermaid-output");
-    const error = diagram.querySelector(".mermaid-error");
+    const source = requiredElement(diagram.querySelector<HTMLElement>(".mermaid-source code"), "Mermaid source");
+    const output = requiredElement(diagram.querySelector<HTMLElement>(".mermaid-output"), "Mermaid output");
+    const error = requiredElement(diagram.querySelector<HTMLElement>(".mermaid-error"), "Mermaid error");
     const definition = source.textContent;
 
     try {
@@ -35,7 +52,8 @@
       output.hidden = true;
       error.textContent = `Could not render diagram: ${cause instanceof Error ? cause.message : "unknown error"}`;
       error.hidden = false;
-      diagram.querySelector(".mermaid-source").open = true;
+      const sourceDetails = diagram.querySelector<HTMLDetailsElement>(".mermaid-source");
+      if (sourceDetails) sourceDetails.open = true;
     }
   });
 })();

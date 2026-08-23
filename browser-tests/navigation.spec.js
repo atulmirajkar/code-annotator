@@ -136,14 +136,89 @@ test.describe("viewer navigation", () => {
     await page.goto(`${viewer.url}view/tall.go`);
 
     const tabs = page.locator(".source-mode-tabs");
-    const topbarHeight = await page.locator(".topbar").evaluate((element) => element.getBoundingClientRect().height);
+    const documentPane = page.locator("main.document");
+    const topbar = page.locator(".topbar");
     await expect(tabs).toBeVisible();
+    await expect(topbar.evaluate((element) => getComputedStyle(element).backgroundColor)).resolves.not.toContain("/");
 
-    await page.mouse.wheel(0, 3000);
-    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
-    // The sticky toolbar pins directly beneath the sticky topbar, so it never
-    // scrolls out of view while reviewing a long file.
+    await documentPane.evaluate((element) => element.scrollTo(0, 3000));
+    await expect.poll(() => documentPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+    // The sticky toolbar stays pinned at the top of the document pane while
+    // reviewing a long file.
     const scrolledTop = await tabs.evaluate((element) => element.getBoundingClientRect().top);
-    expect(Math.abs(scrolledTop - topbarHeight)).toBeLessThan(2);
+    const documentTop = await documentPane.evaluate((element) => element.getBoundingClientRect().top);
+    expect(scrolledTop).toBeGreaterThanOrEqual(documentTop);
+    expect(scrolledTop).toBeLessThan(documentTop + 20);
   });
+
+  test("keeps the topbar and source tabs visible while scrolling at tablet width", async ({ page, viewer }) => {
+    const documentPath = path.join(viewer.contentRoot, "tablet-tall.go");
+    const lines = Array.from({ length: 150 }, (_, index) => `// line ${index + 1} of filler content to force page scrolling.`).join("\n");
+    await writeFile(documentPath, `package fixture\n\n${lines}\n`);
+    await page.setViewportSize({ width: 1000, height: 800 });
+    await page.goto(`${viewer.url}view/tablet-tall.go`);
+
+    const topbar = page.locator(".topbar");
+    const tabs = page.locator(".source-mode-tabs");
+    const topbarHeight = await topbar.evaluate((element) => element.getBoundingClientRect().height);
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+    const geometry = await page.evaluate(() => ({
+      topbarTop: document.querySelector(".topbar").getBoundingClientRect().top,
+      tabsTop: document.querySelector(".source-mode-tabs").getBoundingClientRect().top,
+    }));
+    expect(geometry.topbarTop).toBeGreaterThanOrEqual(0);
+    expect(geometry.tabsTop).toBeGreaterThanOrEqual(topbarHeight - 1);
+  });
+
+  test("keeps the topbar and source tabs visible with long content on mobile", async ({ page, viewer }) => {
+    const documentPath = path.join(viewer.contentRoot, "mobile-tall.go");
+    const lines = Array.from({ length: 200 }, (_, index) => `// mobile filler line ${index + 1} with enough text to force scrolling.`).join("\n");
+    await writeFile(documentPath, `package fixture\n\n${lines}\n`);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`${viewer.url}view/mobile-tall.go`);
+
+    await page.evaluate(() => window.scrollTo(0, 3000));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+    const geometry = await page.evaluate(() => {
+      const topbar = document.querySelector(".topbar");
+      const tabs = document.querySelector(".source-mode-tabs");
+      return {
+        topbarTop: topbar.getBoundingClientRect().top,
+        topbarBottom: topbar.getBoundingClientRect().bottom,
+        tabsTop: tabs.getBoundingClientRect().top,
+      };
+    });
+    expect(geometry.topbarTop).toBeGreaterThanOrEqual(0);
+    expect(geometry.tabsTop).toBeGreaterThanOrEqual(geometry.topbarBottom - 1);
+  });
+
+  test("keeps source tabs above long Changes content", async ({ page, viewer }) => {
+    const documentPath = path.join(viewer.contentRoot, "diff-layout.go");
+    const lines = Array.from({ length: 200 }, (_, index) => `// diff filler line ${index + 1} with enough text to force scrolling.`).join("\n");
+    await writeFile(documentPath, `package fixture\n\n${lines}\n`);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`${viewer.url}view/diff-layout.go?mode=diff`);
+
+    const documentPane = page.locator("main.document");
+    await documentPane.evaluate((element) => element.scrollTo(0, 3000));
+    await expect.poll(() => documentPane.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+
+    const geometry = await page.evaluate(() => {
+      const tabs = document.querySelector(".source-mode-tabs");
+      const documentPane = document.querySelector("main.document");
+      const point = tabs ? document.elementFromPoint(tabs.getBoundingClientRect().right - 20, tabs.getBoundingClientRect().top + 2) : null;
+      return {
+        tabsTop: tabs?.getBoundingClientRect().top ?? -1,
+        documentTop: documentPane?.getBoundingClientRect().top ?? -1,
+        documentPaddingTop: Number.parseFloat(getComputedStyle(documentPane).paddingTop),
+        pointClass: point?.className ?? "",
+      };
+    });
+    expect(geometry.documentPaddingTop).toBe(0);
+    expect(geometry.tabsTop).toBeGreaterThanOrEqual(geometry.documentTop);
+    expect(geometry.tabsTop).toBeLessThan(geometry.documentTop + 20);
+    expect(geometry.pointClass).toContain("source-mode-tabs");
+  });
+
 });

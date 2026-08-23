@@ -5,33 +5,43 @@ import { createAnnotationNavigator } from "./review-navigation.js";
 import { createReviewPanelController } from "./review-panel.js";
 import { createAnnotationRenderer } from "./review-render.js";
 import { createSelectionController } from "./review-selection.js";
+import type { AnnotationPayload, CreateAnnotationRequest, AnnotationIntent } from "./types.js";
+
+function requiredElement<T extends Element>(value: T | null, label: string): T {
+  if (!value) throw new Error(`Missing ${label} in review template`);
+  return value;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
 
 (() => {
-  const panel = document.querySelector(".review-panel");
+  const panel = document.querySelector<HTMLElement>(".review-panel");
   if (!panel) return;
 
-  const list = panel.querySelector(".annotation-list");
-  const count = panel.querySelector(".annotation-count");
-  const showInactive = panel.querySelector(".show-inactive-annotations");
-  const preview = panel.querySelector(".selection-preview");
-  const previewQuote = panel.querySelector(".selection-quote");
-  const previewRange = panel.querySelector(".selection-range");
-  const markdown = document.querySelector(".markdown-body");
-  const form = panel.querySelector(".annotation-form");
-  const addAnnotationButton = panel.querySelector(".add-annotation-toggle");
-  const closeAnnotationButton = panel.querySelector(".annotation-form-close");
-  const formStatus = panel.querySelector(".annotation-form-status");
-  const submitButton = form.querySelector('button[type="submit"]');
-  const selectionScope = form.querySelector('input[name="scope"][value="selection"]');
-  const documentScope = form.querySelector('input[name="scope"][value="document"]');
-  const resizeHandle = panel.querySelector(".review-panel-resize");
-  const layout = panel.closest(".layout");
-  const reviewToken = document.querySelector('meta[name="code-annotator-review-token"]')?.content || "";
+  const list = requiredElement(panel.querySelector<HTMLElement>(".annotation-list"), "annotation list");
+  const count = requiredElement(panel.querySelector<HTMLElement>(".annotation-count"), "annotation count");
+  const showInactive = requiredElement(panel.querySelector<HTMLInputElement>(".show-inactive-annotations"), "inactive toggle");
+  const preview = requiredElement(panel.querySelector<HTMLElement>(".selection-preview"), "selection preview");
+  const previewQuote = requiredElement(panel.querySelector<HTMLElement>(".selection-quote"), "selection quote");
+  const previewRange = requiredElement(panel.querySelector<HTMLElement>(".selection-range"), "selection range");
+  const markdown = requiredElement(document.querySelector<HTMLElement>(".markdown-body"), "markdown body");
+  const form = requiredElement(panel.querySelector<HTMLFormElement>(".annotation-form"), "annotation form");
+  const addAnnotationButton = panel.querySelector<HTMLButtonElement>(".add-annotation-toggle");
+  const closeAnnotationButton = panel.querySelector<HTMLButtonElement>(".annotation-form-close");
+  const formStatus = requiredElement(panel.querySelector<HTMLElement>(".annotation-form-status"), "form status");
+  const submitButton = requiredElement(form.querySelector<HTMLButtonElement>('button[type="submit"]'), "submit button");
+  const selectionScope = requiredElement(form.querySelector<HTMLInputElement>('input[name="scope"][value="selection"]'), "selection scope");
+  const documentScope = requiredElement(form.querySelector<HTMLInputElement>('input[name="scope"][value="document"]'), "document scope");
+  const resizeHandle = panel.querySelector<HTMLElement>(".review-panel-resize");
+  const layout = panel.closest<HTMLElement>(".layout");
+  const reviewToken = document.querySelector<HTMLMetaElement>('meta[name="code-annotator-review-token"]')?.content || "";
   const documentPath = panel.dataset.document;
   let currentRevision = "";
   let updateReattachControls = () => {};
-  let renderAnnotations = () => {};
-  let showMessage = () => {};
+  let renderAnnotations = (_payload: AnnotationPayload): void => {};
+  let showMessage = (_message: string): void => {};
   if (!documentPath) {
     list.replaceChildren();
     const item = document.createElement("p");
@@ -41,6 +51,7 @@ import { createSelectionController } from "./review-selection.js";
     count.textContent = "";
     return;
   }
+  const reviewDocumentPath = documentPath;
 
   const panelController = createReviewPanelController({
     panel,
@@ -50,7 +61,7 @@ import { createSelectionController } from "./review-selection.js";
     closeAnnotationButton,
     layout,
     resizeHandle,
-    documentPath,
+    documentPath: reviewDocumentPath,
   });
   const { setAnnotationFormVisible, setFormStatus } = panelController;
   const selectionController = createSelectionController({
@@ -80,7 +91,7 @@ import { createSelectionController } from "./review-selection.js";
     forceClearSelectionPreview,
     loadAnnotations,
     setFormStatus,
-    reviewerAuthor: () => form.elements.author.value,
+    reviewerAuthor: () => String((form.elements.namedItem("author") as HTMLSelectElement | null)?.value || ""),
     list,
   });
   const {
@@ -112,11 +123,11 @@ import { createSelectionController } from "./review-selection.js";
   });
   selectionController.bind();
 
-  async function loadAnnotations() {
+  async function loadAnnotations(): Promise<void> {
     try {
-      const response = await fetchAnnotations(documentPath);
+      const response = await fetchAnnotations(reviewDocumentPath);
       if (!response.ok) throw new Error(`annotation request failed: ${response.status}`);
-      const payload = await response.json();
+      const payload = await response.json() as AnnotationPayload;
       currentRevision = typeof payload.revision === "string" ? payload.revision : "";
       renderAnnotations(payload);
     } catch (_) {
@@ -124,17 +135,17 @@ import { createSelectionController } from "./review-selection.js";
     }
   }
 
-  async function submitAnnotation(event) {
+  async function submitAnnotation(event: SubmitEvent): Promise<void> {
     event.preventDefault();
     setFormStatus("Saving…");
     submitButton.disabled = true;
 
     const fields = new FormData(form);
-    const payload = {
-      document: documentPath,
-      intent: fields.get("intent"),
-      comment: fields.get("comment"),
-      author: fields.get("author"),
+    const payload: CreateAnnotationRequest = {
+      document: reviewDocumentPath,
+      intent: String(fields.get("intent") || "") as AnnotationIntent,
+      comment: String(fields.get("comment") || ""),
+      author: String(fields.get("author") || ""),
     };
     const selectedRange = currentSelection();
     if (fields.get("scope") === "selection" && selectedRange) {
@@ -151,14 +162,14 @@ import { createSelectionController } from "./review-selection.js";
         throw new Error((await response.text()).trim() || `Could not save annotation (${response.status}).`);
       }
 
-      form.elements.comment.value = "";
+      (form.elements.namedItem("comment") as HTMLTextAreaElement).value = "";
       window.getSelection()?.removeAllRanges();
       forceClearSelectionPreview();
       await loadAnnotations();
       setAnnotationFormVisible(false);
       setFormStatus("Annotation added.");
     } catch (error) {
-      setFormStatus(error.message || "Could not save annotation.", true);
+      setFormStatus(errorMessage(error, "Could not save annotation."), true);
     } finally {
       submitButton.disabled = false;
     }

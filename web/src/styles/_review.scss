@@ -1,0 +1,492 @@
+@use "tokens" as *;
+
+.empty-state p {
+  color: var(--muted);
+}
+
+.review-panel {
+  position: sticky;
+  top: var(--topbar-height);
+  align-self: start;
+  height: calc(100vh - var(--topbar-height));
+  min-width: 18rem;
+  width: 100%;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+}
+.review-panel-scroll {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.5rem 1rem;
+}
+.review-panel-resize {
+  display: none;
+}
+.review-heading-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 0.25rem 1rem;
+  h2 {
+    margin: 0;
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+.review-heading-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.add-annotation-toggle {
+  padding: 0.32rem 0.55rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.35rem;
+  background: var(--accent);
+  color: var(--surface);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.annotation-count,
+.review-message {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+.annotation-visibility {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.45rem 0.25rem 1rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.selection-preview {
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  border: 1px solid var(--accent);
+  border-radius: 0.55rem;
+  background: var(--accent-soft);
+}
+.selection-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.selection-quote {
+  display: block;
+  max-height: 6rem;
+  overflow-y: auto;
+  font-size: 0.85rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.selection-range {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.7rem;
+}
+.annotation-form {
+  display: grid;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  &[hidden] {
+    display: none;
+  }
+  &-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: -0.1rem;
+    h3 {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.72rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+  }
+  & &-close {
+    width: 1.65rem;
+    height: 1.65rem;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 1.25rem;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    &:hover,
+    &:focus-visible {
+      border-color: var(--border);
+      background: var(--surface);
+      color: var(--text);
+    }
+  }
+  > label > span,
+  legend {
+    display: block;
+    margin-bottom: 0.3rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  input[type="text"],
+  input:not([type]),
+  select,
+  textarea {
+    width: 100%;
+    padding: 0.5rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 0.4rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+  }
+  textarea {
+    resize: vertical;
+  }
+  fieldset {
+    display: flex;
+    gap: 0.8rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    label {
+      font-size: 0.82rem;
+    }
+  }
+  button[type="submit"] {
+    @include primary-action;
+    justify-self: start;
+    padding: 0.5rem 0.75rem;
+    &:disabled {
+      cursor: wait;
+      opacity: 0.65;
+    }
+  }
+}
+.annotation-form-status {
+  min-height: 1.2em;
+  margin: 0 0 0.65rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+.annotation-form-status:empty {
+  display: none;
+}
+.annotation-form-status.error {
+  color: #b42318;
+}
+.annotation-list {
+  display: grid;
+  gap: 0.75rem;
+}
+.annotation-card {
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--background);
+  &[open] {
+    .annotation-summary::before {
+      content: "▾";
+    }
+    .annotation-summary-comment {
+      display: none;
+    }
+  }
+}
+.annotation-summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.5rem;
+  padding: 0.75rem 0.85rem;
+  cursor: pointer;
+  list-style: none;
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &::before {
+    grid-row: 1 / span 2;
+    width: 1.1rem;
+    color: var(--muted);
+    content: "▸";
+    font-size: 1.15rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  &:hover {
+    background: var(--surface);
+  }
+}
+.annotation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.annotation-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.annotation-meta,
+.annotation-summary-comment {
+  grid-column: 2;
+}
+.annotation-summary-comment {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.annotation-card[open] .annotation-summary-comment {
+  display: none;
+}
+.annotation-card-body {
+  padding: 0.15rem 0.85rem 0.85rem;
+}
+.annotation-navigation-status {
+  min-height: 0;
+  margin: 0 0 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.annotation-navigation-status:empty {
+  display: none;
+}
+.annotation-navigation-status.approximate {
+  color: #8a4b08;
+}
+.annotation-badge {
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.annotation-badge.stale {
+  background: #fff0d5;
+  color: #8a4b08;
+}
+.annotation-badge.pending-review,
+.annotation-badge.pending-agent {
+  background: var(--waiting-bg);
+  color: var(--waiting-text);
+}
+.annotation-source {
+  margin: 0 0 0.7rem;
+  padding: 0.55rem 0.65rem;
+  border-left: 0.2rem solid var(--accent);
+  background: var(--surface);
+  font-size: 0.8rem;
+  q {
+    display: block;
+    max-height: 7rem;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  &-lines {
+    display: block;
+    margin-top: 0.3rem;
+    color: var(--muted);
+    font-family: $font-mono;
+    font-size: 0.68rem;
+  }
+  &.document-level {
+    color: var(--muted);
+    font-style: italic;
+  }
+}
+.annotation-comment {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.annotation-author {
+  margin: 0.65rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.annotation-thread {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+.annotation-thread-entry {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  border-left: 0.18rem solid var(--border);
+  background: transparent;
+  .annotation-thread-header {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: baseline;
+  }
+  .annotation-thread-kind {
+    padding: 0;
+    color: var(--muted);
+    font-size: 0.64rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  .annotation-thread-author {
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+  .annotation-thread-body {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  &.reply {
+    border-left-color: color-mix(in srgb, var(--accent) 65%, var(--border));
+  }
+  &.acknowledgement {
+    border-left-color: color-mix(
+      in srgb,
+      var(--waiting-text) 65%,
+      var(--border)
+    );
+  }
+  &.resolution {
+    border-left-color: color-mix(in srgb, #2f8f4e 65%, var(--border));
+  }
+  &.review {
+    border-left-color: color-mix(in srgb, #c26d20 65%, var(--border));
+  }
+  &.status-change {
+    border-left-color: var(--muted);
+  }
+}
+.annotation-action-bar {
+  display: flex;
+  gap: 0.65rem;
+  align-items: start;
+  margin-top: 0.8rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+.annotation-actions {
+  flex: 1 1 auto;
+  min-width: 0;
+  > summary {
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+}
+.annotation-quick-close {
+  @include primary-action;
+  flex: 0 0 auto;
+  padding: 0.32rem 0.58rem;
+  border: 1px solid var(--accent);
+  font-size: 0.75rem;
+}
+.annotation-quick-close:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.annotation-reattach,
+.annotation-reply,
+.annotation-lifecycle {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
+}
+.annotation-reply label,
+.annotation-lifecycle label {
+  display: grid;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.annotation-reply input,
+.annotation-reply select,
+.annotation-reply textarea,
+.annotation-lifecycle input,
+.annotation-lifecycle select,
+.annotation-lifecycle textarea {
+  width: 100%;
+  padding: 0.42rem 0.48rem;
+  border: 1px solid var(--border);
+  border-radius: 0.35rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.annotation-reply textarea,
+.annotation-lifecycle textarea {
+  resize: vertical;
+}
+.annotation-reattach button,
+.annotation-reply button,
+.annotation-lifecycle button {
+  @include primary-action;
+  justify-self: start;
+  padding: 0.42rem 0.65rem;
+  font-size: 0.78rem;
+}
+.annotation-reattach button:disabled,
+.annotation-reply button:disabled,
+.annotation-lifecycle button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.reattach-help,
+.reattach-status,
+.reply-status,
+.lifecycle-status {
+  min-height: 1.15em;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.reattach-status.error,
+.reply-status.error,
+.lifecycle-status.error {
+  color: #b42318;
+}

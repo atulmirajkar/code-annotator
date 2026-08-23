@@ -1,4 +1,15 @@
-export function replyActors() {
+import type {
+  ActorRole,
+  Annotation,
+  AnnotationStatus,
+  AnnotationTurnBadge,
+  ReplyActor,
+  ThreadEntry,
+  ThreadKindDisplay,
+  TransitionOption,
+} from "./types.js";
+
+export function replyActors(): ReplyActor[] {
   return [
     { value: "reviewer", label: "Reviewer" },
     { value: "author", label: "Author" },
@@ -6,13 +17,15 @@ export function replyActors() {
   ];
 }
 
-export function replyActorValue(author) {
+export function replyActorValue(author: string): ReplyActor["value"] {
   const preferred = String(author || "").trim().toLowerCase();
-  return replyActors().some((actor) => actor.value === preferred) ? preferred : "reviewer";
+  return replyActors().some((actor) => actor.value === preferred)
+    ? preferred as ReplyActor["value"]
+    : "reviewer";
 }
 
-export function transitionOptions(status) {
-  const transitions = {
+export function transitionOptions(status: AnnotationStatus): TransitionOption[] {
+  const transitions: Partial<Record<AnnotationStatus, TransitionOption[]>> = {
     open: [
       { status: "acknowledged", label: "Acknowledge", role: "agent" },
       { status: "rejected", label: "Reject", role: "agent", activity: "message" },
@@ -32,16 +45,16 @@ export function transitionOptions(status) {
   return transitions[status] || [];
 }
 
-export function threadText(entry) {
+export function threadText(entry: ThreadEntry): string {
   return entry.message || entry.summary || `${entry.fromStatus || ""} → ${entry.toStatus || ""}`;
 }
 
-export function showThreadEntry(entry) {
+export function showThreadEntry(entry: ThreadEntry): boolean {
   return entry.kind !== "acknowledgement";
 }
 
-export function threadKind(entry) {
-  const kinds = {
+export function threadKind(entry: ThreadEntry): ThreadKindDisplay {
+  const kinds: Partial<Record<ThreadEntry["kind"], ThreadKindDisplay>> = {
     reply: { label: "Reply", className: "reply" },
     acknowledgement: { label: "Acknowledgement", className: "acknowledgement" },
     resolution: { label: "Resolution", className: "resolution" },
@@ -51,7 +64,7 @@ export function threadKind(entry) {
   return kinds[entry.kind] || { label: "Update", className: "update" };
 }
 
-export function annotationTurnBadge(annotation) {
+export function annotationTurnBadge(annotation: Annotation): AnnotationTurnBadge | null {
   if (annotation.status !== "open" && annotation.status !== "needs_changes") return null;
   const role = latestThreadActorRole(annotation);
   if (role === "agent") {
@@ -63,16 +76,18 @@ export function annotationTurnBadge(annotation) {
   return null;
 }
 
-function latestThreadActorRole(annotation) {
+function latestThreadActorRole(annotation: Annotation): ActorRole | null {
   if (!Array.isArray(annotation.thread)) return null;
   for (let index = annotation.thread.length - 1; index >= 0; index -= 1) {
-    const role = threadActorRole(annotation.thread[index], annotation);
+    const entry = annotation.thread[index];
+    if (!entry) continue;
+    const role = threadActorRole(entry, annotation);
     if (role) return role;
   }
   return null;
 }
 
-function threadActorRole(entry, annotation) {
+function threadActorRole(entry: ThreadEntry, annotation: Annotation): ActorRole | null {
   if (entry.actorRole === "agent" || entry.actorRole === "reviewer") return entry.actorRole;
   const author = normalizeThreadAuthor(entry.author);
   if (!author) return null;
@@ -83,6 +98,6 @@ function threadActorRole(entry, annotation) {
   return null;
 }
 
-function normalizeThreadAuthor(author) {
+function normalizeThreadAuthor(author: string | undefined): string {
   return String(author || "").trim().toLowerCase();
 }

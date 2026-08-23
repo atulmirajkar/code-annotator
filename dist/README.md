@@ -22,12 +22,14 @@ copying or downloading a file, restore it with `chmod +x code-annotator`.
 Run the distribution script from the repository root:
 
 ```sh
+npm ci
 ./scripts/build-dist.sh
 ```
 
-The script runs `go test ./...`, builds all six targets in a temporary staging
-directory, updates the checked-in binaries only after every build succeeds, and
-regenerates `SHA256SUMS`. It requires `shasum` or `sha256sum` for checksums.
+The script compiles and typechecks the TypeScript/Sass frontend, runs `go test ./...`,
+builds all six targets in a temporary staging directory, updates the checked-in
+binaries only after every build succeeds, and regenerates `SHA256SUMS`. It
+requires Node.js, npm, Go, and `shasum` or `sha256sum`.
 
 The binaries embed the viewer template and CSS and require no runtime assets.
 They still need access to the Markdown directory supplied on the command line.

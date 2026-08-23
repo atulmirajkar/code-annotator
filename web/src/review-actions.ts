@@ -1,6 +1,33 @@
 import { reattachAnnotation, replyToAnnotation, updateAnnotation } from "./review-api.js";
 import { element } from "./review-dom.js";
 import { replyActors, replyActorValue, transitionOptions } from "./review-thread.js";
+import type {
+  Annotation,
+  ReattachRequest,
+  SelectionPayload,
+  TransitionRequest,
+} from "./types.js";
+
+interface AnnotationActionsOptions {
+  documentPath: string;
+  reviewToken: string;
+  getCurrentRevision: () => string;
+  currentSelection: () => SelectionPayload | null;
+  forceClearSelectionPreview: () => void;
+  loadAnnotations: () => Promise<void>;
+  setFormStatus: (message: string, isError?: boolean) => void;
+  reviewerAuthor: () => string;
+  list: HTMLElement;
+}
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error && error.message ? error.message : fallback;
+}
+
+function requiredElement<T extends Element>(value: T | null, label: string): T {
+  if (!value) throw new Error(`Missing ${label} in review template`);
+  return value;
+}
 
 export function createAnnotationActions({
   documentPath,
@@ -12,10 +39,10 @@ export function createAnnotationActions({
   setFormStatus,
   reviewerAuthor,
   list,
-}) {
+}: AnnotationActionsOptions) {
   // Closing is the common reviewer response to an applied annotation, so keep
   // it available without requiring the less-frequent Actions panel to open.
-  function createQuickClose(annotation) {
+  function createQuickClose(annotation: Annotation): HTMLButtonElement {
     const button = element("button", "annotation-quick-close");
     button.type = "button";
     button.textContent = "Close";
@@ -35,7 +62,7 @@ export function createAnnotationActions({
   // A stale annotation can be rebound only to a currently verified selection.
   // The API rebuilds the selector from source bytes and preserves all review
   // content, so the browser sends no replacement quote or thread data.
-  function createReattachForm(annotation) {
+  function createReattachForm(annotation: Annotation): HTMLFormElement {
     const reattach = element("form", "annotation-reattach");
     const help = element("p", "reattach-help");
     const selectedRange = currentSelection();
@@ -57,8 +84,8 @@ export function createAnnotationActions({
   // selection. The user chooses the target annotation by its card button.
   function updateReattachControls() {
     list.querySelectorAll(".annotation-reattach").forEach((reattach) => {
-      const button = reattach.querySelector('button[type="submit"]');
-      const help = reattach.querySelector(".reattach-help");
+      const button = requiredElement(reattach.querySelector<HTMLButtonElement>('button[type="submit"]'), "reattach button");
+      const help = requiredElement(reattach.querySelector<HTMLElement>(".reattach-help"), "reattach help");
       const selectedRange = currentSelection();
       button.disabled = !selectedRange;
       help.textContent = selectedRange
@@ -67,11 +94,11 @@ export function createAnnotationActions({
     });
   }
 
-  async function submitReattach(event, annotationID) {
+  async function submitReattach(event: Event, annotationID: string): Promise<void> {
     event.preventDefault();
-    const reattach = event.currentTarget;
-    const button = reattach.querySelector('button[type="submit"]');
-    const status = reattach.querySelector(".reattach-status");
+    const reattach = requiredElement(event.currentTarget as HTMLFormElement | null, "reattach form");
+    const button = requiredElement(reattach.querySelector<HTMLButtonElement>('button[type="submit"]'), "reattach button");
+    const status = requiredElement(reattach.querySelector<HTMLElement>(".reattach-status"), "reattach status");
     const selectedRange = currentSelection();
     if (!selectedRange) {
       status.textContent = "Select replacement text first.";
@@ -79,12 +106,13 @@ export function createAnnotationActions({
       return;
     }
 
-    const selection = { ...selectedRange };
+    const selection: SelectionPayload = { ...selectedRange };
     status.textContent = "Saving…";
     status.classList.remove("error");
     button.disabled = true;
     try {
-      const response = await reattachAnnotation(reviewToken, getCurrentRevision(), annotationID, { document: documentPath, selection });
+      const payload: ReattachRequest = { document: documentPath, selection };
+      const response = await reattachAnnotation(reviewToken, getCurrentRevision(), annotationID, payload);
       if (!response.ok) {
         if (response.status === 409) {
           await loadAnnotations();
@@ -97,7 +125,7 @@ export function createAnnotationActions({
       forceClearSelectionPreview();
       await loadAnnotations();
     } catch (error) {
-      status.textContent = error.message || "Could not reattach annotation.";
+      status.textContent = errorMessage(error, "Could not reattach annotation.");
       status.classList.add("error");
       button.disabled = false;
     }
@@ -105,7 +133,7 @@ export function createAnnotationActions({
 
   // Ordinary replies extend the discussion thread without implying that the
   // annotation has advanced through its lifecycle.
-  function createReplyForm(annotation) {
+  function createReplyForm(annotation: Annotation): HTMLFormElement {
     const reply = element("form", "annotation-reply");
     const authorLabel = document.createElement("label");
     authorLabel.append(document.createTextNode("Reply as"));
@@ -139,11 +167,11 @@ export function createAnnotationActions({
     return reply;
   }
 
-  async function submitReply(event, annotationID) {
+  async function submitReply(event: Event, annotationID: string): Promise<void> {
     event.preventDefault();
-    const reply = event.currentTarget;
-    const button = reply.querySelector('button[type="submit"]');
-    const status = reply.querySelector(".reply-status");
+    const reply = requiredElement(event.currentTarget as HTMLFormElement | null, "reply form");
+    const button = requiredElement(reply.querySelector<HTMLButtonElement>('button[type="submit"]'), "reply button");
+    const status = requiredElement(reply.querySelector<HTMLElement>(".reply-status"), "reply status");
     const fields = new FormData(reply);
     status.textContent = "Saving…";
     status.classList.remove("error");
@@ -151,8 +179,8 @@ export function createAnnotationActions({
     try {
       const response = await replyToAnnotation(reviewToken, getCurrentRevision(), annotationID, {
         document: documentPath,
-        author: fields.get("author"),
-        message: fields.get("message"),
+        author: String(fields.get("author") || ""),
+        message: String(fields.get("message") || ""),
       });
       if (!response.ok) {
         if (response.status === 409) {
@@ -164,7 +192,7 @@ export function createAnnotationActions({
       }
       await loadAnnotations();
     } catch (error) {
-      status.textContent = error.message || "Could not add reply.";
+      status.textContent = errorMessage(error, "Could not add reply.");
       status.classList.add("error");
       button.disabled = false;
     }
@@ -173,7 +201,7 @@ export function createAnnotationActions({
   // Build only the lifecycle actions valid from the annotation's current
   // state. Actor roles and required activity are derived from that action so
   // the browser cannot accidentally submit an invalid transition shape.
-  function createLifecycleForm(annotation) {
+  function createLifecycleForm(annotation: Annotation): HTMLFormElement | null {
     // Applied annotations expose Close as a quick action beside this panel.
     // Keep only Needs changes here so the same transition is not duplicated.
     const options = transitionOptions(annotation.status)
@@ -225,9 +253,9 @@ export function createAnnotationActions({
 
     lifecycle.append(actionLabel, authorLabel, activityLabel, commitLabel, status, button);
     const updateFields = () => {
-      const selected = action.selectedOptions[0];
+      const selected = requiredElement(action.selectedOptions[0] || null, "lifecycle action");
       const activityKind = selected.dataset.activity;
-      updateLifecycleAuthorOptions(author, selected.dataset.role);
+      updateLifecycleAuthorOptions(author, selected.dataset.role || "reviewer");
       activityLabel.hidden = !activityKind;
       activity.required = Boolean(activityKind);
       activityTitle.textContent = activityKind === "summary" ? "Summary" : "Message";
@@ -241,7 +269,7 @@ export function createAnnotationActions({
     return lifecycle;
   }
 
-  function updateLifecycleAuthorOptions(author, role) {
+  function updateLifecycleAuthorOptions(author: HTMLSelectElement, role: string): void {
     const preferred = replyActorValue(reviewerAuthor());
     const actors = role === "agent"
       ? replyActors().filter((actor) => actor.value === "agent")
@@ -256,25 +284,25 @@ export function createAnnotationActions({
     author.value = actors.some((actor) => actor.value === preferred) ? preferred : actors[0]?.value || "reviewer";
   }
 
-  async function submitLifecycle(event, annotationID) {
+  async function submitLifecycle(event: Event, annotationID: string): Promise<void> {
     event.preventDefault();
-    const lifecycle = event.currentTarget;
-    const button = lifecycle.querySelector('button[type="submit"]');
-    const status = lifecycle.querySelector(".lifecycle-status");
+    const lifecycle = requiredElement(event.currentTarget as HTMLFormElement | null, "lifecycle form");
+    const button = requiredElement(lifecycle.querySelector<HTMLButtonElement>('button[type="submit"]'), "lifecycle button");
+    const status = requiredElement(lifecycle.querySelector<HTMLElement>(".lifecycle-status"), "lifecycle status");
     const fields = new FormData(lifecycle);
-    const selected = lifecycle.elements.status.selectedOptions[0];
+    const selected = requiredElement((lifecycle.elements.namedItem("status") as HTMLSelectElement | null)?.selectedOptions[0] || null, "lifecycle action");
     const activityKind = selected.dataset.activity;
-    const payload = {
+    const payload: TransitionRequest = {
       document: documentPath,
-      status: fields.get("status"),
-      actorRole: selected.dataset.role,
-      author: fields.get("author"),
+      status: selected.value as TransitionRequest["status"],
+      actorRole: selected.dataset.role as TransitionRequest["actorRole"],
+      author: String(fields.get("author") || ""),
     };
-    if (activityKind === "message") payload.message = fields.get("activity");
+    if (activityKind === "message") payload.message = String(fields.get("activity") || "");
     if (activityKind === "summary") {
-      payload.summary = fields.get("activity");
+      payload.summary = String(fields.get("activity") || "");
       const commit = fields.get("commit");
-      if (commit) payload.commit = commit;
+      if (commit) payload.commit = String(commit);
     }
 
     await updateLifecycle(annotationID, payload, button, status);
@@ -282,7 +310,7 @@ export function createAnnotationActions({
 
   // Both the expanded lifecycle form and Quick Close use this mutation path so
   // token, revision-conflict, reload, and error behavior cannot drift apart.
-  async function updateLifecycle(annotationID, payload, button, status) {
+  async function updateLifecycle(annotationID: string, payload: TransitionRequest, button: HTMLButtonElement, status: HTMLElement | null): Promise<void> {
     if (status) {
       status.textContent = "Saving…";
       status.classList.remove("error");
@@ -301,10 +329,10 @@ export function createAnnotationActions({
       await loadAnnotations();
     } catch (error) {
       if (status) {
-        status.textContent = error.message || "Could not update annotation.";
+        status.textContent = errorMessage(error, "Could not update annotation.");
         status.classList.add("error");
       } else {
-        setFormStatus(error.message || "Could not close annotation.", true);
+        setFormStatus(errorMessage(error, "Could not close annotation."), true);
       }
       button.disabled = false;
     }

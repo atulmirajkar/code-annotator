@@ -1,15 +1,23 @@
 import { element } from "./review-dom.js";
+import type { Annotation } from "./types.js";
 
-export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }) {
+interface AnnotationHighlighterOptions {
+  markdown: HTMLElement;
+  sourceSpan: (node: Node) => HTMLElement | null;
+  sourceSpanRange: (startSpan: HTMLElement, endSpan: HTMLElement) => HTMLElement[] | null;
+  utf8Length: (value: string) => number;
+}
+
+export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }: AnnotationHighlighterOptions) {
   // Highlight only anchors resolved against the current document. Stale and
   // document-level annotations remain visible in the panel without a range.
-  function renderAnnotationHighlights(annotations) {
+  function renderAnnotationHighlights(annotations: Annotation[]): void {
     clearFallbackHighlights();
     renderDiagramHighlights(annotations);
     const ranges = annotations
       .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
-      .filter(Boolean);
+      .map((annotation) => sourceRange(annotation.anchor!.startByte, annotation.anchor!.endByte))
+      .filter((range): range is Range => range !== null);
 
     if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
       CSS.highlights.delete("code-annotator-annotations");
@@ -21,19 +29,19 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
 
   // Diagram annotations highlight the rendered region as a whole; their
   // hidden source ranges remain available for quote previews and fallback APIs.
-  function renderDiagramHighlights(annotations) {
+  function renderDiagramHighlights(annotations: Annotation[]): void {
     const activeRanges = annotations
       .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
-    markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
-      const start = Number.parseInt(diagram.dataset.sourceStart, 10);
-      const end = Number.parseInt(diagram.dataset.sourceEnd, 10);
+      .map((annotation): [number, number] => [annotation.anchor!.startByte, annotation.anchor!.endByte]);
+    markdown.querySelectorAll<HTMLElement>(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
+      const start = Number.parseInt(diagram.dataset.sourceStart || "", 10);
+      const end = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
       diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === start && range[1] === end));
     });
   }
 
-  function sourceRange(startByte, endByte) {
-    const spans = Array.from(markdown.querySelectorAll(".source-text"));
+  function sourceRange(startByte: number, endByte: number): Range | null {
+    const spans = Array.from(markdown.querySelectorAll<HTMLElement>(".source-text"));
     const startSpan = spans.find((span) => containsSourceOffset(span, startByte, false));
     const endSpan = spans.slice().reverse().find((span) => containsSourceOffset(span, endByte, true));
     if (!startSpan || !endSpan) return null;
@@ -54,14 +62,14 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     return range.collapsed ? null : range;
   }
 
-  function containsSourceOffset(span, offset, endBoundary) {
-    const start = Number.parseInt(span.dataset.sourceStart, 10);
-    const end = Number.parseInt(span.dataset.sourceEnd, 10);
+  function containsSourceOffset(span: HTMLElement, offset: number, endBoundary: boolean): boolean {
+    const start = Number.parseInt(span.dataset.sourceStart || "", 10);
+    const end = Number.parseInt(span.dataset.sourceEnd || "", 10);
     return Number.isInteger(start) && Number.isInteger(end) && (endBoundary ? start < offset && offset <= end : start <= offset && offset < end);
   }
 
-  function byteOffsetToTextOffset(span, sourceOffset) {
-    const spanStart = Number.parseInt(span.dataset.sourceStart, 10);
+  function byteOffsetToTextOffset(span: HTMLElement, sourceOffset: number): number {
+    const spanStart = Number.parseInt(span.dataset.sourceStart || "", 10);
     const target = sourceOffset - spanStart;
     if (!Number.isInteger(spanStart) || target < 0) return -1;
 
@@ -76,18 +84,19 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     return bytes === target ? textOffset : -1;
   }
 
-  function sourceTextNode(span) {
+  function sourceTextNode(span: HTMLElement): Text | null {
     span.normalize();
-    return span.firstChild && span.firstChild.nodeType === Node.TEXT_NODE ? span.firstChild : null;
+    return span.firstChild instanceof Text ? span.firstChild : null;
   }
 
   // The fallback merges overlapping intervals within each source span before
   // wrapping them, avoiding invalid nested or crossing mark elements.
-  function renderFallbackHighlights(ranges) {
-    const intervals = new Map();
+  function renderFallbackHighlights(ranges: Range[]): void {
+    const intervals = new Map<HTMLElement, Array<[number, number]>>();
     ranges.forEach((range) => {
       const startSpan = sourceSpan(range.startContainer);
       const endSpan = sourceSpan(range.endContainer);
+      if (!startSpan || !endSpan) return;
       const spans = sourceSpanRange(startSpan, endSpan) || [];
       spans.forEach((span) => {
         const length = (span.textContent || "").length;
@@ -111,14 +120,14 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     });
   }
 
-  function mergeIntervals(values) {
+  function mergeIntervals(values: Array<[number, number]>): Array<[number, number]> {
     const sorted = values.sort((left, right) => left[0] - right[0]);
     return sorted.reduce((merged, current) => {
       const previous = merged[merged.length - 1];
       if (previous && current[0] <= previous[1]) previous[1] = Math.max(previous[1], current[1]);
       else merged.push([...current]);
       return merged;
-    }, []);
+    }, [] as Array<[number, number]>);
   }
 
   function clearFallbackHighlights() {

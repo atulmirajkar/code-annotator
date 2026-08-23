@@ -1,3 +1,16 @@
+import type { SelectionPayload } from "./types.js";
+
+interface SelectionControllerOptions {
+  panel: HTMLElement;
+  markdown: HTMLElement;
+  preview: HTMLElement;
+  previewQuote: HTMLElement;
+  previewRange: HTMLElement;
+  selectionScope: HTMLInputElement;
+  documentScope: HTMLInputElement;
+  onSelectionChanged: () => void;
+}
+
 export function createSelectionController({
   panel,
   markdown,
@@ -7,8 +20,8 @@ export function createSelectionController({
   selectionScope,
   documentScope,
   onSelectionChanged,
-}) {
-  let pendingSelection = null;
+}: SelectionControllerOptions) {
+  let pendingSelection: SelectionPayload | null = null;
   let diagramSelectionActive = false;
   let preserveSelection = false;
 
@@ -18,7 +31,6 @@ export function createSelectionController({
       window.setTimeout(() => { preserveSelection = false; }, 0);
     });
 
-    if (!markdown) return;
     // selectionchange covers mouse, touch, and keyboard expansion regardless
     // of which element owns focus or where a drag gesture ends.
     document.addEventListener("selectionchange", updateSelectionPreview);
@@ -29,30 +41,34 @@ export function createSelectionController({
 
   // Beginning a different interaction explicitly releases a synthetic diagram
   // selection. Pointer events inside the diagram itself are handled on click.
-  function clearDiagramSelectionOnPointerdown(event) {
-    if (diagramSelectionActive && !event.target.closest?.(".mermaid-output")) {
+  function clearDiagramSelectionOnPointerdown(event: PointerEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    if (diagramSelectionActive && !target?.closest(".mermaid-output")) {
       forceClearSelectionPreview();
     }
   }
 
   // A rendered diagram has no stable label-to-Markdown mapping. Treat a click
   // anywhere on its SVG as a selection of the complete fenced definition.
-  function captureDiagramClick(event) {
-    const output = event.target.closest?.(".mermaid-output");
+  function captureDiagramClick(event: MouseEvent): void {
+    const target = event.target instanceof Element ? event.target : null;
+    const output = target?.closest(".mermaid-output");
     if (output) captureDiagramSelection(output.closest(".mermaid-diagram"));
   }
 
-  function captureDiagramKeydown(event) {
+  function captureDiagramKeydown(event: KeyboardEvent): void {
     if (event.key !== "Enter" && event.key !== " ") return;
-    const output = event.target.closest?.(".mermaid-output");
+    const target = event.target instanceof Element ? event.target : null;
+    const output = target?.closest(".mermaid-output");
     if (!output) return;
     event.preventDefault();
     captureDiagramSelection(output.closest(".mermaid-diagram"));
   }
 
-  function captureDiagramSelection(diagram) {
-    const startByte = Number.parseInt(diagram?.dataset.sourceStart, 10);
-    const endByte = Number.parseInt(diagram?.dataset.sourceEnd, 10);
+  function captureDiagramSelection(diagram: HTMLElement | null): void {
+    if (!diagram) return;
+    const startByte = Number.parseInt(diagram.dataset.sourceStart || "", 10);
+    const endByte = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
     const documentSHA256 = markdown.dataset.documentSha256;
     const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
     if (!Number.isInteger(startByte) || !Number.isInteger(endByte) || endByte <= startByte || !documentSHA256 || !exact) return;
@@ -80,7 +96,7 @@ export function createSelectionController({
   // Map any ordered pair of source-backed endpoints. Byte gaps may contain
   // Markdown delimiters; the server derives the exact source after verifying
   // the document digest instead of asking the browser to reconstruct them.
-  function updateSelectionPreview() {
+  function updateSelectionPreview(): void {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
       if (diagramSelectionActive && pendingSelection) return;
@@ -97,8 +113,8 @@ export function createSelectionController({
       return;
     }
 
-    const sourceStart = Number.parseInt(startSpan.dataset.sourceStart, 10);
-    const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd, 10);
+    const sourceStart = Number.parseInt(startSpan.dataset.sourceStart || "", 10);
+    const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd || "", 10);
     const spans = sourceSpanRange(startSpan, endSpan);
     const documentSHA256 = markdown.dataset.documentSha256;
     const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
@@ -110,7 +126,7 @@ export function createSelectionController({
     }
 
     const startByte = sourceStart + utf8Length((startSpan.textContent || "").slice(0, startOffset));
-    const endByte = Number.parseInt(endSpan.dataset.sourceStart, 10) + utf8Length((endSpan.textContent || "").slice(0, endOffset));
+    const endByte = Number.parseInt(endSpan.dataset.sourceStart || "", 10) + utf8Length((endSpan.textContent || "").slice(0, endOffset));
     if (endByte > sourceEnd) {
       clearSelectionPreview();
       return;
@@ -128,27 +144,29 @@ export function createSelectionController({
     onSelectionChanged();
   }
 
-  function sourceSpan(node) {
-    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  function sourceSpan(node: Node): HTMLElement | null {
+    const element = node instanceof HTMLElement ? node : node.parentElement;
     if (!element) return null;
-    const direct = element.closest(".source-text");
+    const direct = element.closest<HTMLElement>(".source-text");
     if (direct) return direct;
     // Empty source lines have a zero-length span with no text node of their
     // own, so a native selection boundary lands on the surrounding row/code.
-    return element.closest(".source-line, .diff-current")?.querySelector(".source-text") || null;
+    return element.closest<HTMLElement>(".source-line, .diff-current")?.querySelector<HTMLElement>(".source-text") || null;
   }
 
   // Browser Range text includes line-number and diff-marker siblings between
   // endpoints. For line-oriented code, rebuild the preview from source spans
   // only while preserving visually empty intervening rows as newlines.
-  function selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset) {
-    const startRow = startSpan.closest(".source-line, .diff-current");
-    const endRow = endSpan.closest(".source-line, .diff-current");
+  function selectionPreviewText(range: Range, startSpan: HTMLElement, endSpan: HTMLElement, startOffset: number, endOffset: number): string {
+    const startRow = startSpan.closest<HTMLElement>(".source-line, .diff-current");
+    const endRow = endSpan.closest<HTMLElement>(".source-line, .diff-current");
     if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement) {
       return range.toString();
     }
 
-    const rows = Array.from(startRow.parentElement.children).filter((row) => row.matches(".source-line, .diff-current"));
+    const parent = startRow.parentElement;
+    if (!parent) return "";
+    const rows = Array.from(parent.children).filter((row): row is HTMLElement => row instanceof HTMLElement && row.matches(".source-line, .diff-current"));
     const startIndex = rows.indexOf(startRow);
     const endIndex = rows.indexOf(endRow);
     if (startIndex < 0 || endIndex < startIndex) return "";
@@ -165,8 +183,8 @@ export function createSelectionController({
   }
 
   // Confirm that the selection endpoints occur in document source order.
-  function sourceSpanRange(startSpan, endSpan) {
-    const spans = Array.from(markdown.querySelectorAll(".source-text"));
+  function sourceSpanRange(startSpan: HTMLElement, endSpan: HTMLElement): HTMLElement[] | null {
+    const spans = Array.from(markdown.querySelectorAll<HTMLElement>(".source-text"));
     const startIndex = spans.indexOf(startSpan);
     const endIndex = spans.indexOf(endSpan);
     if (startIndex < 0 || endIndex < startIndex) return null;
@@ -182,13 +200,13 @@ export function createSelectionController({
     return selected;
   }
 
-  function codeBlock(span) {
-    const code = span.closest("code");
+  function codeBlock(span: HTMLElement): HTMLElement | null {
+    const code = span.closest<HTMLElement>("code");
     return code && code.parentElement && code.parentElement.tagName === "PRE" ? code : null;
   }
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.
-  function textOffset(span, boundaryNode, boundaryOffset) {
+  function textOffset(span: HTMLElement, boundaryNode: Node, boundaryOffset: number): number {
     if (!(span.textContent || "") && span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
       return 0;
     }
@@ -202,7 +220,7 @@ export function createSelectionController({
     return range.toString().length;
   }
 
-  function utf8Length(value) {
+  function utf8Length(value: string): number {
     return new TextEncoder().encode(value).length;
   }
 
@@ -231,7 +249,7 @@ export function createSelectionController({
     onSelectionChanged();
   }
 
-  function currentSelection() {
+  function currentSelection(): SelectionPayload | null {
     return pendingSelection;
   }
 

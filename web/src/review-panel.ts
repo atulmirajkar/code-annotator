@@ -2,6 +2,17 @@ const reviewPanelMinWidth = 320;
 const reviewPanelMaxWidth = 640;
 const reviewPanelWidthStep = 24;
 
+interface ReviewPanelOptions {
+  panel: HTMLElement;
+  form: HTMLFormElement;
+  formStatus: HTMLElement;
+  addAnnotationButton: HTMLButtonElement | null;
+  closeAnnotationButton: HTMLButtonElement | null;
+  layout: HTMLElement | null;
+  resizeHandle: HTMLElement | null;
+  documentPath: string;
+}
+
 export function createReviewPanelController({
   panel,
   form,
@@ -11,8 +22,8 @@ export function createReviewPanelController({
   layout,
   resizeHandle,
   documentPath,
-}) {
-  const reviewPanelWidthKey = `code-annotator-review-panel-width:${documentPath || "default"}`;
+}: ReviewPanelOptions) {
+  const reviewPanelWidthKey = `code-annotator-review-panel-width:${documentPath}`;
   let reviewPanelWidth = restoreReviewPanelWidth() || 368;
 
   applyReviewPanelWidth(reviewPanelWidth);
@@ -36,16 +47,16 @@ export function createReviewPanelController({
     setFormStatus("");
   });
 
-  function setFormStatus(message, error = false) {
+  function setFormStatus(message: string, error = false): void {
     formStatus.textContent = message;
     formStatus.classList.toggle("error", error);
   }
 
-  function setAnnotationFormVisible(visible) {
+  function setAnnotationFormVisible(visible: boolean): void {
     form.hidden = !visible;
     syncAnnotationFormToggle();
     if (visible) {
-      form.elements.comment?.focus({ preventScroll: true });
+      (form.elements.namedItem("comment") as HTMLTextAreaElement | null)?.focus({ preventScroll: true });
     }
   }
 
@@ -60,14 +71,14 @@ export function createReviewPanelController({
   function restoreReviewPanelWidth() {
     try {
       const stored = window.localStorage.getItem(reviewPanelWidthKey);
-      const width = Number.parseInt(stored, 10);
+      const width = Number.parseInt(stored || "", 10);
       return Number.isInteger(width) ? clampReviewPanelWidth(width) : null;
     } catch (_) {
       return null;
     }
   }
 
-  function persistReviewPanelWidth(width) {
+  function persistReviewPanelWidth(width: number): void {
     try {
       window.localStorage.setItem(reviewPanelWidthKey, String(width));
     } catch (_) {
@@ -75,24 +86,25 @@ export function createReviewPanelController({
     }
   }
 
-  function clampReviewPanelWidth(width) {
+  function clampReviewPanelWidth(width: number): number {
     return Math.max(reviewPanelMinWidth, Math.min(reviewPanelMaxWidth, Math.round(width)));
   }
 
-  function applyReviewPanelWidth(width) {
+  function applyReviewPanelWidth(width: number): void {
     reviewPanelWidth = clampReviewPanelWidth(width);
     if (layout) layout.style.setProperty("--review-panel-width", `${reviewPanelWidth}px`);
     if (resizeHandle) resizeHandle.setAttribute("aria-valuenow", String(reviewPanelWidth));
   }
 
-  function startReviewPanelResize(event) {
+  function startReviewPanelResize(event: PointerEvent): void {
+    if (!resizeHandle) return;
     if (event.button !== 0) return;
     event.preventDefault();
     resizeHandle.setPointerCapture(event.pointerId);
     const startX = event.clientX;
     const startWidth = panel.getBoundingClientRect().width;
 
-    const track = (moveEvent) => {
+    const track = (moveEvent: PointerEvent): void => {
       applyReviewPanelWidth(startWidth + (startX - moveEvent.clientX));
     };
     const finish = () => {
@@ -105,7 +117,7 @@ export function createReviewPanelController({
     resizeHandle.addEventListener("pointercancel", finish, { once: true });
   }
 
-  function handleReviewPanelResizeKeydown(event) {
+  function handleReviewPanelResizeKeydown(event: KeyboardEvent): void {
     let delta = 0;
     if (event.key === "ArrowLeft") delta = -reviewPanelWidthStep;
     else if (event.key === "ArrowRight") delta = reviewPanelWidthStep;
