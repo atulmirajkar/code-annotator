@@ -46,19 +46,28 @@ const (
 
 // Server serves an index and rendered documents from a content root.
 type Server struct {
-	root         *content.Root
-	indexOptions content.IndexOptions
-	renderer     *mdrender.Renderer
-	annotations  *annotationstore.Store
-	review       *reviewSession
-	comparison   *comparisonController
-	page         *template.Template
-	styles       []byte
-	reviewJS     []byte
-	viewerJS     []byte
-	mermaidJS    []byte
-	mermaidTiny  []byte
-	handler      http.Handler
+	root            *content.Root
+	indexOptions    content.IndexOptions
+	renderer        *mdrender.Renderer
+	annotations     *annotationstore.Store
+	review          *reviewSession
+	comparison      *comparisonController
+	page            *template.Template
+	styles          []byte
+	reviewJS        []byte
+	reviewActionsJS []byte
+	reviewAPIJS     []byte
+	reviewDOMJS     []byte
+	reviewHLJS      []byte
+	reviewNavJS     []byte
+	reviewPanelJS   []byte
+	reviewRenderJS  []byte
+	reviewSelectJS  []byte
+	reviewThreadJS  []byte
+	viewerJS        []byte
+	mermaidJS       []byte
+	mermaidTiny     []byte
+	handler         http.Handler
 }
 
 // reviewSession contains the browser-bound authority required for annotation
@@ -264,6 +273,42 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read review script: %w", err)
 	}
+	reviewActionsJS, err := fs.ReadFile(web.Files, "review-actions.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review actions script: %w", err)
+	}
+	reviewAPIJS, err := fs.ReadFile(web.Files, "review-api.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review API script: %w", err)
+	}
+	reviewDOMJS, err := fs.ReadFile(web.Files, "review-dom.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review DOM script: %w", err)
+	}
+	reviewHLJS, err := fs.ReadFile(web.Files, "review-highlights.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review highlights script: %w", err)
+	}
+	reviewNavJS, err := fs.ReadFile(web.Files, "review-navigation.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review navigation script: %w", err)
+	}
+	reviewPanelJS, err := fs.ReadFile(web.Files, "review-panel.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review panel script: %w", err)
+	}
+	reviewRenderJS, err := fs.ReadFile(web.Files, "review-render.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review render script: %w", err)
+	}
+	reviewSelectJS, err := fs.ReadFile(web.Files, "review-selection.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review selection script: %w", err)
+	}
+	reviewThreadJS, err := fs.ReadFile(web.Files, "review-thread.js")
+	if err != nil {
+		return nil, fmt.Errorf("read review thread script: %w", err)
+	}
 	viewerJS, err := fs.ReadFile(web.Files, "viewer.js")
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
@@ -278,14 +323,23 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	}
 
 	server := &Server{
-		root:        root,
-		renderer:    renderer,
-		page:        page,
-		styles:      styles,
-		reviewJS:    reviewJS,
-		viewerJS:    viewerJS,
-		mermaidJS:   mermaidJS,
-		mermaidTiny: mermaidTiny,
+		root:            root,
+		renderer:        renderer,
+		page:            page,
+		styles:          styles,
+		reviewJS:        reviewJS,
+		reviewActionsJS: reviewActionsJS,
+		reviewAPIJS:     reviewAPIJS,
+		reviewDOMJS:     reviewDOMJS,
+		reviewHLJS:      reviewHLJS,
+		reviewNavJS:     reviewNavJS,
+		reviewPanelJS:   reviewPanelJS,
+		reviewRenderJS:  reviewRenderJS,
+		reviewSelectJS:  reviewSelectJS,
+		reviewThreadJS:  reviewThreadJS,
+		viewerJS:        viewerJS,
+		mermaidJS:       mermaidJS,
+		mermaidTiny:     mermaidTiny,
 	}
 	for _, option := range options {
 		if option == nil {
@@ -301,6 +355,15 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
 	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
+	mux.HandleFunc("GET /static/review-actions.js", server.handleReviewActionsScript)
+	mux.HandleFunc("GET /static/review-api.js", server.handleReviewAPIScript)
+	mux.HandleFunc("GET /static/review-dom.js", server.handleReviewDOMScript)
+	mux.HandleFunc("GET /static/review-highlights.js", server.handleReviewHighlightsScript)
+	mux.HandleFunc("GET /static/review-navigation.js", server.handleReviewNavigationScript)
+	mux.HandleFunc("GET /static/review-panel.js", server.handleReviewPanelScript)
+	mux.HandleFunc("GET /static/review-render.js", server.handleReviewRenderScript)
+	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
+	mux.HandleFunc("GET /static/review-thread.js", server.handleReviewThreadScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
@@ -330,6 +393,51 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.reviewJS)
+}
+
+func (s *Server) handleReviewActionsScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewActionsJS)
+}
+
+func (s *Server) handleReviewAPIScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewAPIJS)
+}
+
+func (s *Server) handleReviewDOMScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewDOMJS)
+}
+
+func (s *Server) handleReviewHighlightsScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewHLJS)
+}
+
+func (s *Server) handleReviewNavigationScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewNavJS)
+}
+
+func (s *Server) handleReviewPanelScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewPanelJS)
+}
+
+func (s *Server) handleReviewRenderScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewRenderJS)
+}
+
+func (s *Server) handleReviewSelectionScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewSelectJS)
+}
+
+func (s *Server) handleReviewThreadScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.reviewThreadJS)
 }
 
 // handleViewerScript serves shared navigation behavior on every viewer page.

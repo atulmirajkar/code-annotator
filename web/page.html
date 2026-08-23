@@ -130,6 +130,6 @@
   <script src="/static/viewer.js" defer></script>
   {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
   <script src="/static/mermaid.js" defer></script>{{end}}
-  {{if .ReviewToken}}<script src="/static/review.js" defer></script>{{end}}
+  {{if .ReviewToken}}<script type="module" src="/static/review.js"></script>{{end}}
 </body>
 </html>

@@ -1,6 +1,12 @@
-(() => {
-  "use strict";
+import { createAnnotation, fetchAnnotations } from "./review-api.js";
+import { createAnnotationActions } from "./review-actions.js";
+import { createAnnotationHighlighter } from "./review-highlights.js";
+import { createAnnotationNavigator } from "./review-navigation.js";
+import { createReviewPanelController } from "./review-panel.js";
+import { createAnnotationRenderer } from "./review-render.js";
+import { createSelectionController } from "./review-selection.js";
 
+(() => {
   const panel = document.querySelector(".review-panel");
   if (!panel) return;
 
@@ -22,263 +28,93 @@
   const layout = panel.closest(".layout");
   const reviewToken = document.querySelector('meta[name="code-annotator-review-token"]')?.content || "";
   const documentPath = panel.dataset.document;
-  const reviewPanelWidthKey = `code-annotator-review-panel-width:${documentPath || "default"}`;
-  const reviewPanelMinWidth = 320;
-  const reviewPanelMaxWidth = 640;
-  const reviewPanelWidthStep = 24;
   let currentRevision = "";
-  let pendingSelection = null;
-  let diagramSelectionActive = false;
-  let preserveSelection = false;
-  let annotationPayload = null;
-  let navigationTargetTimer = 0;
-  let reviewPanelWidth = 368;
+  let updateReattachControls = () => {};
+  let renderAnnotations = () => {};
+  let showMessage = () => {};
   if (!documentPath) {
-    showMessage("Open a Markdown document to review annotations.");
+    list.replaceChildren();
+    const item = document.createElement("p");
+    item.className = "review-message";
+    item.textContent = "Open a Markdown document to review annotations.";
+    list.append(item);
+    count.textContent = "";
     return;
   }
 
-  reviewPanelWidth = restoreReviewPanelWidth() || reviewPanelWidth;
-  applyReviewPanelWidth(reviewPanelWidth);
-  if (resizeHandle) {
-    resizeHandle.setAttribute("aria-valuemin", String(reviewPanelMinWidth));
-    resizeHandle.setAttribute("aria-valuemax", String(reviewPanelMaxWidth));
-    resizeHandle.setAttribute("aria-valuenow", String(reviewPanelWidth));
-    resizeHandle.addEventListener("pointerdown", startReviewPanelResize);
-    resizeHandle.addEventListener("keydown", handleReviewPanelResizeKeydown);
-  }
+  const panelController = createReviewPanelController({
+    panel,
+    form,
+    formStatus,
+    addAnnotationButton,
+    closeAnnotationButton,
+    layout,
+    resizeHandle,
+    documentPath,
+  });
+  const { setAnnotationFormVisible, setFormStatus } = panelController;
+  const selectionController = createSelectionController({
+    panel,
+    markdown,
+    preview,
+    previewQuote,
+    previewRange,
+    selectionScope,
+    documentScope,
+    onSelectionChanged: () => updateReattachControls(),
+  });
+  const {
+    currentSelection,
+    forceClearSelectionPreview,
+    sourceSpan,
+    sourceSpanRange,
+    utf8Length,
+  } = selectionController;
+  const { renderAnnotationHighlights, sourceRange } = createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length });
+  const { navigateFromAnnotation } = createAnnotationNavigator({ markdown, sourceRange, sourceSpan });
+  const actionController = createAnnotationActions({
+    documentPath,
+    reviewToken,
+    getCurrentRevision: () => currentRevision,
+    currentSelection,
+    forceClearSelectionPreview,
+    loadAnnotations,
+    setFormStatus,
+    reviewerAuthor: () => form.elements.author.value,
+    list,
+  });
+  const {
+    createQuickClose,
+    createReattachForm,
+    createReplyForm,
+    createLifecycleForm,
+  } = actionController;
+  updateReattachControls = actionController.updateReattachControls;
+  const renderer = createAnnotationRenderer({
+    list,
+    count,
+    showInactive,
+    renderAnnotationHighlights,
+    navigateFromAnnotation,
+    createQuickClose,
+    createReattachForm,
+    createReplyForm,
+    createLifecycleForm,
+  });
+  renderAnnotations = renderer.renderAnnotations;
+  showMessage = renderer.showMessage;
 
   loadAnnotations();
-  syncAnnotationFormToggle();
-  if (addAnnotationButton) {
-    addAnnotationButton.addEventListener("click", () => {
-      setAnnotationFormVisible(true);
-      setFormStatus("");
-    });
-  }
-  closeAnnotationButton?.addEventListener("click", () => {
-    setAnnotationFormVisible(false);
-    setFormStatus("");
-  });
   form.addEventListener("submit", submitAnnotation);
   showInactive.addEventListener("change", () => {
-    if (annotationPayload) renderAnnotations(annotationPayload);
+    const payload = renderer.currentPayload();
+    if (payload) renderAnnotations(payload);
   });
-  panel.addEventListener("pointerdown", () => { preserveSelection = true; });
-  document.addEventListener("pointerup", () => {
-    window.setTimeout(() => { preserveSelection = false; }, 0);
-  });
-
-  if (markdown) {
-    // selectionchange covers mouse, touch, and keyboard expansion regardless
-    // of which element owns focus or where a drag gesture ends.
-    document.addEventListener("selectionchange", updateSelectionPreview);
-    markdown.addEventListener("pointerdown", clearDiagramSelectionOnPointerdown);
-    markdown.addEventListener("click", captureDiagramClick);
-    markdown.addEventListener("keydown", captureDiagramKeydown);
-  }
-
-  // Beginning a different interaction explicitly releases a synthetic diagram
-  // selection. Pointer events inside the diagram itself are handled on click.
-  function clearDiagramSelectionOnPointerdown(event) {
-    if (diagramSelectionActive && !event.target.closest?.(".mermaid-output")) {
-      forceClearSelectionPreview();
-    }
-  }
-
-  // A rendered diagram has no stable label-to-Markdown mapping. Treat a click
-  // anywhere on its SVG as a selection of the complete fenced definition.
-  function captureDiagramClick(event) {
-    const output = event.target.closest?.(".mermaid-output");
-    if (output) captureDiagramSelection(output.closest(".mermaid-diagram"));
-  }
-
-  function captureDiagramKeydown(event) {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    const output = event.target.closest?.(".mermaid-output");
-    if (!output) return;
-    event.preventDefault();
-    captureDiagramSelection(output.closest(".mermaid-diagram"));
-  }
-
-  function captureDiagramSelection(diagram) {
-    const startByte = Number.parseInt(diagram?.dataset.sourceStart, 10);
-    const endByte = Number.parseInt(diagram?.dataset.sourceEnd, 10);
-    const documentSHA256 = markdown.dataset.documentSha256;
-    const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
-    if (!Number.isInteger(startByte) || !Number.isInteger(endByte) || endByte <= startByte || !documentSHA256 || !exact) return;
-
-    // Diagram selection is synthetic: the SVG has no DOM text range that maps
-    // safely to Markdown. Keep it active across delayed collapsed
-    // selectionchange events until the reviewer starts another interaction.
-    diagramSelectionActive = true;
-    window.getSelection()?.removeAllRanges();
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
-    diagram.classList.add("annotation-selection");
-    preview.dataset.startByte = String(startByte);
-    preview.dataset.endByte = String(endByte);
-    preview.dataset.exact = exact;
-    preview.dataset.documentSha256 = documentSHA256;
-    pendingSelection = { startByte, endByte, documentSHA256 };
-    selectionScope.disabled = false;
-    selectionScope.checked = true;
-    previewQuote.textContent = exact;
-    previewRange.textContent = `bytes ${startByte}–${endByte} · complete diagram`;
-    preview.hidden = false;
-    updateReattachControls();
-  }
-
-  // Map any ordered pair of source-backed endpoints. Byte gaps may contain
-  // Markdown delimiters; the server derives the exact source after verifying
-  // the document digest instead of asking the browser to reconstruct them.
-  function updateSelectionPreview() {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
-      if (diagramSelectionActive && pendingSelection) return;
-      clearSelectionPreview();
-      return;
-    }
-    diagramSelectionActive = false;
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
-    const range = selection.getRangeAt(0);
-    const startSpan = sourceSpan(range.startContainer);
-    const endSpan = sourceSpan(range.endContainer);
-    if (!startSpan || !endSpan || !markdown.contains(startSpan) || !markdown.contains(endSpan)) {
-      clearSelectionPreview();
-      return;
-    }
-
-    const sourceStart = Number.parseInt(startSpan.dataset.sourceStart, 10);
-    const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd, 10);
-    const spans = sourceSpanRange(startSpan, endSpan);
-    const documentSHA256 = markdown.dataset.documentSha256;
-    const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
-    const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
-    const exact = selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset);
-    if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
-      clearSelectionPreview();
-      return;
-    }
-
-    const startByte = sourceStart + utf8Length((startSpan.textContent || "").slice(0, startOffset));
-    const endByte = Number.parseInt(endSpan.dataset.sourceStart, 10) + utf8Length((endSpan.textContent || "").slice(0, endOffset));
-    if (endByte > sourceEnd) {
-      clearSelectionPreview();
-      return;
-    }
-    preview.dataset.startByte = String(startByte);
-    preview.dataset.endByte = String(endByte);
-    preview.dataset.exact = exact;
-    preview.dataset.documentSha256 = documentSHA256;
-    pendingSelection = { startByte, endByte, documentSHA256 };
-    selectionScope.disabled = false;
-    selectionScope.checked = true;
-    previewQuote.textContent = exact;
-    previewRange.textContent = `bytes ${startByte}–${endByte}`;
-    preview.hidden = false;
-    updateReattachControls();
-  }
-
-  function sourceSpan(node) {
-    const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-    if (!element) return null;
-    const direct = element.closest(".source-text");
-    if (direct) return direct;
-    // Empty source lines have a zero-length span with no text node of their
-    // own, so a native selection boundary lands on the surrounding row/code.
-    return element.closest(".source-line, .diff-current")?.querySelector(".source-text") || null;
-  }
-
-  // Browser Range text includes line-number and diff-marker siblings between
-  // endpoints. For line-oriented code, rebuild the preview from source spans
-  // only while preserving visually empty intervening rows as newlines.
-  function selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset) {
-    const startRow = startSpan.closest(".source-line, .diff-current");
-    const endRow = endSpan.closest(".source-line, .diff-current");
-    if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement) {
-      return range.toString();
-    }
-
-    const rows = Array.from(startRow.parentElement.children).filter((row) => row.matches(".source-line, .diff-current"));
-    const startIndex = rows.indexOf(startRow);
-    const endIndex = rows.indexOf(endRow);
-    if (startIndex < 0 || endIndex < startIndex) return "";
-    if (startIndex === endIndex) {
-      return (startSpan.textContent || "").slice(startOffset, endOffset);
-    }
-
-    return rows.slice(startIndex, endIndex + 1).map((row, index, selectedRows) => {
-      const text = row.querySelector(".source-text")?.textContent || "";
-      if (index === 0) return text.slice(startOffset);
-      if (index === selectedRows.length - 1) return text.slice(0, endOffset);
-      return text;
-    }).join("\n");
-  }
-
-  // Confirm that the selection endpoints occur in document source order.
-  function sourceSpanRange(startSpan, endSpan) {
-    const spans = Array.from(markdown.querySelectorAll(".source-text"));
-    const startIndex = spans.indexOf(startSpan);
-    const endIndex = spans.indexOf(endSpan);
-    if (startIndex < 0 || endIndex < startIndex) return null;
-
-    const selected = spans.slice(startIndex, endIndex + 1);
-    const startBlock = codeBlock(startSpan);
-    const endBlock = codeBlock(endSpan);
-    if (startBlock || endBlock) {
-      return startBlock && startBlock === endBlock ? selected : null;
-    }
-    // Keep block-code selection pure even when both endpoints are outside it.
-    if (selected.some((span) => codeBlock(span))) return null;
-    return selected;
-  }
-
-  function codeBlock(span) {
-    const code = span.closest("code");
-    return code && code.parentElement && code.parentElement.tagName === "PRE" ? code : null;
-  }
-
-  // Convert a DOM boundary into a UTF-16 text offset within its source span.
-  function textOffset(span, boundaryNode, boundaryOffset) {
-    if (!(span.textContent || "") && span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
-      return 0;
-    }
-    const range = document.createRange();
-    range.selectNodeContents(span);
-    try {
-      range.setEnd(boundaryNode, boundaryOffset);
-    } catch (_) {
-      return -1;
-    }
-    return range.toString().length;
-  }
-
-  function utf8Length(value) {
-    return new TextEncoder().encode(value).length;
-  }
-
-  function clearSelectionPreview() {
-    if ((preserveSelection || panel.contains(document.activeElement)) && pendingSelection) return;
-    preview.hidden = true;
-    delete preview.dataset.startByte;
-    delete preview.dataset.endByte;
-    delete preview.dataset.exact;
-    delete preview.dataset.documentSha256;
-    previewQuote.textContent = "";
-    previewRange.textContent = "";
-    pendingSelection = null;
-    diagramSelectionActive = false;
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
-    selectionScope.disabled = true;
-    documentScope.checked = true;
-    updateReattachControls();
-  }
+  selectionController.bind();
 
   async function loadAnnotations() {
     try {
-      const response = await fetch(`/api/annotations?document=${encodeURIComponent(documentPath)}`, {
-        headers: { Accept: "application/json" },
-      });
+      const response = await fetchAnnotations(documentPath);
       if (!response.ok) throw new Error(`annotation request failed: ${response.status}`);
       const payload = await response.json();
       currentRevision = typeof payload.revision === "string" ? payload.revision : "";
@@ -300,20 +136,13 @@
       comment: fields.get("comment"),
       author: fields.get("author"),
     };
-    if (fields.get("scope") === "selection" && pendingSelection) {
-      payload.selection = pendingSelection;
+    const selectedRange = currentSelection();
+    if (fields.get("scope") === "selection" && selectedRange) {
+      payload.selection = selectedRange;
     }
 
     try {
-      const response = await fetch("/api/annotations", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": JSON.stringify(currentRevision),
-          "X-Code-Annotator-Token": reviewToken,
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await createAnnotation(reviewToken, currentRevision, payload);
       if (!response.ok) {
         if (response.status === 409) {
           await loadAnnotations();
@@ -335,860 +164,4 @@
     }
   }
 
-  function forceClearSelectionPreview() {
-    pendingSelection = null;
-    diagramSelectionActive = false;
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
-    preview.hidden = true;
-    previewQuote.textContent = "";
-    previewRange.textContent = "";
-    selectionScope.disabled = true;
-    documentScope.checked = true;
-    updateReattachControls();
-  }
-
-  function setFormStatus(message, error = false) {
-    formStatus.textContent = message;
-    formStatus.classList.toggle("error", error);
-  }
-
-  function setAnnotationFormVisible(visible) {
-    form.hidden = !visible;
-    syncAnnotationFormToggle();
-    if (visible) {
-      form.elements.comment?.focus({ preventScroll: true });
-    }
-  }
-
-  function syncAnnotationFormToggle() {
-    if (!addAnnotationButton) return;
-    const visible = !form.hidden;
-    addAnnotationButton.textContent = "Add comment";
-    addAnnotationButton.hidden = visible;
-    addAnnotationButton.setAttribute("aria-expanded", String(visible));
-  }
-
-  function restoreReviewPanelWidth() {
-    try {
-      const stored = window.localStorage.getItem(reviewPanelWidthKey);
-      const width = Number.parseInt(stored, 10);
-      return Number.isInteger(width) ? clampReviewPanelWidth(width) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function persistReviewPanelWidth(width) {
-    try {
-      window.localStorage.setItem(reviewPanelWidthKey, String(width));
-    } catch (_) {
-      // Ignore storage failures; the resize still applies for this session.
-    }
-  }
-
-  function clampReviewPanelWidth(width) {
-    return Math.max(reviewPanelMinWidth, Math.min(reviewPanelMaxWidth, Math.round(width)));
-  }
-
-  function applyReviewPanelWidth(width) {
-    reviewPanelWidth = clampReviewPanelWidth(width);
-    if (layout) layout.style.setProperty("--review-panel-width", `${reviewPanelWidth}px`);
-    if (resizeHandle) resizeHandle.setAttribute("aria-valuenow", String(reviewPanelWidth));
-  }
-
-  function startReviewPanelResize(event) {
-    if (event.button !== 0) return;
-    event.preventDefault();
-    resizeHandle.setPointerCapture(event.pointerId);
-    const startX = event.clientX;
-    const startWidth = panel.getBoundingClientRect().width;
-
-    const track = (moveEvent) => {
-      applyReviewPanelWidth(startWidth + (startX - moveEvent.clientX));
-    };
-    const finish = () => {
-      resizeHandle.removeEventListener("pointermove", track);
-      persistReviewPanelWidth(reviewPanelWidth);
-    };
-
-    resizeHandle.addEventListener("pointermove", track);
-    resizeHandle.addEventListener("pointerup", finish, { once: true });
-    resizeHandle.addEventListener("pointercancel", finish, { once: true });
-  }
-
-  function handleReviewPanelResizeKeydown(event) {
-    let delta = 0;
-    if (event.key === "ArrowLeft") delta = -reviewPanelWidthStep;
-    else if (event.key === "ArrowRight") delta = reviewPanelWidthStep;
-    else if (event.key === "Home") delta = reviewPanelMinWidth - reviewPanelWidth;
-    else if (event.key === "End") delta = reviewPanelMaxWidth - reviewPanelWidth;
-    else return;
-    event.preventDefault();
-    applyReviewPanelWidth(reviewPanelWidth + delta);
-    persistReviewPanelWidth(reviewPanelWidth);
-  }
-
-  // Render user-controlled content with textContent so comments and author
-  // names can never become executable markup.
-  function renderAnnotations(payload) {
-    annotationPayload = payload;
-    list.replaceChildren();
-    const annotations = Array.isArray(payload.annotations) ? payload.annotations : [];
-    const active = annotations.filter((annotation) => !isInactive(annotation));
-    const visible = showInactive.checked ? annotations : active;
-    renderAnnotationHighlights(visible);
-    count.textContent = annotations.length === active.length
-      ? String(active.length)
-      : `${active.length} active · ${annotations.length} total`;
-    if (visible.length === 0) {
-      showMessage(annotations.length === 0 ? "No annotations for this document." : "No active annotations.");
-      return;
-    }
-    visible.forEach((annotation) => list.append(createCard(annotation)));
-  }
-
-  // Closed and rejected annotations retain their history in storage but are
-  // inactive for the current review, so they do not appear or highlight text
-  // unless the reviewer explicitly asks to inspect them.
-  function isInactive(annotation) {
-    return annotation.status === "closed" || annotation.status === "rejected";
-  }
-
-  // Highlight only anchors resolved against the current document. Stale and
-  // document-level annotations remain visible in the panel without a range.
-  function renderAnnotationHighlights(annotations) {
-    clearFallbackHighlights();
-    renderDiagramHighlights(annotations);
-    const ranges = annotations
-      .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
-      .filter(Boolean);
-
-    if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
-      CSS.highlights.delete("code-annotator-annotations");
-      if (ranges.length > 0) CSS.highlights.set("code-annotator-annotations", new Highlight(...ranges));
-      return;
-    }
-    renderFallbackHighlights(ranges);
-  }
-
-  // Diagram annotations highlight the rendered region as a whole; their
-  // hidden source ranges remain available for quote previews and fallback APIs.
-  function renderDiagramHighlights(annotations) {
-    const activeRanges = annotations
-      .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
-    markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
-      const start = Number.parseInt(diagram.dataset.sourceStart, 10);
-      const end = Number.parseInt(diagram.dataset.sourceEnd, 10);
-      diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === start && range[1] === end));
-    });
-  }
-
-  function sourceRange(startByte, endByte) {
-    const spans = Array.from(markdown.querySelectorAll(".source-text"));
-    const startSpan = spans.find((span) => containsSourceOffset(span, startByte, false));
-    const endSpan = spans.slice().reverse().find((span) => containsSourceOffset(span, endByte, true));
-    if (!startSpan || !endSpan) return null;
-
-    const startNode = sourceTextNode(startSpan);
-    const endNode = sourceTextNode(endSpan);
-    const startOffset = byteOffsetToTextOffset(startSpan, startByte);
-    const endOffset = byteOffsetToTextOffset(endSpan, endByte);
-    if (!startNode || !endNode || startOffset < 0 || endOffset < 0) return null;
-
-    const range = document.createRange();
-    try {
-      range.setStart(startNode, startOffset);
-      range.setEnd(endNode, endOffset);
-    } catch (_) {
-      return null;
-    }
-    return range.collapsed ? null : range;
-  }
-
-  function containsSourceOffset(span, offset, endBoundary) {
-    const start = Number.parseInt(span.dataset.sourceStart, 10);
-    const end = Number.parseInt(span.dataset.sourceEnd, 10);
-    return Number.isInteger(start) && Number.isInteger(end) && (endBoundary ? start < offset && offset <= end : start <= offset && offset < end);
-  }
-
-  function byteOffsetToTextOffset(span, sourceOffset) {
-    const spanStart = Number.parseInt(span.dataset.sourceStart, 10);
-    const target = sourceOffset - spanStart;
-    if (!Number.isInteger(spanStart) || target < 0) return -1;
-
-    let bytes = 0;
-    let textOffset = 0;
-    for (const character of span.textContent || "") {
-      if (bytes === target) return textOffset;
-      bytes += utf8Length(character);
-      textOffset += character.length;
-      if (bytes > target) return -1;
-    }
-    return bytes === target ? textOffset : -1;
-  }
-
-  function sourceTextNode(span) {
-    span.normalize();
-    return span.firstChild && span.firstChild.nodeType === Node.TEXT_NODE ? span.firstChild : null;
-  }
-
-  // The fallback merges overlapping intervals within each source span before
-  // wrapping them, avoiding invalid nested or crossing mark elements.
-  function renderFallbackHighlights(ranges) {
-    const intervals = new Map();
-    ranges.forEach((range) => {
-      const startSpan = sourceSpan(range.startContainer);
-      const endSpan = sourceSpan(range.endContainer);
-      const spans = sourceSpanRange(startSpan, endSpan) || [];
-      spans.forEach((span) => {
-        const length = (span.textContent || "").length;
-        const start = span === startSpan ? range.startOffset : 0;
-        const end = span === endSpan ? range.endOffset : length;
-        if (end > start) intervals.set(span, [...(intervals.get(span) || []), [start, end]]);
-      });
-    });
-
-    intervals.forEach((values, span) => {
-      const merged = mergeIntervals(values);
-      const textNode = sourceTextNode(span);
-      if (!textNode) return;
-      merged.reverse().forEach(([start, end]) => {
-        const range = document.createRange();
-        range.setStart(textNode, start);
-        range.setEnd(textNode, end);
-        const mark = element("mark", "annotation-highlight-fallback");
-        range.surroundContents(mark);
-      });
-    });
-  }
-
-  function mergeIntervals(values) {
-    const sorted = values.sort((left, right) => left[0] - right[0]);
-    return sorted.reduce((merged, current) => {
-      const previous = merged[merged.length - 1];
-      if (previous && current[0] <= previous[1]) previous[1] = Math.max(previous[1], current[1]);
-      else merged.push([...current]);
-      return merged;
-    }, []);
-  }
-
-  function clearFallbackHighlights() {
-    markdown.querySelectorAll("mark.annotation-highlight-fallback").forEach((mark) => {
-      mark.replaceWith(document.createTextNode(mark.textContent || ""));
-    });
-    markdown.querySelectorAll(".source-text").forEach((span) => span.normalize());
-  }
-
-  function createCard(annotation) {
-    const card = element("details", "annotation-card");
-    card.dataset.annotationId = annotation.id || "";
-
-    const summary = element("summary", "annotation-summary");
-    summary.title = "Show this annotation in the document";
-
-    const meta = element("span", "annotation-meta");
-    meta.append(badge(annotation.intent || "comment"), badge(annotation.status || "open"));
-    const turnBadge = annotationTurnBadge(annotation);
-    if (turnBadge) meta.append(badge(turnBadge.label, turnBadge.className));
-    if (annotation.anchor && annotation.anchor.state === "stale") {
-      meta.append(badge("stale", "stale"));
-    }
-    const summaryComment = element("span", "annotation-summary-comment");
-    summaryComment.textContent = annotation.comment || "Annotation";
-    summary.append(meta, summaryComment);
-    summary.addEventListener("click", (event) => navigateFromAnnotation(event, card, annotation));
-    card.append(summary);
-
-    const body = element("div", "annotation-card-body");
-
-    const navigationStatus = element("p", "annotation-navigation-status");
-    navigationStatus.setAttribute("role", "status");
-    body.append(navigationStatus);
-
-    const source = element("div", "annotation-source");
-    if (annotation.source && annotation.source.selector) {
-      const quote = document.createElement("q");
-      quote.textContent = annotation.source.selector.exact || "";
-      source.append(quote);
-      const lines = element("span", "annotation-source-lines");
-      const startLine = annotation.source.selector.startLine;
-      const endLine = annotation.source.selector.endLine;
-      lines.textContent = startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}–${endLine}`;
-      source.append(lines);
-    } else {
-      source.textContent = "Whole document";
-      source.classList.add("document-level");
-    }
-    body.append(source);
-
-    const comment = element("p", "annotation-comment");
-    comment.textContent = annotation.comment || "";
-    body.append(comment);
-
-    const author = element("p", "annotation-author");
-    author.textContent = annotation.author ? `By ${annotation.author}` : "Unknown author";
-    body.append(author);
-
-    if (Array.isArray(annotation.thread) && annotation.thread.length > 0) {
-      const thread = element("ol", "annotation-thread");
-      annotation.thread.forEach((entry) => {
-        const item = document.createElement("li");
-        const kind = threadKind(entry);
-        item.className = `annotation-thread-entry ${kind.className}`;
-        item.dataset.kind = entry.kind || "";
-        if (entry.actorRole) item.dataset.role = entry.actorRole;
-
-        const header = element("div", "annotation-thread-header");
-        const kindBadge = element("span", "annotation-thread-kind");
-        kindBadge.textContent = kind.label;
-        const author = element("span", "annotation-thread-author");
-        author.textContent = entry.author || "Unknown";
-        header.append(kindBadge, author);
-
-        const body = element("p", "annotation-thread-body");
-        body.textContent = threadText(entry);
-        item.append(header, body);
-        thread.append(item);
-      });
-      body.append(thread);
-    }
-
-    const actionBar = element("div", "annotation-action-bar");
-    const actions = element("details", "annotation-actions");
-    const actionsSummary = document.createElement("summary");
-    actionsSummary.textContent = "Actions";
-    actions.append(actionsSummary);
-    if (annotation.anchor && annotation.anchor.state === "stale") {
-      actions.append(createReattachForm(annotation));
-    }
-    actions.append(createReplyForm(annotation));
-    const lifecycle = createLifecycleForm(annotation);
-    if (lifecycle) actions.append(lifecycle);
-    actionBar.append(actions);
-    if (annotation.status === "applied") {
-      actionBar.append(createQuickClose(annotation));
-    }
-    body.append(actionBar);
-    card.append(body);
-    return card;
-  }
-
-  // Closing is the common reviewer response to an applied annotation, so keep
-  // it available without requiring the less-frequent Actions panel to open.
-  function createQuickClose(annotation) {
-    const button = element("button", "annotation-quick-close");
-    button.type = "button";
-    button.textContent = "Close";
-    button.setAttribute("aria-label", `Close annotation: ${annotation.comment || annotation.id}`);
-    button.addEventListener("click", async () => {
-      const author = form.elements.author.value || "reviewer";
-      await updateLifecycle(annotation.id, {
-        document: documentPath,
-        status: "closed",
-        actorRole: "reviewer",
-        author,
-      }, button, null);
-    });
-    return button;
-  }
-
-  // Annotation cards navigate to resolved source when possible. Stale anchors
-  // use only their original byte position as an explicitly approximate hint;
-  // this never mutates or silently reattaches the persisted selector.
-  function navigateFromAnnotation(event, card, annotation) {
-    if (window.getSelection()?.toString()) return;
-    event.preventDefault();
-    if (card.open) {
-      card.open = false;
-      return;
-    }
-    card.open = true;
-
-    const result = annotationNavigationTarget(annotation);
-    const status = card.querySelector(".annotation-navigation-status");
-    if (!result.target) {
-      status.textContent = "No approximate source location is available.";
-      status.classList.add("approximate");
-      return;
-    }
-
-    status.textContent = result.approximate ? "Showing the approximate original location." : "";
-    status.classList.toggle("approximate", result.approximate);
-    emphasizeNavigationTarget(result.target);
-  }
-
-  function annotationNavigationTarget(annotation) {
-    if (!annotation.source || !annotation.source.selector) {
-      return { target: markdown.querySelector("h1, h2, h3, h4, h5, h6") || markdown, approximate: false };
-    }
-
-    if (annotation.anchor && annotation.anchor.state !== "stale") {
-      const diagram = diagramForRange(annotation.anchor.startByte, annotation.anchor.endByte);
-      if (diagram) return { target: diagram, approximate: false };
-      const range = sourceRange(annotation.anchor.startByte, annotation.anchor.endByte);
-      if (range) return { target: sourceSpan(range.startContainer), approximate: false };
-    }
-
-    const originalOffset = Number.parseInt(annotation.source.selector.startByte, 10);
-    return { target: nearestSourceTarget(originalOffset), approximate: true };
-  }
-
-  function diagramForRange(startByte, endByte) {
-    return Array.from(markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]"))
-      .find((diagram) => Number.parseInt(diagram.dataset.sourceStart, 10) === startByte
-        && Number.parseInt(diagram.dataset.sourceEnd, 10) === endByte) || null;
-  }
-
-  // Choose the source-backed element closest to the old byte offset. A span in
-  // collapsed Mermaid source maps to its visible diagram container.
-  function nearestSourceTarget(sourceOffset) {
-    if (!Number.isInteger(sourceOffset)) return null;
-    const candidates = Array.from(markdown.querySelectorAll(".source-text"))
-      .map((span) => {
-        const start = Number.parseInt(span.dataset.sourceStart, 10);
-        const end = Number.parseInt(span.dataset.sourceEnd, 10);
-        if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
-        const distance = sourceOffset < start ? start - sourceOffset : sourceOffset > end ? sourceOffset - end : 0;
-        return { span, distance };
-      })
-      .filter(Boolean)
-      .sort((left, right) => left.distance - right.distance)[0];
-    if (!candidates) return null;
-    return candidates.span.closest(".mermaid-diagram") || candidates.span;
-  }
-
-  function emphasizeNavigationTarget(target) {
-    window.clearTimeout(navigationTargetTimer);
-    markdown.querySelectorAll(".annotation-navigation-target").forEach((item) => {
-      item.classList.remove("annotation-navigation-target");
-      if (item.dataset.annotationNavigationTabindex === "added") {
-        item.removeAttribute("tabindex");
-        delete item.dataset.annotationNavigationTabindex;
-      }
-    });
-
-    if (!target.hasAttribute("tabindex")) {
-      target.tabIndex = -1;
-      target.dataset.annotationNavigationTabindex = "added";
-    }
-    target.classList.add("annotation-navigation-target");
-    target.focus({ preventScroll: true });
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
-    navigationTargetTimer = window.setTimeout(() => {
-      target.classList.remove("annotation-navigation-target");
-      if (target.dataset.annotationNavigationTabindex === "added") {
-        target.removeAttribute("tabindex");
-        delete target.dataset.annotationNavigationTabindex;
-      }
-    }, 1800);
-  }
-
-  // A stale annotation can be rebound only to a currently verified selection.
-  // The API rebuilds the selector from source bytes and preserves all review
-  // content, so the browser sends no replacement quote or thread data.
-  function createReattachForm(annotation) {
-    const reattach = element("form", "annotation-reattach");
-    const help = element("p", "reattach-help");
-    help.textContent = pendingSelection
-      ? "Use the current selection as the replacement anchor."
-      : "Select replacement text in the document to enable reattachment.";
-    const status = element("p", "reattach-status");
-    status.setAttribute("role", "status");
-    const button = document.createElement("button");
-    button.type = "submit";
-    button.textContent = "Reattach selection";
-    button.disabled = !pendingSelection;
-    reattach.append(help, status, button);
-    reattach.addEventListener("submit", (event) => submitReattach(event, annotation.id));
-    return reattach;
-  }
-
-  // Keep every visible stale card synchronized with the one shared document
-  // selection. The user chooses the target annotation by its card button.
-  function updateReattachControls() {
-    list.querySelectorAll(".annotation-reattach").forEach((reattach) => {
-      const button = reattach.querySelector('button[type="submit"]');
-      const help = reattach.querySelector(".reattach-help");
-      button.disabled = !pendingSelection;
-      help.textContent = pendingSelection
-        ? "Use the current selection as the replacement anchor."
-        : "Select replacement text in the document to enable reattachment.";
-    });
-  }
-
-  async function submitReattach(event, annotationID) {
-    event.preventDefault();
-    const reattach = event.currentTarget;
-    const button = reattach.querySelector('button[type="submit"]');
-    const status = reattach.querySelector(".reattach-status");
-    if (!pendingSelection) {
-      status.textContent = "Select replacement text first.";
-      status.classList.add("error");
-      return;
-    }
-
-    const selection = { ...pendingSelection };
-    status.textContent = "Saving…";
-    status.classList.remove("error");
-    button.disabled = true;
-    try {
-      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}/reattach`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": JSON.stringify(currentRevision),
-          "X-Code-Annotator-Token": reviewToken,
-        },
-        body: JSON.stringify({ document: documentPath, selection }),
-      });
-      if (!response.ok) {
-        if (response.status === 409) {
-          await loadAnnotations();
-          setFormStatus("The document or annotations changed. Refresh and select again.", true);
-          return;
-        }
-        throw new Error((await response.text()).trim() || `Could not reattach annotation (${response.status}).`);
-      }
-      window.getSelection()?.removeAllRanges();
-      forceClearSelectionPreview();
-      await loadAnnotations();
-    } catch (error) {
-      status.textContent = error.message || "Could not reattach annotation.";
-      status.classList.add("error");
-      button.disabled = false;
-    }
-  }
-
-  // Ordinary replies extend the discussion thread without implying that the
-  // annotation has advanced through its lifecycle.
-  function createReplyForm(annotation) {
-    const reply = element("form", "annotation-reply");
-    const authorLabel = document.createElement("label");
-    authorLabel.append(document.createTextNode("Reply as"));
-    const author = document.createElement("select");
-    author.name = "author";
-    author.required = true;
-    replyActors().forEach((actor) => {
-      const option = document.createElement("option");
-      option.value = actor.value;
-      option.textContent = actor.label;
-      author.append(option);
-    });
-    author.value = replyActorValue();
-    authorLabel.append(author);
-
-    const messageLabel = document.createElement("label");
-    messageLabel.append(document.createTextNode("Reply"));
-    const message = document.createElement("textarea");
-    message.name = "message";
-    message.rows = 3;
-    message.required = true;
-    messageLabel.append(message);
-
-    const status = element("p", "reply-status");
-    status.setAttribute("role", "status");
-    const button = document.createElement("button");
-    button.type = "submit";
-    button.textContent = "Add reply";
-    reply.append(authorLabel, messageLabel, status, button);
-    reply.addEventListener("submit", (event) => submitReply(event, annotation.id));
-    return reply;
-  }
-
-  function replyActors() {
-    return [
-      { value: "reviewer", label: "Reviewer" },
-      { value: "author", label: "Author" },
-      { value: "agent", label: "Agent" },
-    ];
-  }
-
-  function replyActorValue() {
-    const preferred = String(form.elements.author.value || "").trim().toLowerCase();
-    return replyActors().some((actor) => actor.value === preferred) ? preferred : "reviewer";
-  }
-
-  async function submitReply(event, annotationID) {
-    event.preventDefault();
-    const reply = event.currentTarget;
-    const button = reply.querySelector('button[type="submit"]');
-    const status = reply.querySelector(".reply-status");
-    const fields = new FormData(reply);
-    status.textContent = "Saving…";
-    status.classList.remove("error");
-    button.disabled = true;
-    try {
-      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}/replies`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": JSON.stringify(currentRevision),
-          "X-Code-Annotator-Token": reviewToken,
-        },
-        body: JSON.stringify({
-          document: documentPath,
-          author: fields.get("author"),
-          message: fields.get("message"),
-        }),
-      });
-      if (!response.ok) {
-        if (response.status === 409) {
-          await loadAnnotations();
-          setFormStatus("Annotations changed. Review the latest thread and try again.", true);
-          return;
-        }
-        throw new Error((await response.text()).trim() || `Could not add reply (${response.status}).`);
-      }
-      await loadAnnotations();
-    } catch (error) {
-      status.textContent = error.message || "Could not add reply.";
-      status.classList.add("error");
-      button.disabled = false;
-    }
-  }
-
-  // Build only the lifecycle actions valid from the annotation's current
-  // state. Actor roles and required activity are derived from that action so
-  // the browser cannot accidentally submit an invalid transition shape.
-  function createLifecycleForm(annotation) {
-    // Applied annotations expose Close as a quick action beside this panel.
-    // Keep only Needs changes here so the same transition is not duplicated.
-    const options = transitionOptions(annotation.status)
-      .filter((option) => !(annotation.status === "applied" && option.status === "closed"));
-    if (options.length === 0) return null;
-
-    const lifecycle = element("form", "annotation-lifecycle");
-    const actionLabel = document.createElement("label");
-    actionLabel.append(document.createTextNode("Action"));
-    const action = document.createElement("select");
-    action.name = "status";
-    options.forEach((option) => {
-      const item = document.createElement("option");
-      item.value = option.status;
-      item.textContent = option.label;
-      item.dataset.role = option.role;
-      item.dataset.activity = option.activity || "";
-      action.append(item);
-    });
-    actionLabel.append(action);
-
-    const authorLabel = document.createElement("label");
-    authorLabel.append(document.createTextNode("Author"));
-    const author = document.createElement("select");
-    author.name = "author";
-    author.required = true;
-    authorLabel.append(author);
-
-    const activityLabel = document.createElement("label");
-    activityLabel.className = "lifecycle-activity";
-    const activityTitle = document.createElement("span");
-    const activity = document.createElement("textarea");
-    activity.name = "activity";
-    activity.rows = 3;
-    activityLabel.append(activityTitle, activity);
-
-    const commitLabel = document.createElement("label");
-    commitLabel.className = "lifecycle-commit";
-    commitLabel.append(document.createTextNode("Commit (optional)"));
-    const commit = document.createElement("input");
-    commit.name = "commit";
-    commitLabel.append(commit);
-
-    const status = element("p", "lifecycle-status");
-    status.setAttribute("role", "status");
-    const button = document.createElement("button");
-    button.type = "submit";
-    button.textContent = "Update status";
-
-    lifecycle.append(actionLabel, authorLabel, activityLabel, commitLabel, status, button);
-    const updateFields = () => {
-      const selected = action.selectedOptions[0];
-      const activityKind = selected.dataset.activity;
-      updateLifecycleAuthorOptions(author, selected.dataset.role);
-      activityLabel.hidden = !activityKind;
-      activity.required = Boolean(activityKind);
-      activityTitle.textContent = activityKind === "summary" ? "Summary" : "Message";
-      commitLabel.hidden = activityKind !== "summary";
-      if (!activityKind) activity.value = "";
-      if (activityKind !== "summary") commit.value = "";
-    };
-    action.addEventListener("change", updateFields);
-    lifecycle.addEventListener("submit", (event) => submitLifecycle(event, annotation.id));
-    updateFields();
-    return lifecycle;
-  }
-
-  function updateLifecycleAuthorOptions(author, role) {
-    const preferred = replyActorValue();
-    const actors = role === "agent"
-      ? replyActors().filter((actor) => actor.value === "agent")
-      : replyActors().filter((actor) => actor.value !== "agent");
-    author.replaceChildren();
-    actors.forEach((actor) => {
-      const option = document.createElement("option");
-      option.value = actor.value;
-      option.textContent = actor.label;
-      author.append(option);
-    });
-    author.value = actors.some((actor) => actor.value === preferred) ? preferred : actors[0]?.value || "reviewer";
-  }
-
-  // Keep the browser controls aligned with the server-owned transition model.
-  // The server remains authoritative and validates every submitted action.
-  function transitionOptions(status) {
-    const transitions = {
-      open: [
-        { status: "acknowledged", label: "Acknowledge", role: "agent" },
-        { status: "rejected", label: "Reject", role: "agent", activity: "message" },
-      ],
-      acknowledged: [
-        { status: "applied", label: "Mark applied", role: "agent", activity: "summary" },
-        { status: "rejected", label: "Reject", role: "agent", activity: "message" },
-      ],
-      needs_changes: [{ status: "acknowledged", label: "Acknowledge retry", role: "agent" }],
-      applied: [
-        { status: "closed", label: "Close", role: "reviewer" },
-        { status: "needs_changes", label: "Needs changes", role: "reviewer", activity: "message" },
-      ],
-      closed: [{ status: "open", label: "Reopen", role: "reviewer" }],
-      rejected: [{ status: "open", label: "Reopen", role: "reviewer" }],
-    };
-    return transitions[status] || [];
-  }
-
-  async function submitLifecycle(event, annotationID) {
-    event.preventDefault();
-    const lifecycle = event.currentTarget;
-    const button = lifecycle.querySelector('button[type="submit"]');
-    const status = lifecycle.querySelector(".lifecycle-status");
-    const fields = new FormData(lifecycle);
-    const selected = lifecycle.elements.status.selectedOptions[0];
-    const activityKind = selected.dataset.activity;
-    const payload = {
-      document: documentPath,
-      status: fields.get("status"),
-      actorRole: selected.dataset.role,
-      author: fields.get("author"),
-    };
-    if (activityKind === "message") payload.message = fields.get("activity");
-    if (activityKind === "summary") {
-      payload.summary = fields.get("activity");
-      const commit = fields.get("commit");
-      if (commit) payload.commit = commit;
-    }
-
-    await updateLifecycle(annotationID, payload, button, status);
-  }
-
-  // Both the expanded lifecycle form and Quick Close use this mutation path so
-  // token, revision-conflict, reload, and error behavior cannot drift apart.
-  async function updateLifecycle(annotationID, payload, button, status) {
-    if (status) {
-      status.textContent = "Saving…";
-      status.classList.remove("error");
-    }
-    button.disabled = true;
-    try {
-      const response = await fetch(`/api/annotations/${encodeURIComponent(annotationID)}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": JSON.stringify(currentRevision),
-          "X-Code-Annotator-Token": reviewToken,
-        },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) {
-        if (response.status === 409) {
-          await loadAnnotations();
-          setFormStatus("Annotations changed. Review the latest status and try again.", true);
-          return;
-        }
-        throw new Error((await response.text()).trim() || `Could not update annotation (${response.status}).`);
-      }
-      await loadAnnotations();
-    } catch (error) {
-      if (status) {
-        status.textContent = error.message || "Could not update annotation.";
-        status.classList.add("error");
-      } else {
-        setFormStatus(error.message || "Could not close annotation.", true);
-      }
-      button.disabled = false;
-    }
-  }
-
-  function threadText(entry) {
-    return entry.message || entry.summary || `${entry.fromStatus || ""} → ${entry.toStatus || ""}`;
-  }
-
-  function threadKind(entry) {
-    const kinds = {
-      reply: { label: "Reply", className: "reply" },
-      acknowledgement: { label: "Acknowledgement", className: "acknowledgement" },
-      resolution: { label: "Resolution", className: "resolution" },
-      review: { label: "Review note", className: "review" },
-      status_change: { label: "Status change", className: "status-change" },
-    };
-    return kinds[entry.kind] || { label: "Update", className: "update" };
-  }
-
-  function annotationTurnBadge(annotation) {
-    if (annotation.status !== "open" && annotation.status !== "needs_changes") return null;
-    const role = latestThreadActorRole(annotation);
-    if (role === "agent") {
-      return { label: "waiting for reviewer", className: "pending-review" };
-    }
-    if (role === "reviewer") {
-      return { label: "waiting for agent", className: "pending-agent" };
-    }
-    return null;
-  }
-
-  function latestThreadActorRole(annotation) {
-    if (!Array.isArray(annotation.thread)) return null;
-    for (let index = annotation.thread.length - 1; index >= 0; index -= 1) {
-      const role = threadActorRole(annotation.thread[index], annotation);
-      if (role) return role;
-    }
-    return null;
-  }
-
-  function threadActorRole(entry, annotation) {
-    if (entry.actorRole === "agent" || entry.actorRole === "reviewer") return entry.actorRole;
-    const author = normalizeThreadAuthor(entry.author);
-    if (!author) return null;
-    const reviewerAuthor = normalizeThreadAuthor(annotation.author);
-    if (author === reviewerAuthor || author === "reviewer") return "reviewer";
-    if (author === "author") return "reviewer";
-    if (author === "agent" || author === "codex" || author === "claude") return "agent";
-    return null;
-  }
-
-  function normalizeThreadAuthor(author) {
-    return String(author || "").trim().toLowerCase();
-  }
-
-  function badge(text, extraClass = "") {
-    const item = element("span", `annotation-badge ${extraClass}`.trim());
-    item.textContent = String(text).replaceAll("_", " ");
-    return item;
-  }
-
-  function element(tag, className) {
-    const item = document.createElement(tag);
-    item.className = className;
-    return item;
-  }
-
-  function showMessage(message) {
-    list.replaceChildren();
-    const item = element("p", "review-message");
-    item.textContent = message;
-    list.append(item);
-    count.textContent = "";
-  }
 })();
