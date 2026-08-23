@@ -17,10 +17,14 @@ Choose exactly one operating mode before reading or mutating annotations:
 
 Never write annotation sidecars directly in either mode.
 
+The default behavior is a single queue pass: discover the server, load the
+current actionable queue, process the annotations in scope, and report the
+result. Do not start a long-running watcher unless the user or the surrounding
+agent runtime explicitly asks to wait for future review work.
+
 ## Live server workflow
 
-From this repository use `go run ./cmd/code-annotator agent`; outside the source
-tree use an installed `code-annotator agent` command.
+Use an installed `code-annotator agent` command.
 
 0. If no viewer URL is already known, discover one instead of asking first:
 
@@ -91,14 +95,47 @@ go run ./cmd/code-annotator agent reply \
 
 ## Watching for new work
 
-Nothing in this skill, the CLI, or the server makes an agent poll on its own.
-A skill document is instructions read while already running; it cannot
-schedule its own future invocation. If new or changed annotations should be
-noticed without a human re-invoking this skill, that loop has to come from
-the agent's own runtime or orchestration — a scheduled wakeup, `/loop`, a
-cron job, a shell loop — calling `agent queue` on whatever interval the
-caller chooses. This skill's job is only to make each individual check cheap,
-never to decide whether or how often one happens.
+### Optional fallback: wait for new work
+
+The live workflow above is intentionally one-shot. If it finds no actionable
+annotations, or if the agent has finished the current batch, the agent may
+offer waiting as a fallback when its runtime can keep a process alive. Waiting
+is useful when a reviewer is expected to add comments soon, but it is not a
+required part of processing a review and it is not the default behavior.
+
+Only start the watcher when one of these is true:
+
+- the user explicitly asks the agent to monitor or wait for new comments;
+- the runtime has a supported long-running loop or scheduler; or
+- the agent is handing the queue to an external supervisor that will invoke
+  the skill again when stdout contains a changed queue.
+
+If the runtime cannot keep a process alive, finish the current one-shot
+workflow and tell the user that a later invocation is needed. Do not simulate
+waiting by repeatedly invoking the skill in the background.
+
+When waiting is appropriate, run the bundled polling helper:
+
+```sh
+.agents/skills/code-annotator/scripts/poll-agent-queue.sh \
+  --root <content-root> --interval 30
+```
+
+Use `--url <viewer-url>` when the runtime already knows the viewer URL, and
+`--once` when an external scheduler owns the cadence. The helper discovers a
+server once, polls the live queue, and prints only changed queue JSON on
+stdout; status messages and transient errors go to stderr. It does not process
+or mutate annotations. When stdout contains a queue, continue with step 2 of
+the live workflow above and use the document revisions returned by that queue.
+
+The helper requires `jq` and an installed `code-annotator` executable on
+`PATH`. If a runtime implements its own loop, it may call `agent queue` directly
+using the same `--etag` contract below.
+
+When the helper prints a queue, treat it as a fresh start at step 2 of the live
+workflow: select the in-scope IDs, reread their current threads, acknowledge
+before editing, and use the returned per-document revisions. A queue change is
+not permission to mutate every annotation automatically.
 
 Once such a loop exists, poll cheaply with `--etag`:
 

@@ -334,6 +334,31 @@ Install it for personal use across projects with:
 npx skills add . --skill code-annotator -g -y
 ```
 
+The normal skill workflow processes the current queue once. If an agent runtime
+supports waiting and the user asks it to monitor for later comments, the skill
+also includes this optional read-only queue watcher:
+
+```sh
+.agents/skills/code-annotator/scripts/poll-agent-queue.sh \
+  --root . --interval 30
+```
+
+It discovers the loopback server once and prints only changed queue JSON on
+stdout. The installed `code-annotator` executable and `jq` must be on `PATH`.
+Use `--url` to skip discovery or `--once` when an external scheduler owns the
+cadence; the watcher never processes or mutates annotations.
+
+The repository also includes a developer-only regression test for this helper:
+
+```sh
+./scripts/test-poll-agent-queue.sh
+```
+
+The test puts a fake `code-annotator` on `PATH` and verifies discovery, retry
+behavior, ETag carry-forward, unchanged-poll suppression, and `--once`. It is
+not needed to run the skill or the watcher in production; run it after editing
+the polling script or its CLI contract.
+
 After the repository is published, the same convention supports installation
 without a checkout:
 

@@ -263,6 +263,23 @@ Cheap queue polling follow-up, see
   concern (a scheduled wakeup, `/loop`, a cron job); this project only makes
   each individual poll cheap.
 
+### 16. Skill-managed agent queue polling
+
+Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling.md).
+
+- [x] Add a skill-bundled polling helper with URL discovery and configurable
+  interval/status options.
+- [x] Carry the queue ETag between polls and emit only changed queue payloads
+  on stdout.
+- [x] Keep processing and annotation mutations in the existing live workflow;
+  make the helper read-only and signal-safe.
+- [x] Add fake-CLI shell tests for discovery, retries, ETag carry-forward,
+  unchanged polls, and `--once`.
+- [x] Document the helper in the skill and user-facing agent handoff docs.
+- [ ] Run the complete Go, vet, race, and browser checks and close the
+  milestone; the current Go suite has unrelated `internal/app` lifecycle test
+  timeouts in this environment.
+
 ## Decisions
 
 | Decision | Status |
@@ -296,6 +313,9 @@ Cheap queue polling follow-up, see
 ## Next milestone
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
+Milestone 16 (skill-managed agent queue polling) is implemented; final suite
+verification remains pending because of the noted `internal/app` lifecycle
+timeouts.
 Milestone 14
 (TypeScript frontend migration) is implemented and verified.
 Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
