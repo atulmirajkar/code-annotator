@@ -64,6 +64,7 @@ type Server struct {
 	reviewRenderJS  []byte
 	reviewSelectJS  []byte
 	reviewThreadJS  []byte
+	documentTreeJS  []byte
 	viewerJS        []byte
 	mermaidJS       []byte
 	mermaidTiny     []byte
@@ -135,6 +136,7 @@ type pageData struct {
 }
 
 type documentView struct {
+	Path      string
 	Name      string
 	Directory string
 	URL       string
@@ -313,6 +315,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
 	}
+	documentTreeJS, err := fs.ReadFile(web.Files, "generated/document-tree.js")
+	if err != nil {
+		return nil, fmt.Errorf("read document tree script: %w", err)
+	}
 	mermaidJS, err := fs.ReadFile(web.Files, "generated/mermaid.js")
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
@@ -337,6 +343,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewRenderJS:  reviewRenderJS,
 		reviewSelectJS:  reviewSelectJS,
 		reviewThreadJS:  reviewThreadJS,
+		documentTreeJS:  documentTreeJS,
 		viewerJS:        viewerJS,
 		mermaidJS:       mermaidJS,
 		mermaidTiny:     mermaidTiny,
@@ -365,6 +372,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/review-thread.js", server.handleReviewThreadScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
+	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
@@ -444,6 +452,11 @@ func (s *Server) handleReviewThreadScript(response http.ResponseWriter, _ *http.
 func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerJS)
+}
+
+func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.documentTreeJS)
 }
 
 // handleStyles serves the embedded viewer stylesheet from the same origin so
@@ -617,6 +630,7 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 			isCode = true
 		}
 		documents = append(documents, documentView{
+			Path:      document.Path,
 			Name:      document.Name,
 			Directory: document.Directory,
 			URL:       routeURL("/view/", document.Path),

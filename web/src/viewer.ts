@@ -1,3 +1,5 @@
+import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
+
 (() => {
   "use strict";
 
@@ -27,6 +29,7 @@
   }
 
   const changedOnlyStorageKey = "code-annotator.changed-only";
+  const documentScopeStorageKey = "code-annotator.document-scope";
   const sourceModeStorageKey = "code-annotator.source-mode";
   const diffSplitStorageKey = "code-annotator.diff-split";
   const panelStoragePrefix = "code-annotator.panel-collapsed.";
@@ -116,43 +119,86 @@
     });
   }
 
-  // bindDocumentSearch filters by the displayed slash-separated relative path.
-  // Enter opens the first match, while slash focuses lookup from document view.
+  type DocumentScope = "all" | "changed" | "open-comments";
+
+  // bindDocumentSearch builds the real file tree from the stable flat catalog
+  // emitted by the server, then applies path lookup and one mutually exclusive
+  // document scope. Enter opens the first match, while slash focuses lookup.
   function bindDocumentSearch() {
     const input = document.querySelector<HTMLInputElement>(".document-search input");
     const changedOnly = document.querySelector<HTMLInputElement>(".document-changed-filter input");
+    const openComments = document.querySelector<HTMLInputElement>(".document-open-filter input");
+    const openCommentsTotal = document.querySelector<HTMLElement>(".document-open-total");
     const status = document.querySelector<HTMLElement>(".document-search-status");
-    const items = Array.from(document.querySelectorAll<HTMLElement>(".documents li"));
-    if (!input || !status || items.length === 0) return;
-    if (changedOnly) changedOnly.checked = readChangedOnlyPreference();
+    const list = document.querySelector<HTMLUListElement>(".documents");
+    if (!input || !status || !list) return;
+    const fileItems = Array.from(list.children).filter((item): item is HTMLLIElement => item instanceof HTMLLIElement);
+    if (fileItems.length === 0) return;
+    const tree = buildDocumentTree(list, fileItems, readPreference, writePreference);
+    // refreshAnnotationSummary owns this map: it replaces the counts from the
+    // server's annotation queue. applyDocumentFilters consumes those counts
+    // when the reviewer scopes the tree to documents with open comments.
+    let openCommentCounts = new Map<string, number>();
+    let scope = readDocumentScope();
+    setScope(scope, false);
 
-    const visibleLinks = (): HTMLAnchorElement[] => items.filter((item) => !item.hidden).map((item) => item.querySelector<HTMLAnchorElement>("a")).filter((link): link is HTMLAnchorElement => link !== null);
-    const filter = (): void => {
+    const visibleLinks = (): HTMLAnchorElement[] => fileItems
+      .filter((item) => !item.hidden)
+      .map((item) => item.querySelector<HTMLAnchorElement>("a"))
+      .filter((link): link is HTMLAnchorElement => link !== null);
+    // applyDocumentFilters marks each file match, then updateTreeVisibility
+    // propagates those marks up through directory nodes so empty directories
+    // disappear while a search or document scope is active.
+    const applyDocumentFilters = (): void => {
       const query = input.value.trim().toLocaleLowerCase();
-      const changed = Boolean(changedOnly?.checked);
       let matches = 0;
-      items.forEach((item) => {
-        const path = (item.textContent || "").trim().toLocaleLowerCase();
-        const pathMatches = !query || path.includes(query);
-        const changeMatches = !changed || item.dataset.changed === "true";
-        item.hidden = !pathMatches || !changeMatches;
-        if (!item.hidden) matches++;
+      fileItems.forEach((item) => {
+        const path = item.dataset.documentPath || "";
+        const pathMatches = !query || path.toLocaleLowerCase().includes(query);
+        const scopeMatches = scope === "all"
+          || (scope === "changed" && item.dataset.changed === "true")
+          || (scope === "open-comments" && (openCommentCounts.get(path) || 0) > 0);
+        item.dataset.filterMatch = String(pathMatches && scopeMatches);
+        if (pathMatches && scopeMatches) matches++;
       });
-      status.hidden = !query && !changed;
-      const qualifier = changed ? (query ? "matching changed" : "changed") : "matching";
-      status.textContent = matches === 0 ? `No ${qualifier} documents.` : `${matches} ${qualifier} document${matches === 1 ? "" : "s"}.`;
+      updateTreeVisibility(tree, scope !== "all");
+      const descriptor = scope === "changed"
+        ? (query ? "matching changed document" : "changed document")
+        : scope === "open-comments"
+          ? (query ? "matching document with open comments" : "document with open comments")
+          : "matching document";
+      const pluralDescriptor = descriptor.replace("document", "documents");
+      const hasFilter = Boolean(query) || scope !== "all";
+      status.hidden = !hasFilter;
+      status.textContent = matches === 0
+        ? `No ${pluralDescriptor}.`
+        : `${matches} ${matches === 1 ? descriptor : pluralDescriptor}.`;
     };
 
-    input.addEventListener("input", filter);
+    input.addEventListener("input", applyDocumentFilters);
     changedOnly?.addEventListener("change", () => {
-      writeChangedOnlyPreference(changedOnly.checked);
-      filter();
+      if (changedOnly.checked) setScope("changed");
+      else setScope("all");
+      applyDocumentFilters();
     });
-    filter();
+    openComments?.addEventListener("change", () => {
+      if (openComments.checked) setScope("open-comments");
+      else setScope("all");
+      applyDocumentFilters();
+    });
+    document.addEventListener("code-annotator:annotations-updated", () => {
+      if (!openComments) return;
+      refreshAnnotationSummary().then(applyDocumentFilters).catch(() => undefined);
+    });
+    if (openComments) refreshAnnotationSummary().then(applyDocumentFilters).catch(() => {
+      openComments.disabled = true;
+      applyDocumentFilters();
+    });
+    applyDocumentFilters();
     input.addEventListener("keydown", (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         input.value = "";
-        filter();
+        applyDocumentFilters();
       } else if (event.key === "Enter") {
         visibleLinks()[0]?.click();
       } else if (event.key === "ArrowDown") {
@@ -168,6 +214,52 @@
         input.focus();
       }
     });
+
+    function setScope(next: DocumentScope, persist = true): void {
+      scope = next;
+      if (changedOnly) changedOnly.checked = next === "changed";
+      if (openComments) openComments.checked = next === "open-comments";
+      if (persist) writePreference(documentScopeStorageKey, next);
+    }
+
+    async function refreshAnnotationSummary(): Promise<void> {
+      if (!openComments) return;
+      const response = await fetch("/api/annotations?status=open,acknowledged,needs_changes,applied", {
+        headers: { Accept: "application/json" },
+      });
+      if (!response.ok) throw new Error(`annotation queue request failed: ${response.status}`);
+      const payload = await response.json() as { documents?: Array<{ document?: string; annotations?: unknown[] }> };
+      openCommentCounts = new Map((payload.documents || []).map((item) => [item.document || "", Array.isArray(item.annotations) ? item.annotations.length : 0]));
+      const matchingDocuments = Array.from(openCommentCounts.values()).filter((count) => count > 0).length;
+      if (openCommentsTotal) {
+        openCommentsTotal.textContent = `${matchingDocuments} document${matchingDocuments === 1 ? "" : "s"}`;
+      }
+      fileItems.forEach((item) => {
+        const path = item.dataset.documentPath || "";
+        const count = openCommentCounts.get(path) || 0;
+        const link = item.querySelector<HTMLAnchorElement>("a");
+        if (!link) return;
+        let badge = link.querySelector<HTMLElement>(".document-open-count");
+        if (count > 0) {
+          if (!badge) {
+            badge = document.createElement("span");
+            badge.className = "document-open-count";
+            link.append(badge);
+          }
+          badge.textContent = String(count);
+          badge.setAttribute("aria-label", `${count} open comment${count === 1 ? "" : "s"}`);
+        } else {
+          badge?.remove();
+        }
+      });
+    }
+  }
+
+  function readDocumentScope(): DocumentScope {
+    const stored = readPreference(documentScopeStorageKey);
+    if (stored === "all" || stored === "changed" || stored === "open-comments") return stored;
+    if (readPreference(changedOnlyStorageKey) === "true") return "changed";
+    return hasChangedDocuments() ? "changed" : "all";
   }
 
   // bindComparisonControl turns the static base label into a bounded revision

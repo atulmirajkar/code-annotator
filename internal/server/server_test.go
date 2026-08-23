@@ -1678,6 +1678,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if hasReviewToggle != test.wantPanel {
 				t.Fatalf("page contains annotation-panel toggle = %t, want %t", hasReviewToggle, test.wantPanel)
 			}
+			hasOpenCommentsFilter := strings.Contains(response.Body.String(), `class="document-open-filter"`)
+			if hasOpenCommentsFilter != test.wantPanel {
+				t.Fatalf("page contains open-comments filter = %t, want %t", hasOpenCommentsFilter, test.wantPanel)
+			}
 			hasSource := strings.Contains(response.Body.String(), `class="source-text" data-source-start=`)
 			if hasSource != test.wantSource {
 				t.Fatalf("page contains source metadata = %t, want %t", hasSource, test.wantSource)
@@ -1712,7 +1716,8 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get review render module", path: "/static/review-render.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationRenderer", "createCard", "annotation-summary", "annotation-actions"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
 		{name: "get review thread module", path: "/static/review-thread.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"replyActors", "transitionOptions", "annotationTurnBadge"}},
-		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "matching changed"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-tree.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
+		{name: "get document tree module", path: "/static/document-tree.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "updateTreeVisibility", "document-tree-expanded"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},

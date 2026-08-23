@@ -1,4 +1,4 @@
-const { writeFile } = require("node:fs/promises");
+const { mkdir, writeFile } = require("node:fs/promises");
 const path = require("node:path");
 const { test, expect } = require("./viewer");
 
@@ -52,16 +52,16 @@ test.describe("viewer navigation", () => {
     await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
     await page.locator("#documents-sidebar h2").click();
     const search = page.getByRole("searchbox", { name: "Find document" });
-    const initialDocumentCount = await page.locator(".documents li:not([hidden])").count();
+    const initialDocumentCount = await page.locator(".documents .document-file:not([hidden])").count();
     await page.keyboard.press("/");
     await expect(search).toBeFocused();
 
     await search.fill("missing-document-name");
     await expect(page.locator(".document-search-status")).toHaveText("No matching documents.");
-    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(0);
+    await expect(page.locator(".documents .document-file:not([hidden])")).toHaveCount(0);
     await search.press("Escape");
     await expect(search).toHaveValue("");
-    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(initialDocumentCount);
+    await expect(page.locator(".documents .document-file:not([hidden])")).toHaveCount(initialDocumentCount);
 
     await search.fill("stale");
     await search.press("ArrowDown");
@@ -79,7 +79,7 @@ test.describe("viewer navigation", () => {
     const search = page.getByRole("searchbox", { name: "Find document" });
     await search.fill("missing-change");
     await expect(page.locator(".document-search-status")).toHaveText("No matching changed documents.");
-    await expect(page.locator(".documents li:not([hidden])")).toHaveCount(0);
+    await expect(page.locator(".documents .document-file:not([hidden])")).toHaveCount(0);
 
     await search.fill("changed-only");
     await expect(page.locator(".document-search-status")).toHaveText("1 matching changed document.");
@@ -87,6 +87,48 @@ test.describe("viewer navigation", () => {
     await expect(page).toHaveURL(/\/view\/changed-only\.go$/);
     await expect(page.getByRole("checkbox", { name: "Changed only" })).toBeChecked();
     await expect(page.locator(".document-search-status")).toHaveText(/changed document/);
+  });
+
+  test("renders a file tree and switches exclusively between changed and open-comment scopes", async ({ page, viewer, viewerURL }) => {
+    await mkdir(path.join(viewer.contentRoot, "nested"));
+    await writeFile(path.join(viewer.contentRoot, "nested", "reviewed.md"), "# Reviewed nested document\n");
+    await writeFile(path.join(viewer.contentRoot, "nested", "other.md"), "# Other nested document\n");
+    await page.goto(viewerURL);
+
+    const token = await page.locator('meta[name="code-annotator-review-token"]').getAttribute("content");
+    const current = await page.request.get(`${viewerURL}api/annotations?document=nested%2Freviewed.md`);
+    const currentPayload = await current.json();
+    const created = await page.request.post(`${viewerURL}api/annotations`, {
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": JSON.stringify(currentPayload.revision),
+        "Origin": new URL(viewerURL).origin,
+        "X-Code-Annotator-Token": token,
+      },
+      data: {
+        document: "nested/reviewed.md",
+        intent: "question",
+        comment: "Review this nested document.",
+        author: "reviewer",
+      },
+    });
+    expect(created.ok()).toBe(true);
+    await page.reload();
+
+    await expect(page.locator(".document-directory-toggle", { hasText: "nested" })).toBeVisible();
+    await expect(page.locator(".document-directory-toggle", { hasText: "nested" })).toHaveAttribute("aria-expanded", "true");
+    const openComments = page.getByRole("checkbox", { name: "Open comments" });
+    const changedOnly = page.getByRole("checkbox", { name: "Changed only" });
+    await expect(page.locator(".document-open-total")).toHaveText(/^\d+ documents?$/);
+    await openComments.check();
+    await expect(changedOnly).not.toBeChecked();
+    await expect(page.locator('.document-file[data-document-path="nested/reviewed.md"]')).toBeVisible();
+    await expect(page.locator('.document-file[data-document-path="nested/other.md"]')).toBeHidden();
+    await expect(page.locator('.document-file[data-document-path="nested/reviewed.md"] .document-open-count')).toHaveText("1");
+
+    await changedOnly.check();
+    await expect(openComments).not.toBeChecked();
+    await expect(changedOnly).toBeChecked();
   });
 
   test("preserves diff mode and collapsed annotations across code navigation", async ({ page, viewerURL }) => {

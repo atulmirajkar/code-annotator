@@ -31,10 +31,15 @@
         <input type="checkbox">
         <span>Changed only</span>
       </label>{{else if .ChangedError}}<p class="document-filter-error">Changed-file lookup unavailable.</p>{{end}}
+      {{if .ReviewToken}}<label class="document-open-filter">
+        <input type="checkbox" aria-label="Open comments">
+        <span>Open comments</span>
+        <span class="document-open-total" aria-live="polite"></span>
+      </label>{{end}}
       <p class="document-search-status" role="status" aria-live="polite" hidden></p>
       <ul class="documents">
         {{range .Documents}}
-        <li data-changed="{{.Changed}}" data-kind="{{.Kind}}">
+        <li data-document-path="{{.Path}}" data-changed="{{.Changed}}" data-kind="{{.Kind}}">
           <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
             {{if .Directory}}<span class="directory">{{.Directory}}/</span>{{end}}{{.Name}}
             {{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}
@@ -127,7 +132,7 @@
     </aside>
     {{end}}
   </div>
-  <script src="/static/viewer.js" defer></script>
+  <script type="module" src="/static/viewer.js"></script>
   {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
   <script src="/static/mermaid.js" defer></script>{{end}}
   {{if .ReviewToken}}<script type="module" src="/static/review.js"></script>{{end}}

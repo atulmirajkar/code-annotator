@@ -228,6 +228,27 @@ Design: [`docs/designs/typescript-migration.md`](docs/designs/typescript-migrati
 - [x] Run browser regression tests with a working Edge process.
 - [x] Update build and architecture documentation.
 
+### 15. Cross-document open-comment status
+
+Design: [`docs/designs/cross-document-comment-status.md`](docs/designs/cross-document-comment-status.md).
+
+- [x] Replace the flat document list with an expandable file tree containing
+  explicit directory rows, preserving existing catalog ordering and
+  navigation.
+- [x] Define the document-level active-comment summary from the existing
+  annotation queue response.
+- [x] Add mutually exclusive `Changed only` and `Open comments` scope toggles
+  to the file tree.
+- [x] Display accessible per-document active-comment counts and a matching
+  document total.
+- [x] Preserve document hierarchy, navigation, lookup, collapsed-sidebar
+  state, and File/Changes mode while filtering.
+- [x] Refresh counts after annotation creation, replies, lifecycle changes,
+  reattachment, and revision-conflict reloads.
+- [x] Add unit and browser coverage for filtering, counts, empty results,
+  keyboard access, and narrow layouts.
+- [x] Update user-facing documentation and verify the complete milestone.
+
 Cheap queue polling follow-up, see
 [`docs/designs/queue-etag.md`](docs/designs/queue-etag.md):
 
@@ -274,7 +295,9 @@ Cheap queue polling follow-up, see
 
 ## Next milestone
 
-Milestone 14 (TypeScript frontend migration) is implemented and verified.
+Milestone 15 (cross-document open-comment status) is implemented and verified.
+Milestone 14
+(TypeScript frontend migration) is implemented and verified.
 Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
 35 Playwright Edge tests pass. The only unchecked item in this milestone is a
 CI workflow check for generated-asset reproducibility; this repository has no

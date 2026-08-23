@@ -115,6 +115,9 @@ function errorMessage(error, fallback) {
             const payload = await response.json();
             currentRevision = typeof payload.revision === "string" ? payload.revision : "";
             renderAnnotations(payload);
+            document.dispatchEvent(new CustomEvent("code-annotator:annotations-updated", {
+                detail: { document: reviewDocumentPath },
+            }));
         }
         catch (_) {
             showMessage("Could not load annotations. Refresh to try again.");

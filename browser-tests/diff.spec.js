@@ -283,9 +283,8 @@ test.describe("side-by-side diff", () => {
   });
 
   test("keeps a long unfiltered document list from widening the page on a narrow viewport", async ({ page, viewer }) => {
-    // A single-row flex layout with no width constraint of its own grows to
-    // fit every item before its overflow-x:auto can clip anything, so this
-    // needs enough cataloged files to actually exceed the viewport.
+    // The file tree is vertical, so a long catalog must remain inside the
+    // narrow sidebar without widening the page.
     for (let index = 0; index < 40; index += 1) {
       await writeFile(
         path.join(viewer.contentRoot, `narrow-layout-fixture-${index}.go`),
@@ -306,7 +305,7 @@ test.describe("side-by-side diff", () => {
     const documentsList = page.locator(".documents");
     const listBox = await documentsList.boundingBox();
     expect(listBox.width).toBeLessThanOrEqual(viewport.clientWidth + 1);
-    await expect.poll(() => documentsList.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true);
+    await expect.poll(() => documentsList.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   });
 
   for (const colorScheme of ["light", "dark"]) {

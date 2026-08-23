@@ -185,6 +185,20 @@ a {
   font-size: 0.75rem;
 }
 
+.document-open-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: -0.15rem 0.5rem 0.75rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.document-open-total {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
 .document-filter-error {
   margin: -0.15rem 0.5rem 0.75rem;
   color: var(--muted);
@@ -202,6 +216,39 @@ a {
   padding: 0;
   list-style: none;
 }
+.documents .document-tree-children {
+  margin: 0 0 0 0.85rem;
+  padding: 0;
+  list-style: none;
+}
+.documents .document-directory-toggle {
+  display: block;
+  width: 100%;
+  padding: 0.42rem 0.65rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.documents .document-directory-toggle::before {
+  display: inline-block;
+  width: 1rem;
+  content: "▾";
+}
+.documents .document-directory-toggle[aria-expanded=false]::before {
+  content: "▸";
+}
+.documents .document-directory-toggle:hover {
+  background: var(--background);
+  color: var(--text);
+}
+.documents .document-directory.collapsed > .document-tree-children {
+  display: none;
+}
 .documents a {
   display: block;
   padding: 0.55rem 0.65rem;
@@ -218,6 +265,21 @@ a {
   background: var(--accent-soft);
   color: var(--accent);
   font-weight: 650;
+}
+
+.document-open-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .directory {
@@ -1202,13 +1264,8 @@ a {
     border-bottom: 1px solid var(--border);
   }
   .documents {
-    display: flex;
-    gap: 0.25rem;
     overflow-x: auto;
     padding-bottom: 0.25rem;
-  }
-  .documents li {
-    flex: 0 0 auto;
   }
   .documents a {
     max-width: 18rem;

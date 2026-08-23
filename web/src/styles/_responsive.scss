@@ -28,13 +28,8 @@
     border-bottom: 1px solid var(--border);
   }
   .documents {
-    display: flex;
-    gap: 0.25rem;
     overflow-x: auto;
     padding-bottom: 0.25rem;
-  }
-  .documents li {
-    flex: 0 0 auto;
   }
   .documents a {
     max-width: 18rem;
