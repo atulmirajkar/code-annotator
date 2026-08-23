@@ -392,17 +392,16 @@
   }
 }
 .annotation-action-bar {
-  display: flex;
-  gap: 0.65rem;
-  align-items: start;
+  position: relative;
   margin-top: 0.8rem;
-  padding-top: 0.65rem;
+  padding: 0.65rem 0.65rem;
   border-top: 1px solid var(--border);
 }
 .annotation-actions {
-  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
   > summary {
+    padding-right: 5rem;
     color: var(--muted);
     cursor: pointer;
     font-size: 0.75rem;
@@ -413,7 +412,9 @@
 }
 .annotation-quick-close {
   @include primary-action;
-  flex: 0 0 auto;
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
   padding: 0.32rem 0.58rem;
   border: 1px solid var(--accent);
   font-size: 0.75rem;

@@ -50,7 +50,11 @@ tree use an installed `code-annotator agent` command.
    `language` to interpret the selected source, anchor state, and complete
    thread. A stale anchor means the old selection is no longer uniquely
    located; do not guess a replacement.
-3. Before changing files, acknowledge an `open` or `needs_changes` annotation:
+3. For a `needs_changes` annotation, choose the valid next transition after
+   reviewing the request: acknowledge it as an agent to begin a retry, or
+   reject it as an agent with a message when the requested change cannot or
+   should not be performed. Before changing files, acknowledge an `open` or
+   `needs_changes` annotation when proceeding with implementation:
 
    ```sh
    go run ./cmd/code-annotator agent resolve \
@@ -75,8 +79,9 @@ tree use an installed `code-annotator agent` command.
 
 Use `reply` with the same document, revision, ID, and author arguments plus
 `--message` for clarification or discussion that must not change lifecycle
-state. Use `resolve --status rejected --message <reason>` only when the request
-cannot or should not be performed, not merely because clarification is needed.
+state. Use `resolve --status rejected --message <reason>` when an agent rejects
+an `open` or `needs_changes` request because it cannot or should not be
+performed, not merely because clarification is needed.
 
 ```sh
 go run ./cmd/code-annotator agent reply \

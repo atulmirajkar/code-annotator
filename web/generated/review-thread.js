@@ -21,7 +21,10 @@ export function transitionOptions(status) {
             { status: "applied", label: "Mark applied", role: "agent", activity: "summary" },
             { status: "rejected", label: "Reject", role: "agent", activity: "message" },
         ],
-        needs_changes: [{ status: "acknowledged", label: "Acknowledge retry", role: "agent" }],
+        needs_changes: [
+            { status: "acknowledged", label: "Acknowledge retry", role: "agent" },
+            { status: "rejected", label: "Reject", role: "agent", activity: "message" },
+        ],
         applied: [
             { status: "closed", label: "Close", role: "reviewer" },
             { status: "needs_changes", label: "Needs changes", role: "reviewer", activity: "message" },

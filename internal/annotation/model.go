@@ -278,7 +278,7 @@ func ValidateTransition(from, to Status, actor ActorRole) error {
 	case RoleAgent:
 		allowed = (from == StatusOpen && (to == StatusAcknowledged || to == StatusRejected)) ||
 			(from == StatusAcknowledged && (to == StatusApplied || to == StatusRejected)) ||
-			(from == StatusNeedsChanges && to == StatusAcknowledged)
+			(from == StatusNeedsChanges && (to == StatusAcknowledged || to == StatusRejected))
 	case RoleReviewer:
 		allowed = (from == StatusApplied && (to == StatusClosed || to == StatusNeedsChanges)) ||
 			((from == StatusClosed || from == StatusRejected) && to == StatusOpen)
