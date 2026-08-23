@@ -46,6 +46,14 @@ async function hasAnnotationHighlight(page, text) {
   }, text);
 }
 
+async function openNewAnnotationForm(page) {
+  const form = page.locator(".annotation-form");
+  if (!(await form.isVisible())) {
+    await page.locator(".add-annotation-toggle").click();
+  }
+  await expect(form).toBeVisible();
+}
+
 test.describe("side-by-side diff", () => {
   test("keeps long lines inside independently scrollable panes", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
@@ -128,6 +136,7 @@ test.describe("side-by-side diff", () => {
     await openAnnotations(page);
     await selectCurrentText(page, selectedText);
     await expect(page.locator(".selection-preview")).toContainText(selectedText);
+    await openNewAnnotationForm(page);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review the replacement in Changes view.");
     await page.locator('.annotation-form button[type="submit"]').click();
 
@@ -162,6 +171,7 @@ test.describe("side-by-side diff", () => {
     await expect(preview).toContainText("fixture");
     await expect(preview).toContainText("current-side replacement");
     await expect(preview.locator(".selection-quote")).toHaveText('fixture\n\nconst layoutMessage = "This current-side replacement');
+    await openNewAnnotationForm(page);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Review this multi-line replacement context.");
     await page.locator('.annotation-form button[type="submit"]').click();
 

@@ -13,6 +13,14 @@ function captureBrowserSignals(page) {
   return { consoleErrors, externalRequests };
 }
 
+async function openNewAnnotationForm(page) {
+  const form = page.locator(".annotation-form");
+  if (!(await form.isVisible())) {
+    await page.locator(".add-annotation-toggle").click();
+  }
+  await expect(form).toBeVisible();
+}
+
 test.describe("Mermaid rendering", () => {
   for (const colorScheme of ["light", "dark"]) {
     test(`renders a sequence diagram in ${colorScheme} mode without CSP or network errors`, async ({ page, viewerURL }) => {
@@ -67,6 +75,7 @@ test.describe("Mermaid rendering", () => {
     await page.goto(`${viewerURL}view/valid.md`);
     await openAnnotations(page);
     await page.locator(".mermaid-output svg text").first().click();
+    await openNewAnnotationForm(page);
     await page.locator('.annotation-form textarea[name="comment"]').fill("Update this interaction.");
     await page.locator('.annotation-form button[type="submit"]').click();
 

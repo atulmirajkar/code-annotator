@@ -12,24 +12,54 @@
   const previewRange = panel.querySelector(".selection-range");
   const markdown = document.querySelector(".markdown-body");
   const form = panel.querySelector(".annotation-form");
+  const addAnnotationButton = panel.querySelector(".add-annotation-toggle");
+  const closeAnnotationButton = panel.querySelector(".annotation-form-close");
   const formStatus = panel.querySelector(".annotation-form-status");
   const submitButton = form.querySelector('button[type="submit"]');
   const selectionScope = form.querySelector('input[name="scope"][value="selection"]');
   const documentScope = form.querySelector('input[name="scope"][value="document"]');
+  const resizeHandle = panel.querySelector(".review-panel-resize");
+  const layout = panel.closest(".layout");
   const reviewToken = document.querySelector('meta[name="code-annotator-review-token"]')?.content || "";
   const documentPath = panel.dataset.document;
+  const reviewPanelWidthKey = `code-annotator-review-panel-width:${documentPath || "default"}`;
+  const reviewPanelMinWidth = 320;
+  const reviewPanelMaxWidth = 640;
+  const reviewPanelWidthStep = 24;
   let currentRevision = "";
   let pendingSelection = null;
   let diagramSelectionActive = false;
   let preserveSelection = false;
   let annotationPayload = null;
   let navigationTargetTimer = 0;
+  let reviewPanelWidth = 368;
   if (!documentPath) {
     showMessage("Open a Markdown document to review annotations.");
     return;
   }
 
+  reviewPanelWidth = restoreReviewPanelWidth() || reviewPanelWidth;
+  applyReviewPanelWidth(reviewPanelWidth);
+  if (resizeHandle) {
+    resizeHandle.setAttribute("aria-valuemin", String(reviewPanelMinWidth));
+    resizeHandle.setAttribute("aria-valuemax", String(reviewPanelMaxWidth));
+    resizeHandle.setAttribute("aria-valuenow", String(reviewPanelWidth));
+    resizeHandle.addEventListener("pointerdown", startReviewPanelResize);
+    resizeHandle.addEventListener("keydown", handleReviewPanelResizeKeydown);
+  }
+
   loadAnnotations();
+  syncAnnotationFormToggle();
+  if (addAnnotationButton) {
+    addAnnotationButton.addEventListener("click", () => {
+      setAnnotationFormVisible(true);
+      setFormStatus("");
+    });
+  }
+  closeAnnotationButton?.addEventListener("click", () => {
+    setAnnotationFormVisible(false);
+    setFormStatus("");
+  });
   form.addEventListener("submit", submitAnnotation);
   showInactive.addEventListener("change", () => {
     if (annotationPayload) renderAnnotations(annotationPayload);
@@ -296,6 +326,7 @@
       window.getSelection()?.removeAllRanges();
       forceClearSelectionPreview();
       await loadAnnotations();
+      setAnnotationFormVisible(false);
       setFormStatus("Annotation added.");
     } catch (error) {
       setFormStatus(error.message || "Could not save annotation.", true);
@@ -319,6 +350,82 @@
   function setFormStatus(message, error = false) {
     formStatus.textContent = message;
     formStatus.classList.toggle("error", error);
+  }
+
+  function setAnnotationFormVisible(visible) {
+    form.hidden = !visible;
+    syncAnnotationFormToggle();
+    if (visible) {
+      form.elements.comment?.focus({ preventScroll: true });
+    }
+  }
+
+  function syncAnnotationFormToggle() {
+    if (!addAnnotationButton) return;
+    const visible = !form.hidden;
+    addAnnotationButton.textContent = "Add comment";
+    addAnnotationButton.hidden = visible;
+    addAnnotationButton.setAttribute("aria-expanded", String(visible));
+  }
+
+  function restoreReviewPanelWidth() {
+    try {
+      const stored = window.localStorage.getItem(reviewPanelWidthKey);
+      const width = Number.parseInt(stored, 10);
+      return Number.isInteger(width) ? clampReviewPanelWidth(width) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function persistReviewPanelWidth(width) {
+    try {
+      window.localStorage.setItem(reviewPanelWidthKey, String(width));
+    } catch (_) {
+      // Ignore storage failures; the resize still applies for this session.
+    }
+  }
+
+  function clampReviewPanelWidth(width) {
+    return Math.max(reviewPanelMinWidth, Math.min(reviewPanelMaxWidth, Math.round(width)));
+  }
+
+  function applyReviewPanelWidth(width) {
+    reviewPanelWidth = clampReviewPanelWidth(width);
+    if (layout) layout.style.setProperty("--review-panel-width", `${reviewPanelWidth}px`);
+    if (resizeHandle) resizeHandle.setAttribute("aria-valuenow", String(reviewPanelWidth));
+  }
+
+  function startReviewPanelResize(event) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    resizeHandle.setPointerCapture(event.pointerId);
+    const startX = event.clientX;
+    const startWidth = panel.getBoundingClientRect().width;
+
+    const track = (moveEvent) => {
+      applyReviewPanelWidth(startWidth + (startX - moveEvent.clientX));
+    };
+    const finish = () => {
+      resizeHandle.removeEventListener("pointermove", track);
+      persistReviewPanelWidth(reviewPanelWidth);
+    };
+
+    resizeHandle.addEventListener("pointermove", track);
+    resizeHandle.addEventListener("pointerup", finish, { once: true });
+    resizeHandle.addEventListener("pointercancel", finish, { once: true });
+  }
+
+  function handleReviewPanelResizeKeydown(event) {
+    let delta = 0;
+    if (event.key === "ArrowLeft") delta = -reviewPanelWidthStep;
+    else if (event.key === "ArrowRight") delta = reviewPanelWidthStep;
+    else if (event.key === "Home") delta = reviewPanelMinWidth - reviewPanelWidth;
+    else if (event.key === "End") delta = reviewPanelMaxWidth - reviewPanelWidth;
+    else return;
+    event.preventDefault();
+    applyReviewPanelWidth(reviewPanelWidth + delta);
+    persistReviewPanelWidth(reviewPanelWidth);
   }
 
   // Render user-controlled content with textContent so comments and author
@@ -483,6 +590,8 @@
 
     const meta = element("span", "annotation-meta");
     meta.append(badge(annotation.intent || "comment"), badge(annotation.status || "open"));
+    const turnBadge = annotationTurnBadge(annotation);
+    if (turnBadge) meta.append(badge(turnBadge.label, turnBadge.className));
     if (annotation.anchor && annotation.anchor.state === "stale") {
       meta.append(badge("stale", "stale"));
     }
@@ -526,7 +635,21 @@
       const thread = element("ol", "annotation-thread");
       annotation.thread.forEach((entry) => {
         const item = document.createElement("li");
-        item.textContent = `${entry.author || "Unknown"}: ${threadText(entry)}`;
+        const kind = threadKind(entry);
+        item.className = `annotation-thread-entry ${kind.className}`;
+        item.dataset.kind = entry.kind || "";
+        if (entry.actorRole) item.dataset.role = entry.actorRole;
+
+        const header = element("div", "annotation-thread-header");
+        const kindBadge = element("span", "annotation-thread-kind");
+        kindBadge.textContent = kind.label;
+        const author = element("span", "annotation-thread-author");
+        author.textContent = entry.author || "Unknown";
+        header.append(kindBadge, author);
+
+        const body = element("p", "annotation-thread-body");
+        body.textContent = threadText(entry);
+        item.append(header, body);
         thread.append(item);
       });
       body.append(thread);
@@ -577,6 +700,10 @@
   function navigateFromAnnotation(event, card, annotation) {
     if (window.getSelection()?.toString()) return;
     event.preventDefault();
+    if (card.open) {
+      card.open = false;
+      return;
+    }
     card.open = true;
 
     const result = annotationNavigationTarget(annotation);
@@ -741,10 +868,16 @@
     const reply = element("form", "annotation-reply");
     const authorLabel = document.createElement("label");
     authorLabel.append(document.createTextNode("Reply as"));
-    const author = document.createElement("input");
+    const author = document.createElement("select");
     author.name = "author";
     author.required = true;
-    author.value = form.elements.author.value || "reviewer";
+    replyActors().forEach((actor) => {
+      const option = document.createElement("option");
+      option.value = actor.value;
+      option.textContent = actor.label;
+      author.append(option);
+    });
+    author.value = replyActorValue();
     authorLabel.append(author);
 
     const messageLabel = document.createElement("label");
@@ -763,6 +896,19 @@
     reply.append(authorLabel, messageLabel, status, button);
     reply.addEventListener("submit", (event) => submitReply(event, annotation.id));
     return reply;
+  }
+
+  function replyActors() {
+    return [
+      { value: "reviewer", label: "Reviewer" },
+      { value: "author", label: "Author" },
+      { value: "agent", label: "Agent" },
+    ];
+  }
+
+  function replyActorValue() {
+    const preferred = String(form.elements.author.value || "").trim().toLowerCase();
+    return replyActors().some((actor) => actor.value === preferred) ? preferred : "reviewer";
   }
 
   async function submitReply(event, annotationID) {
@@ -831,10 +977,9 @@
 
     const authorLabel = document.createElement("label");
     authorLabel.append(document.createTextNode("Author"));
-    const author = document.createElement("input");
+    const author = document.createElement("select");
     author.name = "author";
     author.required = true;
-    author.value = form.elements.author.value || "reviewer";
     authorLabel.append(author);
 
     const activityLabel = document.createElement("label");
@@ -862,6 +1007,7 @@
     const updateFields = () => {
       const selected = action.selectedOptions[0];
       const activityKind = selected.dataset.activity;
+      updateLifecycleAuthorOptions(author, selected.dataset.role);
       activityLabel.hidden = !activityKind;
       activity.required = Boolean(activityKind);
       activityTitle.textContent = activityKind === "summary" ? "Summary" : "Message";
@@ -873,6 +1019,21 @@
     lifecycle.addEventListener("submit", (event) => submitLifecycle(event, annotation.id));
     updateFields();
     return lifecycle;
+  }
+
+  function updateLifecycleAuthorOptions(author, role) {
+    const preferred = replyActorValue();
+    const actors = role === "agent"
+      ? replyActors().filter((actor) => actor.value === "agent")
+      : replyActors().filter((actor) => actor.value !== "agent");
+    author.replaceChildren();
+    actors.forEach((actor) => {
+      const option = document.createElement("option");
+      option.value = actor.value;
+      option.textContent = actor.label;
+      author.append(option);
+    });
+    author.value = actors.some((actor) => actor.value === preferred) ? preferred : actors[0]?.value || "reviewer";
   }
 
   // Keep the browser controls aligned with the server-owned transition model.
@@ -962,6 +1123,53 @@
 
   function threadText(entry) {
     return entry.message || entry.summary || `${entry.fromStatus || ""} → ${entry.toStatus || ""}`;
+  }
+
+  function threadKind(entry) {
+    const kinds = {
+      reply: { label: "Reply", className: "reply" },
+      acknowledgement: { label: "Acknowledgement", className: "acknowledgement" },
+      resolution: { label: "Resolution", className: "resolution" },
+      review: { label: "Review note", className: "review" },
+      status_change: { label: "Status change", className: "status-change" },
+    };
+    return kinds[entry.kind] || { label: "Update", className: "update" };
+  }
+
+  function annotationTurnBadge(annotation) {
+    if (annotation.status !== "open" && annotation.status !== "needs_changes") return null;
+    const role = latestThreadActorRole(annotation);
+    if (role === "agent") {
+      return { label: "waiting for reviewer", className: "pending-review" };
+    }
+    if (role === "reviewer") {
+      return { label: "waiting for agent", className: "pending-agent" };
+    }
+    return null;
+  }
+
+  function latestThreadActorRole(annotation) {
+    if (!Array.isArray(annotation.thread)) return null;
+    for (let index = annotation.thread.length - 1; index >= 0; index -= 1) {
+      const role = threadActorRole(annotation.thread[index], annotation);
+      if (role) return role;
+    }
+    return null;
+  }
+
+  function threadActorRole(entry, annotation) {
+    if (entry.actorRole === "agent" || entry.actorRole === "reviewer") return entry.actorRole;
+    const author = normalizeThreadAuthor(entry.author);
+    if (!author) return null;
+    const reviewerAuthor = normalizeThreadAuthor(annotation.author);
+    if (author === reviewerAuthor || author === "reviewer") return "reviewer";
+    if (author === "author") return "reviewer";
+    if (author === "agent" || author === "codex" || author === "claude") return "agent";
+    return null;
+  }
+
+  function normalizeThreadAuthor(author) {
+    return String(author || "").trim().toLowerCase();
   }
 
   function badge(text, extraClass = "") {
