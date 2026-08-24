@@ -58,6 +58,36 @@ type createAnnotationResult struct {
 	Document annotationDocumentResult
 }
 
+type replyAnnotationInput struct {
+	Document         string
+	AnnotationID     string
+	Message          string
+	Role             annotation.Role
+	ExpectedRevision annotationstore.Revision
+}
+
+type replyAnnotationResult struct {
+	Reply    annotation.ThreadEntry
+	Updated  resolvedAnnotation
+	Document annotationDocumentResult
+}
+
+type transitionAnnotationInput struct {
+	Document         string
+	AnnotationID     string
+	Status           annotation.Status
+	Role             annotation.Role
+	Message          string
+	Summary          string
+	Commit           string
+	ExpectedRevision annotationstore.Revision
+}
+
+type transitionAnnotationResult struct {
+	Updated  resolvedAnnotation
+	Document annotationDocumentResult
+}
+
 // readAnnotationDocumentOperation returns the current resolved annotations for
 // one cataloged document without knowing whether the caller needs JSON or HTML.
 func (s *Server) readAnnotationDocumentOperation(documentPath string) (annotationDocumentResult, error) {
@@ -136,6 +166,111 @@ func (s *Server) createAnnotationOperation(input createAnnotationInput) (createA
 		Document: annotationDocumentResult{
 			Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations,
 		},
+	}, nil
+}
+
+// replyAnnotationOperation appends one validated discussion entry and returns
+// the refreshed document view without depending on JSON or HTML transport.
+func (s *Server) replyAnnotationOperation(input replyAnnotationInput) (replyAnnotationResult, error) {
+	document, catalogDocument, err := s.loadAnnotationSource(input.Document)
+	if err != nil {
+		return replyAnnotationResult{}, err
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		return replyAnnotationResult{}, operationError(annotationOperationInternal, "could not read annotations", err)
+	}
+	annotationIndex := findAnnotation(sidecar, input.AnnotationID)
+	if annotationIndex < 0 {
+		return replyAnnotationResult{}, operationError(annotationOperationNotFound, "annotation not found", nil)
+	}
+
+	now := time.Now().UTC()
+	identifier, err := annotation.NewThreadID(now)
+	if err != nil {
+		return replyAnnotationResult{}, operationError(annotationOperationInternal, "could not generate reply identifier", err)
+	}
+	reply := annotation.ThreadEntry{ID: identifier, Kind: annotation.ThreadReply, Message: input.Message, Role: input.Role, CreatedAt: now}
+	if err := reply.Validate(); err != nil {
+		return replyAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
+	}
+	updated := &sidecar.Annotations[annotationIndex]
+	updated.Thread = append(updated.Thread, reply)
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		return replyAnnotationResult{}, operationError(annotationOperationInternal, "could not validate updated annotation", err)
+	}
+	anchoredAnnotations, err := anchorAnnotations(document, sidecar.Annotations)
+	if err != nil {
+		return replyAnnotationResult{}, operationError(annotationOperationInternal, "could not resolve annotation anchor", err)
+	}
+	revision, err := s.annotations.Save(sidecar, input.ExpectedRevision)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			return replyAnnotationResult{}, &annotationOperationError{kind: annotationOperationConflict, message: "annotation sidecar revision conflict", revision: revision, cause: err}
+		}
+		return replyAnnotationResult{}, operationError(annotationOperationInternal, "could not save annotation reply", err)
+	}
+	return replyAnnotationResult{
+		Reply: reply, Updated: anchoredAnnotations[annotationIndex],
+		Document: annotationDocumentResult{Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations},
+	}, nil
+}
+
+// transitionAnnotationOperation validates and records one lifecycle change,
+// including its immutable activity events, in the same optimistic save.
+func (s *Server) transitionAnnotationOperation(input transitionAnnotationInput) (transitionAnnotationResult, error) {
+	document, catalogDocument, err := s.loadAnnotationSource(input.Document)
+	if err != nil {
+		return transitionAnnotationResult{}, err
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not read annotations", err)
+	}
+	annotationIndex := findAnnotation(sidecar, input.AnnotationID)
+	if annotationIndex < 0 {
+		return transitionAnnotationResult{}, operationError(annotationOperationNotFound, "annotation not found", nil)
+	}
+	updated := &sidecar.Annotations[annotationIndex]
+	if err := annotation.ValidateTransition(updated.Status, input.Status, input.Role); err != nil {
+		return transitionAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
+	}
+
+	now := time.Now().UTC()
+	if now.Before(updated.UpdatedAt) {
+		now = updated.UpdatedAt
+	}
+	entries, err := annotation.TransitionEntries(*updated, annotation.TransitionInput{
+		Status: input.Status, Role: input.Role, Message: input.Message,
+		Summary: input.Summary, Commit: input.Commit,
+	}, now)
+	if err != nil {
+		if errors.Is(err, annotation.ErrTransitionIdentifier) {
+			return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not generate transition identifier", err)
+		}
+		return transitionAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
+	}
+	updated.Status = input.Status
+	updated.Thread = append(updated.Thread, entries...)
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not validate transitioned annotation", err)
+	}
+	anchoredAnnotations, err := anchorAnnotations(document, sidecar.Annotations)
+	if err != nil {
+		return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not resolve annotation anchor", err)
+	}
+	revision, err := s.annotations.Save(sidecar, input.ExpectedRevision)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			return transitionAnnotationResult{}, &annotationOperationError{kind: annotationOperationConflict, message: "annotation sidecar revision conflict", revision: revision, cause: err}
+		}
+		return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not save annotation transition", err)
+	}
+	return transitionAnnotationResult{
+		Updated:  anchoredAnnotations[annotationIndex],
+		Document: annotationDocumentResult{Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations},
 	}, nil
 }
 

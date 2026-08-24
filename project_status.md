@@ -330,7 +330,7 @@ for explicit approval before starting the next item.
 - [x] Commit 4 review follow-up: preserve comments when a captured selection's
   document digest is stale, expose the result as requiring reattachment, and
   use anchor terminology consistently across shared operations.
-- [ ] Commit 5: share reply/transition operations and add 422/409 HTML
+- [x] Commit 5: share reply/transition operations and add 422/409 HTML
   responses while preserving JSON behavior.
 - [ ] Commit 6: share reattach operations and complete the inactive HTML
   mutation surface.
@@ -384,12 +384,13 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 4 is approved; its focused review follow-up preserves a
-selected comment when the document changes before creation and represents it as
-a stale annotation awaiting reattachment. That follow-up is the current review
-gate. The next allowed implementation slice is commit 5, sharing
-reply/transition operations and adding their HTML handlers; it must not begin
-until the maintainer explicitly approves proceeding.
+milestone. Commit 5 shares reply and transition application operations between
+the stable JSON API and inactive server-rendered form routes. Expected HTML
+validation and revision conflicts return authoritative panels with escaped
+draft values. Commit 5 is the current review gate. The next allowed
+implementation slice is commit 6, sharing reattachment operations and
+completing the inactive HTML mutation surface; it must not begin until the
+maintainer explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

@@ -2,9 +2,9 @@
 
 ## Status
 
-Implementation in progress. Commit gates 0 through 4 and the intervening
-role-only compatibility slice are implemented. Commit 4 is awaiting maintainer
-review before gate 5 may begin.
+Implementation in progress. Commit gates 0 through 5, the commit 4 review
+follow-up, and the intervening role-only compatibility slice are implemented.
+Commit 5 is awaiting maintainer review before gate 6 may begin.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -312,6 +312,13 @@ in loaded fragments, disable the history cache for review pages, and set
   reach the shared error status region.
 
 There is no automatic conflict retry.
+
+Commit 5 implements the reply and transition form routes while leaving them
+inactive in the browser until HTMX activation. Both call the same application
+operations as their JSON counterparts. Domain validation returns `422` with an
+escaped draft in the authoritative panel; optimistic conflicts return `409`,
+the latest ETag and panel state, and the escaped draft. JSON status codes,
+headers, and payloads remain unchanged.
 
 ### Related updates
 

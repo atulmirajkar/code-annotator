@@ -194,6 +194,13 @@ comment with `needsReattachment: true`; select replacement text and use the
 same reattachment action. No source quote is stored until that replacement is
 verified against the current document.
 
+The server-rendered annotation reply and transition routes are compiled and
+tested but remain inactive in the page until the HTMX activation milestone.
+They accept URL-encoded forms under the same origin, token, 64 KiB, and strong
+`If-Match` protections as creation. Tests should assert both the stable JSON
+contract and the HTML fragment contract, including escaped drafts in expected
+`422` validation and `409` revision-conflict responses.
+
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.
 

@@ -350,69 +350,22 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, _, ok := s.readAnnotationDocument(response, input.Document)
-	if !ok {
-		return
-	}
-	sidecar, _, err := s.annotations.Load(input.Document)
+	result, err := s.replyAnnotationOperation(replyAnnotationInput{
+		Document: input.Document, AnnotationID: request.PathValue("id"), Message: input.Message,
+		Role: input.Role, ExpectedRevision: expected,
+	})
 	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
-		return
-	}
-
-	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
-	if annotationIndex < 0 {
-		http.Error(response, "annotation not found", http.StatusNotFound)
-		return
-	}
-	now := time.Now().UTC()
-	identifier, err := annotation.NewThreadID(now)
-	if err != nil {
-		http.Error(response, "could not generate reply identifier", http.StatusInternalServerError)
-		return
-	}
-	reply := annotation.ThreadEntry{
-		ID:        identifier,
-		Kind:      annotation.ThreadReply,
-		Message:   input.Message,
-		Role:      input.Role,
-		CreatedAt: now,
-	}
-	if err := reply.Validate(); err != nil {
-		http.Error(response, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	updated := &sidecar.Annotations[annotationIndex]
-	updated.Thread = append(updated.Thread, reply)
-	updated.UpdatedAt = now
-	if err := sidecar.Validate(); err != nil {
-		http.Error(response, "could not validate updated annotation", http.StatusInternalServerError)
-		return
-	}
-	view, err := resolveAnnotation(document, *updated)
-	if err != nil {
-		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-		return
-	}
-	revision, err := s.annotations.Save(sidecar, expected)
-	if err != nil {
-		if errors.Is(err, annotationstore.ErrConflict) {
-			response.Header().Set("ETag", strconv.Quote(string(revision)))
-			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
-			return
-		}
-		http.Error(response, "could not save annotation reply", http.StatusInternalServerError)
+		writeAnnotationOperationError(response, err, false)
 		return
 	}
 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("ETag", strconv.Quote(string(revision)))
-	response.Header().Set("Location", "/api/annotations/"+updated.ID+"/replies/"+reply.ID)
+	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
+	response.Header().Set("Location", "/api/annotations/"+result.Updated.ID+"/replies/"+result.Reply.ID)
 	response.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(response).Encode(replyAnnotationResponse{
-		Annotation: view,
-		Revision:   string(revision),
+		Annotation: result.Updated,
+		Revision:   string(result.Document.Revision),
 	})
 }
 
@@ -430,70 +383,21 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, _, ok := s.readAnnotationDocument(response, input.Document)
-	if !ok {
-		return
-	}
-	sidecar, _, err := s.annotations.Load(input.Document)
+	result, err := s.transitionAnnotationOperation(transitionAnnotationInput{
+		Document: input.Document, AnnotationID: request.PathValue("id"), Status: input.Status,
+		Role: input.Role, Message: input.Message, Summary: input.Summary, Commit: input.Commit,
+		ExpectedRevision: expected,
+	})
 	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
-		return
-	}
-
-	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
-	if annotationIndex < 0 {
-		http.Error(response, "annotation not found", http.StatusNotFound)
-		return
-	}
-	updated := &sidecar.Annotations[annotationIndex]
-	if err := annotation.ValidateTransition(updated.Status, input.Status, input.Role); err != nil {
-		http.Error(response, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	now := time.Now().UTC()
-	if now.Before(updated.UpdatedAt) {
-		// Preserve chronological thread ordering if the system clock moves
-		// backwards or the sidecar came from a slightly faster clock.
-		now = updated.UpdatedAt
-	}
-	entries, err := transitionEntries(*updated, input, now)
-	if err != nil {
-		if errors.Is(err, annotation.ErrTransitionIdentifier) {
-			http.Error(response, "could not generate transition identifier", http.StatusInternalServerError)
-			return
-		}
-		http.Error(response, err.Error(), http.StatusBadRequest)
-		return
-	}
-	updated.Status = input.Status
-	updated.Thread = append(updated.Thread, entries...)
-	updated.UpdatedAt = now
-	if err := sidecar.Validate(); err != nil {
-		http.Error(response, "could not validate transitioned annotation", http.StatusInternalServerError)
-		return
-	}
-	view, err := resolveAnnotation(document, *updated)
-	if err != nil {
-		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-		return
-	}
-	revision, err := s.annotations.Save(sidecar, expected)
-	if err != nil {
-		if errors.Is(err, annotationstore.ErrConflict) {
-			response.Header().Set("ETag", strconv.Quote(string(revision)))
-			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
-			return
-		}
-		http.Error(response, "could not save annotation transition", http.StatusInternalServerError)
+		writeAnnotationOperationError(response, err, false)
 		return
 	}
 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
 	_ = json.NewEncoder(response).Encode(transitionAnnotationResponse{
-		Annotation: view,
-		Revision:   string(revision),
+		Annotation: result.Updated,
+		Revision:   string(result.Document.Revision),
 	})
 }
 

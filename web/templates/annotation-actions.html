@@ -17,11 +17,11 @@
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Reply as
         <select name="role" required>
-          <option value="reviewer">Reviewer</option>
-          <option value="agent">Agent</option>
+          <option value="reviewer"{{if eq .ReplyRole "reviewer"}} selected{{end}}>Reviewer</option>
+          <option value="agent"{{if eq .ReplyRole "agent"}} selected{{end}}>Agent</option>
         </select>
       </label>
-      <label>Reply<textarea name="message" rows="3" required></textarea></label>
+      <label>Reply<textarea name="message" rows="3" required>{{.ReplyMessage}}</textarea></label>
       <p class="reply-status" role="status"></p>
       <button type="submit">Add reply</button>
     </form>
@@ -30,17 +30,17 @@
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Action
         <select name="status" required>
-          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.Role}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}>{{.Label}}</option>{{end}}
+          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.Role}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
         </select>
       </label>
       <label>Role
         <select name="role" required>
-          <option value="reviewer">Reviewer</option>
-          <option value="agent">Agent</option>
+          <option value="reviewer"{{if eq .TransitionRole "reviewer"}} selected{{end}}>Reviewer</option>
+          <option value="agent"{{if eq .TransitionRole "agent"}} selected{{end}}>Agent</option>
         </select>
       </label>
-      <label class="lifecycle-activity" hidden><span>Message</span><textarea name="activity" rows="3"></textarea></label>
-      <label class="lifecycle-commit" hidden>Commit (optional)<input name="commit"></label>
+      <label class="lifecycle-activity" hidden><span>Message</span><textarea name="activity" rows="3">{{.TransitionActivity}}</textarea></label>
+      <label class="lifecycle-commit" hidden>Commit (optional)<input name="commit" value="{{.TransitionCommit}}"></label>
       <p class="lifecycle-status" role="status"></p>
       <button type="submit">Update status</button>
     </form>

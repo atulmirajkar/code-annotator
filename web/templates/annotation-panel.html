@@ -1,6 +1,7 @@
 {{define "annotation-panel"}}
 <div id="annotation-panel-content" data-document="{{.Document}}" data-revision="{{.Revision}}" data-show-inactive="{{.ShowInactive}}">
   <span class="annotation-count" aria-live="polite">{{.CountLabel}}</span>
+  {{if .Feedback}}<p class="annotation-panel-feedback {{.FeedbackKind}}" role="status">{{.Feedback}}</p>{{end}}
   {{if .Cards}}
   <div class="annotation-list" aria-live="polite">
     {{range .Cards}}{{template "annotation-card" .}}{{end}}

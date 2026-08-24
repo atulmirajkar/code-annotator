@@ -237,6 +237,10 @@ selecting its replacement text and using the action on its card. By default, sid
 code-annotator --review --annotations-dir ./reviews ./docs
 ```
 
+Internally, reply and lifecycle persistence is shared by the agent-facing JSON
+API and the server-rendered review fragments, so both transports enforce the
+same roles, transitions, optimistic revision checks, and append-only history.
+
 List annotations for agents or local tooling without starting the server:
 
 ```sh

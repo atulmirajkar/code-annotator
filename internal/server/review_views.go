@@ -20,6 +20,9 @@ type annotationPanelView struct {
 	CountLabel string
 	// EmptyMessage distinguishes an empty document from an active-only filter.
 	EmptyMessage string
+	// Feedback is an escaped mutation result shown above the authoritative list.
+	Feedback     string
+	FeedbackKind string
 	// Cards contains only annotations visible under ShowInactive.
 	Cards []annotationCardView
 }
@@ -91,6 +94,12 @@ type annotationActionsView struct {
 	CanQuickClose bool
 	// Transitions contains the remaining domain-authorized lifecycle actions.
 	Transitions []annotationTransitionView
+	// Draft values preserve user input in expected validation/conflict fragments.
+	ReplyRole          annotation.Role
+	ReplyMessage       string
+	TransitionRole     annotation.Role
+	TransitionActivity string
+	TransitionCommit   string
 }
 
 // annotationTransitionView describes one option rendered in the lifecycle
@@ -105,6 +114,8 @@ type annotationTransitionView struct {
 	// Activity and ActivityLabel describe optional message/summary input.
 	Activity      string
 	ActivityLabel string
+	// Selected preserves the attempted action when a form is returned with feedback.
+	Selected bool
 }
 
 // lifecycleActionDefinition is presentation metadata for a possible domain
@@ -201,6 +212,7 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 		TransitionURL: baseURL + "/transition",
 		CanReattach:   (item.Source != nil || item.NeedsReattachment) && anchorStale,
 		CanQuickClose: item.Status == annotation.StatusApplied,
+		ReplyRole:     annotation.RoleReviewer,
 	}
 	for _, definition := range lifecycleActionDefinitions {
 		if err := annotation.ValidateTransition(item.Status, definition.status, definition.role); err != nil {
@@ -220,6 +232,10 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 			Activity:      definition.activity,
 			ActivityLabel: definition.activityLabel,
 		})
+	}
+	if len(view.Transitions) > 0 {
+		view.Transitions[0].Selected = true
+		view.TransitionRole = view.Transitions[0].Role
 	}
 	return view
 }

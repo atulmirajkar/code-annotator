@@ -223,6 +223,186 @@ func TestCreateAnnotationUI(t *testing.T) {
 	}
 }
 
+func TestReplyAnnotationUI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	newViewer := func(t *testing.T) (*Server, *annotationstore.Store, annotationstore.Revision) {
+		t.Helper()
+		rootPath := t.TempDir()
+		writeTestFile(t, filepath.Join(rootPath, "README.md"), "Review this document")
+		root, err := content.Open(rootPath)
+		if err != nil {
+			t.Fatalf("content.Open() error = %v", err)
+		}
+		store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+		if err != nil {
+			t.Fatalf("annotationstore.Open() error = %v", err)
+		}
+		revision := saveTransitionAnnotation(t, store, annotation.StatusOpen)
+		viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		return viewer, store, revision
+	}
+	post := func(t *testing.T, viewer *Server, revision annotationstore.Revision, form url.Values) *httptest.ResponseRecorder {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodPost, "/ui/review/annotations/ann_transition_test/replies", strings.NewReader(form.Encode()))
+		request.Header.Set("Origin", origin)
+		request.Header.Set(reviewTokenHeader, token)
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("If-Match", strconv.Quote(string(revision)))
+		response := httptest.NewRecorder()
+		viewer.Handler().ServeHTTP(response, request)
+		return response
+	}
+
+	t.Run("appends reply and returns authoritative panel", func(t *testing.T) {
+		t.Parallel()
+		viewer, store, revision := newViewer(t)
+		response := post(t, viewer, revision, url.Values{"document": {"README.md"}, "role": {"agent"}, "message": {"Checked <this>."}})
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Checked &lt;this&gt;.") {
+			t.Fatalf("status = %d; body: %s", response.Code, response.Body.String())
+		}
+		stored, savedRevision, err := store.Load("README.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		if len(stored.Annotations[0].Thread) != 1 || stored.Annotations[0].Thread[0].Role != annotation.RoleAgent || response.Header().Get("ETag") != strconv.Quote(string(savedRevision)) {
+			t.Fatalf("stored = %#v, ETag = %q", stored, response.Header().Get("ETag"))
+		}
+	})
+
+	t.Run("validation returns HTML and preserves escaped draft", func(t *testing.T) {
+		t.Parallel()
+		viewer, _, revision := newViewer(t)
+		response := post(t, viewer, revision, url.Values{"document": {"README.md"}, "role": {"owner"}, "message": {"Retry <script>alert(1)</script>"}})
+		body := response.Body.String()
+		if response.Code != http.StatusUnprocessableEntity || response.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+			t.Fatalf("status = %d, Content-Type = %q; body: %s", response.Code, response.Header().Get("Content-Type"), body)
+		}
+		for _, want := range []string{`id="annotation-panel-content"`, `annotation-panel-feedback validation`, `Retry &lt;script&gt;alert(1)&lt;/script&gt;`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("body missing %q:\n%s", want, body)
+			}
+		}
+		if strings.Contains(body, "<script>alert(1)</script>") {
+			t.Errorf("body contains unescaped draft:\n%s", body)
+		}
+	})
+
+	t.Run("conflict returns latest panel and preserves draft", func(t *testing.T) {
+		t.Parallel()
+		viewer, _, currentRevision := newViewer(t)
+		response := post(t, viewer, "", url.Values{"document": {"README.md"}, "role": {"reviewer"}, "message": {"Retry this reply."}})
+		body := response.Body.String()
+		if response.Code != http.StatusConflict || response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
+			t.Fatalf("status = %d, ETag = %q; body: %s", response.Code, response.Header().Get("ETag"), body)
+		}
+		for _, want := range []string{"Annotations changed; review the latest state before retrying.", "Retry this reply."} {
+			if !strings.Contains(body, want) {
+				t.Errorf("body missing %q:\n%s", want, body)
+			}
+		}
+	})
+}
+
+func TestTransitionAnnotationUI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin = "http://127.0.0.1:8080"
+		token  = "0123456789abcdef0123456789abcdef"
+	)
+	newViewer := func(t *testing.T) (*Server, *annotationstore.Store, annotationstore.Revision) {
+		t.Helper()
+		rootPath := t.TempDir()
+		writeTestFile(t, filepath.Join(rootPath, "README.md"), "Review this document")
+		root, err := content.Open(rootPath)
+		if err != nil {
+			t.Fatalf("content.Open() error = %v", err)
+		}
+		store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+		if err != nil {
+			t.Fatalf("annotationstore.Open() error = %v", err)
+		}
+		revision := saveTransitionAnnotation(t, store, annotation.StatusApplied)
+		viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+		if err != nil {
+			t.Fatalf("New() error = %v", err)
+		}
+		return viewer, store, revision
+	}
+	post := func(t *testing.T, viewer *Server, revision annotationstore.Revision, form url.Values) *httptest.ResponseRecorder {
+		t.Helper()
+		request := httptest.NewRequest(http.MethodPost, "/ui/review/annotations/ann_transition_test/transition", strings.NewReader(form.Encode()))
+		request.Header.Set("Origin", origin)
+		request.Header.Set(reviewTokenHeader, token)
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("If-Match", strconv.Quote(string(revision)))
+		response := httptest.NewRecorder()
+		viewer.Handler().ServeHTTP(response, request)
+		return response
+	}
+
+	t.Run("records lifecycle activity and returns authoritative panel", func(t *testing.T) {
+		t.Parallel()
+		viewer, store, revision := newViewer(t)
+		response := post(t, viewer, revision, url.Values{
+			"document": {"README.md"}, "status": {"needs_changes"}, "role": {"reviewer"},
+			"activity": {"Keep the loopback default."},
+		})
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "needs_changes") || !strings.Contains(response.Body.String(), "Keep the loopback default.") {
+			t.Fatalf("status = %d; body: %s", response.Code, response.Body.String())
+		}
+		stored, _, err := store.Load("README.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		if stored.Annotations[0].Status != annotation.StatusNeedsChanges || len(stored.Annotations[0].Thread) != 2 {
+			t.Fatalf("stored = %#v", stored)
+		}
+	})
+
+	t.Run("validation returns HTML with attempted transition", func(t *testing.T) {
+		t.Parallel()
+		viewer, _, revision := newViewer(t)
+		response := post(t, viewer, revision, url.Values{
+			"document": {"README.md"}, "status": {"needs_changes"}, "role": {"reviewer"},
+			"activity": {"   "}, "commit": {"draft123"},
+		})
+		body := response.Body.String()
+		if response.Code != http.StatusUnprocessableEntity {
+			t.Fatalf("status = %d; body: %s", response.Code, body)
+		}
+		for _, want := range []string{`value="needs_changes"`, `value="reviewer" selected`, `value="draft123"`, `annotation-panel-feedback validation`} {
+			if !strings.Contains(body, want) {
+				t.Errorf("body missing %q:\n%s", want, body)
+			}
+		}
+	})
+
+	t.Run("quick close succeeds", func(t *testing.T) {
+		t.Parallel()
+		viewer, store, revision := newViewer(t)
+		response := post(t, viewer, revision, url.Values{"document": {"README.md"}, "status": {"closed"}, "role": {"reviewer"}})
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "No active annotations.") {
+			t.Fatalf("status = %d; body: %s", response.Code, response.Body.String())
+		}
+		stored, _, err := store.Load("README.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		if stored.Annotations[0].Status != annotation.StatusClosed {
+			t.Fatalf("stored status = %q", stored.Annotations[0].Status)
+		}
+	})
+}
+
 func TestAnnotationUIRoutesRequireReviewSession(t *testing.T) {
 	t.Parallel()
 	rootPath := t.TempDir()
@@ -239,12 +419,17 @@ func TestAnnotationUIRoutesRequireReviewSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New() error = %v", err)
 	}
-	for _, method := range []string{http.MethodGet, http.MethodPost} {
-		request := httptest.NewRequest(method, "/ui/review/annotations?document=README.md", nil)
+	for _, route := range []struct{ method, path string }{
+		{http.MethodGet, "/ui/review/annotations?document=README.md"},
+		{http.MethodPost, "/ui/review/annotations"},
+		{http.MethodPost, "/ui/review/annotations/ann_test/replies"},
+		{http.MethodPost, "/ui/review/annotations/ann_test/transition"},
+	} {
+		request := httptest.NewRequest(route.method, route.path, nil)
 		response := httptest.NewRecorder()
 		viewer.Handler().ServeHTTP(response, request)
 		if response.Code != http.StatusNotFound {
-			t.Errorf("%s status = %d, want 404", method, response.Code)
+			t.Errorf("%s %s status = %d, want 404", route.method, route.path, response.Code)
 		}
 	}
 }

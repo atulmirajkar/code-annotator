@@ -229,6 +229,15 @@ send the review token and the latest sidecar revision to the shared transition
 endpoint. On a revision conflict, the browser reloads the authoritative list
 and asks the user to review the new state before retrying.
 
+Reply and lifecycle mutations now have transport-neutral application
+operations shared by the stable JSON API and inactive server-rendered form
+routes. The form routes return the complete authoritative annotation panel:
+successful mutations use `200`, domain validation uses `422`, and revision
+conflicts use `409` with the current ETag. Expected error fragments preserve
+submitted reply or transition values through escaped template fields and never
+retry a stale mutation automatically. The browser continues using the JSON
+routes until the HTMX activation gate.
+
 The browser treats `closed` and `rejected` as inactive presentation states.
 They remain in the API response and sidecar, but the default panel filters out
 their cards before rendering and passes only active annotations to the highlight
