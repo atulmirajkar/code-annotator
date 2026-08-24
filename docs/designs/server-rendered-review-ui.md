@@ -2,9 +2,9 @@
 
 ## Status
 
-Implementation in progress. Commit gates 0 through 6, the commit 4 review
+Implementation in progress. Commit gates 0 through 7, the commit 4 review
 follow-up, and the intervening role-only compatibility slice are approved.
-Commit 7 is implemented and awaiting maintainer review before gate 8 may begin.
+Commit 7 review follow-up A is implemented and awaiting maintainer review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -606,7 +606,7 @@ Checks: annotation, renderer/server, full Go, and affected race tests.
 
 ### Commit 7: activate the HTMX annotation panel
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -620,6 +620,41 @@ Scope:
 
 Checks: unit tests, `npm run check:web`, full Go tests, race tests, and focused
 annotation Playwright tests.
+
+### Commit 7 review follow-up A: establish typed browser state
+
+Status: implemented in the current review commit; awaiting maintainer approval.
+
+Scope:
+
+- make semantic element IDs and typed state the replacement for custom HTML
+  application data;
+- add the inactive versioned viewer-state response and TypeScript runtime
+  parser without changing current browser behavior;
+- reject unknown schema values, malformed nested fields, and duplicate IDs;
+- add a shrinking per-file baseline that rejects new authored `data-*`
+  attributes and dataset consumers;
+- update all source-of-truth documentation and stop for review.
+
+Checks: parser unit tests, viewer-state handler tests, `npm run check:web`, full
+Go/race tests, vet, and diff checks.
+
+### Commit 7 review follow-up B: migrate annotation and source state
+
+Scope:
+
+- give annotation cards, source spans, and diagrams semantic IDs;
+- extend viewer state with source-node and diagram ranges;
+- move panel revision, annotation locations, lifecycle behavior, document
+  digest, selection preview, and temporary navigation state into typed maps and
+  objects;
+- remove the corresponding template, renderer, TypeScript, Sass, and test
+  `data-*` uses and shrink the enforcement baseline;
+- retain the verified HTMX, selection, highlight, navigation, lifecycle, and
+  Mermaid behavior.
+
+Checks: unit, renderer/server, `check:web`, Go/race, annotation and Mermaid
+Playwright tests.
 
 ### Commit 8: server-render the document tree and benchmark filtering
 

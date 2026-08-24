@@ -41,6 +41,14 @@ creation, replies, lifecycle transitions, quick close, and reattachment. The
 browser adds the review token and current strong revision through a typed HTMX
 adapter; the JSON API remains the automation contract.
 
+`GET /ui/viewer-state?document={path}` is the inactive, versioned JSON boundary
+for browser-only state that will move out of custom HTML attributes. Authored
+TypeScript must parse its response through `parseViewerState`; type assertions
+alone are not a wire validator. `go test ./web` also scans production Go
+rendering, templates, TypeScript, and Sass against a shrinking per-file
+`data-*` allowlist. New attributes and dataset consumers fail that test, and a
+migration that removes an existing use must remove its stale allowance.
+
 ## Run from source
 
 From the repository root:

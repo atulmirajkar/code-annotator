@@ -85,6 +85,18 @@ one-commit-at-a-time review gates are defined in
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.
 
+Application state must not gain new custom HTML `data-*` channels. The
+currently inactive `GET /ui/viewer-state?document={path}` endpoint establishes
+the replacement boundary: a versioned Go response reports document identity,
+kind, digest, optional review revision, resolved annotation locations, and
+lifecycle behavior. `web/src/viewer-state.ts` accepts the HTTP body as
+`unknown`, validates every nested field and enum, rejects duplicate semantic
+IDs, and returns typed maps. Existing dataset uses remain temporarily
+allowlisted by file in `web/data_attributes_test.go`; each migration slice must
+shrink that list. HTML will retain presentation, semantic IDs, accessibility
+attributes, links, and normal form semantics—not application state encoded in
+custom attributes.
+
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production
 TypeScript configuration excludes test files from `web/generated/`, while

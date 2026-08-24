@@ -4,8 +4,9 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit gate 7 is implemented and awaiting
-maintainer review. Gate 8 must not begin without explicit approval.
+**Phase:** Server-rendered review UI commit 7 review follow-up A is implemented
+and awaiting maintainer review. Follow-up B must not begin without explicit
+approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
@@ -24,6 +25,10 @@ and every read or mutation now use those templates through HTMX. TypeScript is
 limited to authenticated transport configuration and browser-owned selection,
 highlight, navigation, panel, and lifecycle-field adapters; the superseded API,
 DOM renderer, action builder, and thread presentation modules are removed.
+Commit 7 is approved. The browser-state follow-ups now establish semantic IDs
+plus runtime-validated TypeScript state as the replacement for all authored
+custom HTML data. `/ui/viewer-state` is registered but inactive, and a shrinking
+per-file test baseline rejects new `data-*` attributes or dataset consumers.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
@@ -341,6 +346,12 @@ for explicit approval before starting the next item.
   mutation surface.
 - [x] Commit 7: activate the HTMX annotation panel, retain browser-only
   selection/highlight/navigation adapters, and remove superseded DOM renderers.
+- [x] Commit 7 review follow-up A: establish the inactive versioned viewer-state
+  endpoint, runtime-validated TypeScript contract, and shrinking `data-*`
+  enforcement baseline.
+- [ ] Commit 7 review follow-up B: migrate annotation, source, Mermaid,
+  lifecycle, revision, digest, selection, and navigation state from custom
+  attributes to semantic IDs and typed in-memory state.
 - [ ] Commit 8: server-render the document tree and counts; activate server
   filtering only if the documented 5,000-path benchmark passes.
 - [ ] Commit 9: server-render comparison selection while retaining the JSON
@@ -389,13 +400,13 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 7 activates the server-rendered annotation panel through
-HTMX, keeps selection, highlighting, navigation, panel controls, and lifecycle
-field behavior in small TypeScript adapters, and removes the superseded JSON
-transport, DOM renderer, action builder, and thread presentation modules.
-Commit 7 is the current review gate. The next allowed implementation slice is
-commit 8, server-rendering the document tree and benchmarking server-side
-filtering; it must not begin until the maintainer explicitly approves.
+milestone. Commit 7 is approved. Review follow-up A adds the inactive,
+versioned viewer-state endpoint, validates its unknown JSON payload into
+strongly typed TypeScript maps, and freezes all current authored custom data
+attributes in a shrinking per-file allowlist. Follow-up A is the current review
+gate. The next allowed slice is follow-up B, migrating annotation and source
+state to semantic IDs and typed memory; it must not begin until the maintainer
+explicitly approves.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

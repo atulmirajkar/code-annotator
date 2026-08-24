@@ -41,6 +41,13 @@ selection mapping, highlights, source navigation, panel controls, lifecycle
 field state, and the authenticated HTMX headers. The stable JSON API remains
 available for agents and other automation.
 
+Custom `data-*` attributes are now treated as migration debt rather than a
+browser-state contract. The inactive `/ui/viewer-state` foundation exposes a
+versioned Go JSON model, and `web/src/viewer-state.ts` validates unknown wire
+data before returning strongly typed state. A shrinking repository allowlist
+rejects new authored data attributes; reviewed follow-ups will replace the
+existing uses with semantic element IDs and typed in-memory maps.
+
 ## Usage
 
 Run directly from the repository:

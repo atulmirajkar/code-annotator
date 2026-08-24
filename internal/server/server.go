@@ -63,6 +63,7 @@ type Server struct {
 	reviewSelectJS    []byte
 	documentTreeJS    []byte
 	viewerJS          []byte
+	viewerStateJS     []byte
 	htmxJS            []byte
 	mermaidJS         []byte
 	mermaidTiny       []byte
@@ -307,6 +308,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
 	}
+	viewerStateJS, err := fs.ReadFile(web.Files, "generated/viewer-state.js")
+	if err != nil {
+		return nil, fmt.Errorf("read viewer state script: %w", err)
+	}
 	documentTreeJS, err := fs.ReadFile(web.Files, "generated/document-tree.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document tree script: %w", err)
@@ -338,6 +343,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewSelectJS:    reviewSelectJS,
 		documentTreeJS:    documentTreeJS,
 		viewerJS:          viewerJS,
+		viewerStateJS:     viewerStateJS,
 		htmxJS:            htmxJS,
 		mermaidJS:         mermaidJS,
 		mermaidTiny:       mermaidTiny,
@@ -363,11 +369,13 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-panel.js", server.handleReviewPanelScript)
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
+	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
 	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
+	mux.HandleFunc("GET /ui/viewer-state", server.handleViewerState)
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
@@ -438,6 +446,11 @@ func (s *Server) handleReviewSelectionScript(response http.ResponseWriter, _ *ht
 func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerJS)
+}
+
+func (s *Server) handleViewerStateScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.viewerStateJS)
 }
 
 func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
