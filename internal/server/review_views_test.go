@@ -18,7 +18,7 @@ func TestAnnotationPanelViewFiltersInactiveCards(t *testing.T) {
 		{Annotation: annotation.Annotation{ID: "ann_rejected", Status: annotation.StatusRejected}},
 	}
 
-	active := newAnnotationPanelView("README.md", "revision", items, false)
+	active := newAnnotationPanelView("README.md", items, false)
 	if got, want := active.CountLabel, "1 active · 3 total"; got != want {
 		t.Fatalf("CountLabel = %q, want %q", got, want)
 	}
@@ -26,19 +26,15 @@ func TestAnnotationPanelViewFiltersInactiveCards(t *testing.T) {
 		t.Fatalf("active card IDs = %v, want %v", got, want)
 	}
 
-	all := newAnnotationPanelView("README.md", "revision", items, true)
+	all := newAnnotationPanelView("README.md", items, true)
 	if got, want := cardIDs(all.Cards), []string{"ann_open", "ann_closed", "ann_rejected"}; !slices.Equal(got, want) {
 		t.Fatalf("all card IDs = %v, want %v", got, want)
 	}
-	if !all.Cards[1].Inactive || !all.Cards[2].Inactive {
-		t.Fatalf("closed and rejected cards are not marked inactive: %#v", all.Cards)
-	}
-
-	empty := newAnnotationPanelView("README.md", "revision", nil, false)
+	empty := newAnnotationPanelView("README.md", nil, false)
 	if got, want := empty.EmptyMessage, "No annotations for this document."; got != want {
 		t.Fatalf("empty message = %q, want %q", got, want)
 	}
-	inactiveOnly := newAnnotationPanelView("README.md", "revision", items[1:], false)
+	inactiveOnly := newAnnotationPanelView("README.md", items[1:], false)
 	if got, want := inactiveOnly.EmptyMessage, "No active annotations."; got != want {
 		t.Fatalf("inactive-only message = %q, want %q", got, want)
 	}
@@ -112,7 +108,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		},
 		Anchor: &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleNotFound},
 	}
-	view := newAnnotationPanelView("README.md", "revision-1", []resolvedAnnotation{item}, false)
+	view := newAnnotationPanelView("README.md", []resolvedAnnotation{item}, false)
 	var output bytes.Buffer
 	if err := templates.ExecuteTemplate(&output, "annotation-panel", view); err != nil {
 		t.Fatalf("ExecuteTemplate() error = %v", err)

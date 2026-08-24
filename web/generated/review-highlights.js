@@ -11,7 +11,7 @@ export function mergeIntervals(values) {
         return merged;
     }, []);
 }
-export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }) {
+export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length, sourceNodes, diagrams }) {
     // Highlight only anchors resolved against the current document. Stale and
     // document-level annotations remain visible in the panel without a range.
     function renderAnnotationHighlights(annotations) {
@@ -19,7 +19,7 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         renderDiagramHighlights(annotations);
         const ranges = annotations
             .filter(hasResolvedAnchor)
-            .map((annotation) => sourceRange(annotation.anchorStartByte, annotation.anchorEndByte))
+            .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
             .filter((range) => range !== null);
         if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
             CSS.highlights.delete("code-annotator-annotations");
@@ -34,11 +34,12 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     function renderDiagramHighlights(annotations) {
         const activeRanges = annotations
             .filter(hasResolvedAnchor)
-            .map((annotation) => [annotation.anchorStartByte, annotation.anchorEndByte]);
-        markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
-            const start = Number.parseInt(diagram.dataset.sourceStart || "", 10);
-            const end = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
-            diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === start && range[1] === end));
+            .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
+        diagrams.forEach((position) => {
+            const diagram = document.getElementById(position.elementId);
+            if (!diagram || !markdown.contains(diagram))
+                return;
+            diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === position.startByte && range[1] === position.endByte));
         });
     }
     function sourceRange(startByte, endByte) {
@@ -64,15 +65,16 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         return range.collapsed ? null : range;
     }
     function containsSourceOffset(span, offset, endBoundary) {
-        const start = Number.parseInt(span.dataset.sourceStart || "", 10);
-        const end = Number.parseInt(span.dataset.sourceEnd || "", 10);
-        return Number.isInteger(start) && Number.isInteger(end) && (endBoundary ? start < offset && offset <= end : start <= offset && offset < end);
+        const position = sourceNodes.get(span.id);
+        return Boolean(position) && (endBoundary
+            ? position.startByte < offset && offset <= position.endByte
+            : position.startByte <= offset && offset < position.endByte);
     }
     function byteOffsetToTextOffset(span, sourceOffset) {
-        const spanStart = Number.parseInt(span.dataset.sourceStart || "", 10);
-        const target = sourceOffset - spanStart;
-        if (!Number.isInteger(spanStart) || target < 0)
+        const position = sourceNodes.get(span.id);
+        if (!position)
             return -1;
+        const target = sourceOffset - position.startByte;
         let bytes = 0;
         let textOffset = 0;
         for (const character of span.textContent || "") {
@@ -134,8 +136,5 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     };
 }
 function hasResolvedAnchor(annotation) {
-    return annotation.anchorState !== null
-        && annotation.anchorState !== "stale"
-        && annotation.anchorStartByte !== null
-        && annotation.anchorEndByte !== null;
+    return annotation.anchor !== null && annotation.anchor.state !== "stale";
 }

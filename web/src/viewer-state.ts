@@ -9,8 +9,14 @@ export interface SourceRange {
   endByte: number;
 }
 
+export interface SourcePosition extends SourceRange {
+  elementId: string;
+}
+
 export interface AnnotationBrowserState {
   id: string;
+  elementId: string;
+  lifecycleFormId: string;
   documentLevel: boolean;
   needsReattachment: boolean;
   sourceStartByte: number | null;
@@ -31,11 +37,30 @@ export interface ViewerState {
     path: string;
     kind: DocumentKind;
     sha256: string;
+    sourceNodes: ReadonlyMap<string, SourcePosition>;
+    diagrams: ReadonlyMap<string, SourcePosition>;
   };
   review: {
     revision: string;
     annotations: ReadonlyMap<string, AnnotationBrowserState>;
+    annotationsByElementId: ReadonlyMap<string, AnnotationBrowserState>;
+    annotationsByLifecycleFormId: ReadonlyMap<string, AnnotationBrowserState>;
   } | null;
+}
+
+function parseSourcePositions(value: unknown, label: string): ReadonlyMap<string, SourcePosition> {
+  if (!Array.isArray(value)) throw new Error(`${label} must be an array`);
+  const result = new Map<string, SourcePosition>();
+  value.forEach((positionValue, index) => {
+    const position = requireRecord(positionValue, `${label}[${index}]`);
+    const elementId = requireString(position.elementId, `${label}[${index}].elementId`);
+    const startByte = requireInteger(position.startByte, `${label}[${index}].startByte`);
+    const endByte = requireInteger(position.endByte, `${label}[${index}].endByte`);
+    if (!elementId || result.has(elementId)) throw new Error(`${label} element IDs must be non-empty and unique`);
+    if (endByte < startByte) throw new Error(`${label}[${index}] range is reversed`);
+    result.set(elementId, { elementId, startByte, endByte });
+  });
+  return result;
 }
 
 type UnknownRecord = Record<string, unknown>;
@@ -96,6 +121,8 @@ function parseAnnotation(value: unknown, index: number): AnnotationBrowserState 
   if (!Array.isArray(item.transitions)) throw new Error("annotation.transitions must be an array");
   return {
     id: requireString(item.id, "annotation.id"),
+    elementId: requireString(item.elementId, "annotation.elementId"),
+    lifecycleFormId: requireString(item.lifecycleFormId, "annotation.lifecycleFormId"),
     documentLevel: requireBoolean(item.documentLevel, "annotation.documentLevel"),
     needsReattachment: requireBoolean(item.needsReattachment, "annotation.needsReattachment"),
     sourceStartByte: nullableInteger(item.sourceStartByte, "annotation.sourceStartByte"),
@@ -118,12 +145,23 @@ export function parseViewerState(value: unknown): ViewerState {
     const reviewValue = requireRecord(root.review, "viewer state review");
     if (!Array.isArray(reviewValue.annotations)) throw new Error("review.annotations must be an array");
     const annotations = new Map<string, AnnotationBrowserState>();
+    const annotationsByElementId = new Map<string, AnnotationBrowserState>();
+    const annotationsByLifecycleFormId = new Map<string, AnnotationBrowserState>();
     reviewValue.annotations.forEach((annotationValue, index) => {
       const annotation = parseAnnotation(annotationValue, index);
       if (!annotation.id || annotations.has(annotation.id)) throw new Error("annotation IDs must be non-empty and unique");
+      if (!annotation.elementId || annotationsByElementId.has(annotation.elementId)) throw new Error("annotation element IDs must be non-empty and unique");
+      if (!annotation.lifecycleFormId || annotationsByLifecycleFormId.has(annotation.lifecycleFormId)) throw new Error("annotation lifecycle form IDs must be non-empty and unique");
       annotations.set(annotation.id, annotation);
+      annotationsByElementId.set(annotation.elementId, annotation);
+      annotationsByLifecycleFormId.set(annotation.lifecycleFormId, annotation);
     });
-    review = { revision: requireString(reviewValue.revision, "review.revision"), annotations };
+    review = {
+      revision: requireString(reviewValue.revision, "review.revision"),
+      annotations,
+      annotationsByElementId,
+      annotationsByLifecycleFormId,
+    };
   }
 
   return {
@@ -132,13 +170,16 @@ export function parseViewerState(value: unknown): ViewerState {
       path,
       kind: requireMember(documentValue.kind, ["markdown", "code"], "document.kind"),
       sha256,
+      sourceNodes: parseSourcePositions(documentValue.sourceNodes, "document.sourceNodes"),
+      diagrams: parseSourcePositions(documentValue.diagrams, "document.diagrams"),
     },
     review,
   };
 }
 
-export async function fetchViewerState(documentPath: string): Promise<ViewerState> {
+export async function fetchViewerState(documentPath: string, mode: "file" | "diff" = "file"): Promise<ViewerState> {
   const query = new URLSearchParams({ document: documentPath });
+  if (mode === "diff") query.set("mode", mode);
   const response = await fetch(`/ui/viewer-state?${query.toString()}`, { headers: { Accept: "application/json" } });
   if (!response.ok) throw new Error(`viewer state request failed: ${response.status}`);
   const payload: unknown = await response.json();

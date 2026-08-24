@@ -1,15 +1,18 @@
-import type { AnnotationLocation } from "./review-fragments.js";
+import type { AnnotationBrowserState, SourcePosition } from "./viewer-state.js";
 
 interface AnnotationNavigatorOptions {
   markdown: HTMLElement;
   sourceRange: (startByte: number, endByte: number) => Range | null;
   sourceSpan: (node: Node) => HTMLElement | null;
+  sourceNodes: ReadonlyMap<string, SourcePosition>;
+  diagrams: ReadonlyMap<string, SourcePosition>;
 }
 
-export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }: AnnotationNavigatorOptions) {
+export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan, sourceNodes, diagrams }: AnnotationNavigatorOptions) {
   let navigationTargetTimer = 0;
+  const temporaryTabIndex = new WeakSet<HTMLElement>();
 
-  function navigateFromAnnotation(event: MouseEvent, card: HTMLDetailsElement, annotation: AnnotationLocation): void {
+  function navigateFromAnnotation(event: MouseEvent, card: HTMLDetailsElement, annotation: AnnotationBrowserState): void {
     if (window.getSelection()?.toString()) return;
     event.preventDefault();
     if (card.open) {
@@ -32,7 +35,7 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
     emphasizeNavigationTarget(result.target);
   }
 
-  function annotationNavigationTarget(annotation: AnnotationLocation): { target: HTMLElement | null; approximate: boolean } {
+  function annotationNavigationTarget(annotation: AnnotationBrowserState): { target: HTMLElement | null; approximate: boolean } {
     if (annotation.needsReattachment) {
       return { target: null, approximate: true };
     }
@@ -40,10 +43,10 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
       return { target: markdown.querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6") || markdown, approximate: false };
     }
 
-    if (annotation.anchorState !== null && annotation.anchorState !== "stale" && annotation.anchorStartByte !== null && annotation.anchorEndByte !== null) {
-      const diagram = diagramForRange(annotation.anchorStartByte, annotation.anchorEndByte);
+    if (annotation.anchor !== null && annotation.anchor.state !== "stale") {
+      const diagram = diagramForRange(annotation.anchor.startByte, annotation.anchor.endByte);
       if (diagram) return { target: diagram, approximate: false };
-      const range = sourceRange(annotation.anchorStartByte, annotation.anchorEndByte);
+      const range = sourceRange(annotation.anchor.startByte, annotation.anchor.endByte);
       if (range) return { target: sourceSpan(range.startContainer), approximate: false };
     }
 
@@ -51,21 +54,23 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
   }
 
   function diagramForRange(startByte: number, endByte: number): HTMLElement | null {
-    return Array.from(markdown.querySelectorAll<HTMLElement>(".mermaid-diagram[data-source-start][data-source-end]"))
-      .find((diagram) => Number.parseInt(diagram.dataset.sourceStart || "", 10) === startByte
-        && Number.parseInt(diagram.dataset.sourceEnd || "", 10) === endByte) || null;
+    const position = Array.from(diagrams.values())
+      .find((candidate) => candidate.startByte === startByte && candidate.endByte === endByte);
+    const element = position ? document.getElementById(position.elementId) : null;
+    return element instanceof HTMLElement && markdown.contains(element) ? element : null;
   }
 
   // Choose the source-backed element closest to the old byte offset. A span in
   // collapsed Mermaid source maps to its visible diagram container.
   function nearestSourceTarget(sourceOffset: number): HTMLElement | null {
     if (!Number.isInteger(sourceOffset)) return null;
-    const candidates = Array.from(markdown.querySelectorAll<HTMLElement>(".source-text"))
-      .map((span): { span: HTMLElement; distance: number } | null => {
-        const start = Number.parseInt(span.dataset.sourceStart || "", 10);
-        const end = Number.parseInt(span.dataset.sourceEnd || "", 10);
-        if (!Number.isInteger(start) || !Number.isInteger(end)) return null;
-        const distance = sourceOffset < start ? start - sourceOffset : sourceOffset > end ? sourceOffset - end : 0;
+    const candidates = Array.from(sourceNodes.values())
+      .map((position): { span: HTMLElement; distance: number } | null => {
+        const span = document.getElementById(position.elementId);
+        if (!(span instanceof HTMLElement) || !markdown.contains(span)) return null;
+        const distance = sourceOffset < position.startByte
+          ? position.startByte - sourceOffset
+          : sourceOffset > position.endByte ? sourceOffset - position.endByte : 0;
         return { span, distance };
       })
       .filter((candidate): candidate is { span: HTMLElement; distance: number } => candidate !== null)
@@ -78,15 +83,15 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
     window.clearTimeout(navigationTargetTimer);
     markdown.querySelectorAll<HTMLElement>(".annotation-navigation-target").forEach((item) => {
       item.classList.remove("annotation-navigation-target");
-      if (item.dataset.annotationNavigationTabindex === "added") {
+      if (temporaryTabIndex.has(item)) {
         item.removeAttribute("tabindex");
-        delete item.dataset.annotationNavigationTabindex;
+        temporaryTabIndex.delete(item);
       }
     });
 
     if (!target.hasAttribute("tabindex")) {
       target.tabIndex = -1;
-      target.dataset.annotationNavigationTabindex = "added";
+      temporaryTabIndex.add(target);
     }
     target.classList.add("annotation-navigation-target");
     target.focus({ preventScroll: true });
@@ -94,9 +99,9 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
     target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center", inline: "nearest" });
     navigationTargetTimer = window.setTimeout(() => {
       target.classList.remove("annotation-navigation-target");
-      if (target.dataset.annotationNavigationTabindex === "added") {
+      if (temporaryTabIndex.has(target)) {
         target.removeAttribute("tabindex");
-        delete target.dataset.annotationNavigationTabindex;
+        temporaryTabIndex.delete(target);
       }
     }, 1800);
   }

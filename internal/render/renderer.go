@@ -8,7 +8,6 @@ import (
 	"html"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -37,6 +36,22 @@ type Renderer struct {
 	reviewMarkdown goldmark.Markdown
 }
 
+// SourcePosition binds one semantic HTML element identity to its source byte
+// range. Browser code receives these typed values from viewer state instead of
+// reading custom attributes from presentation markup.
+type SourcePosition struct {
+	ElementID string
+	StartByte int
+	EndByte   int
+}
+
+// SourceMap contains selectable text nodes and whole-diagram regions for one
+// rendered document mode.
+type SourceMap struct {
+	Nodes    []SourcePosition
+	Diagrams []SourcePosition
+}
+
 // New creates a Renderer configured with GitHub Flavored Markdown extensions.
 func New() *Renderer {
 	return &Renderer{
@@ -56,7 +71,7 @@ func New() *Renderer {
 	}
 }
 
-// sourceTextRenderer adds Markdown byte offsets to plain text segments. The
+// sourceTextRenderer adds semantic IDs to source-backed Markdown text. The
 // browser intentionally accepts selections within one segment only, avoiding
 // ambiguous mappings across Markdown formatting delimiters.
 type sourceTextRenderer struct {
@@ -80,18 +95,9 @@ func (r *sourceTextRenderer) renderText(writer util.BufWriter, source []byte, no
 	}
 	textNode := node.(*ast.Text)
 	value := textNode.Segment.Value(source)
-	eligible := !bytes.ContainsAny(value, "\\&\r\n")
-	endByte := textNode.Segment.Stop
-	includeSoftBreak := eligible && textNode.SoftLineBreak() && endByte < len(source) && source[endByte] == '\n'
-	if includeSoftBreak {
-		endByte++
-	}
+	startByte, endByte, eligible, includeSoftBreak := textNodeSourceRange(textNode, source)
 	if eligible {
-		_, _ = writer.WriteString(`<span class="source-text" data-source-start="`)
-		_, _ = writer.WriteString(strconv.Itoa(textNode.Segment.Start))
-		_, _ = writer.WriteString(`" data-source-end="`)
-		_, _ = writer.WriteString(strconv.Itoa(endByte))
-		_, _ = writer.WriteString(`">`)
+		_, _ = fmt.Fprintf(writer, `<span id="%s" class="source-text">`, sourceElementID(startByte, endByte))
 	}
 	if textNode.IsRaw() {
 		r.writer.RawWrite(writer, value)
@@ -130,11 +136,7 @@ func (r *sourceTextRenderer) renderCodeSpan(writer util.BufWriter, source []byte
 	eligible := first != nil && first == node.LastChild() && !bytes.ContainsAny(first.(*ast.Text).Segment.Value(source), "\r\n")
 	if eligible {
 		segment := first.(*ast.Text).Segment
-		_, _ = writer.WriteString(`<span class="source-text" data-source-start="`)
-		_, _ = writer.WriteString(strconv.Itoa(segment.Start))
-		_, _ = writer.WriteString(`" data-source-end="`)
-		_, _ = writer.WriteString(strconv.Itoa(segment.Stop))
-		_, _ = writer.WriteString(`">`)
+		_, _ = fmt.Fprintf(writer, `<span id="%s" class="source-text">`, sourceElementID(segment.Start, segment.Stop))
 	}
 	for child := first; child != nil; child = child.NextSibling() {
 		value := child.(*ast.Text).Segment.Value(source)
@@ -152,7 +154,7 @@ func (r *sourceTextRenderer) renderCodeSpan(writer util.BufWriter, source []byte
 }
 
 // fencedCodeRenderer recognizes Mermaid fences and optionally gives ordinary
-// code lines their exact source byte ranges in review mode.
+// code lines semantic IDs that viewer state maps to exact byte ranges.
 type fencedCodeRenderer struct {
 	writer          goldmarkhtml.Writer
 	sourcePositions bool
@@ -185,15 +187,11 @@ func (r *fencedCodeRenderer) renderFencedCodeBlock(writer util.BufWriter, source
 	}
 
 	if isMermaidBlock(block, source) {
-		_, _ = writer.WriteString(`<div class="mermaid-diagram"`)
+		_, _ = writer.WriteString(`<div`)
 		if start, end, ok := mermaidSourceRange(block); r.sourcePositions && ok {
-			_, _ = writer.WriteString(` data-source-start="`)
-			_, _ = writer.WriteString(strconv.Itoa(start))
-			_, _ = writer.WriteString(`" data-source-end="`)
-			_, _ = writer.WriteString(strconv.Itoa(end))
-			_, _ = writer.WriteString(`"`)
+			_, _ = fmt.Fprintf(writer, ` id="%s"`, diagramElementID(start, end))
 		}
-		_, _ = writer.WriteString(`><details class="mermaid-source"><summary>Diagram source</summary><pre><code class="language-mermaid">`)
+		_, _ = writer.WriteString(` class="mermaid-diagram"><details class="mermaid-source"><summary>Diagram source</summary><pre><code class="language-mermaid">`)
 		r.renderLines(writer, source, block)
 		return ast.WalkContinue, nil
 	}
@@ -215,11 +213,7 @@ func (r *fencedCodeRenderer) renderLines(writer util.BufWriter, source []byte, b
 	for index := 0; index < block.Lines().Len(); index++ {
 		line := block.Lines().At(index)
 		if r.sourcePositions {
-			_, _ = writer.WriteString(`<span class="source-text source-code-text" data-source-start="`)
-			_, _ = writer.WriteString(strconv.Itoa(line.Start))
-			_, _ = writer.WriteString(`" data-source-end="`)
-			_, _ = writer.WriteString(strconv.Itoa(line.Stop))
-			_, _ = writer.WriteString(`">`)
+			_, _ = fmt.Fprintf(writer, `<span id="%s" class="source-text source-code-text">`, sourceElementID(line.Start, line.Stop))
 		}
 		r.writer.RawWrite(writer, line.Value(source))
 		if r.sourcePositions {
@@ -243,6 +237,69 @@ func mermaidSourceRange(block *ast.FencedCodeBlock) (int, int, bool) {
 	return block.Lines().At(0).Start, block.Lines().At(block.Lines().Len() - 1).Stop, true
 }
 
+func sourceElementID(start, end int) string {
+	return fmt.Sprintf("source-%d-%d", start, end)
+}
+
+func diagramElementID(start, end int) string {
+	return fmt.Sprintf("diagram-%d-%d", start, end)
+}
+
+func textNodeSourceRange(textNode *ast.Text, source []byte) (start, end int, eligible, includeSoftBreak bool) {
+	value := textNode.Segment.Value(source)
+	eligible = !bytes.ContainsAny(value, "\\&\r\n")
+	start = textNode.Segment.Start
+	end = textNode.Segment.Stop
+	includeSoftBreak = eligible && textNode.SoftLineBreak() && end < len(source) && source[end] == '\n'
+	if includeSoftBreak {
+		end++
+	}
+	return start, end, eligible, includeSoftBreak
+}
+
+// MarkdownSourceMap derives the same semantic identities emitted by the
+// review renderer without serializing byte offsets into HTML.
+func (r *Renderer) MarkdownSourceMap(source []byte) SourceMap {
+	document := r.reviewMarkdown.Parser().Parse(text.NewReader(source))
+	result := SourceMap{Nodes: []SourcePosition{}, Diagrams: []SourcePosition{}}
+	_ = ast.Walk(document, func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch typed := node.(type) {
+		case *ast.FencedCodeBlock:
+			for index := 0; index < typed.Lines().Len(); index++ {
+				line := typed.Lines().At(index)
+				result.Nodes = append(result.Nodes, sourcePosition(line.Start, line.Stop))
+			}
+			if isMermaidBlock(typed, source) {
+				if start, end, ok := mermaidSourceRange(typed); ok {
+					result.Diagrams = append(result.Diagrams, SourcePosition{ElementID: diagramElementID(start, end), StartByte: start, EndByte: end})
+				}
+			}
+			return ast.WalkSkipChildren, nil
+		case *ast.CodeSpan:
+			first := typed.FirstChild()
+			if first != nil && first == typed.LastChild() && !bytes.ContainsAny(first.(*ast.Text).Segment.Value(source), "\r\n") {
+				segment := first.(*ast.Text).Segment
+				result.Nodes = append(result.Nodes, sourcePosition(segment.Start, segment.Stop))
+			}
+			return ast.WalkSkipChildren, nil
+		case *ast.Text:
+			start, end, eligible, _ := textNodeSourceRange(typed, source)
+			if eligible {
+				result.Nodes = append(result.Nodes, sourcePosition(start, end))
+			}
+		}
+		return ast.WalkContinue, nil
+	})
+	return result
+}
+
+func sourcePosition(start, end int) SourcePosition {
+	return SourcePosition{ElementID: sourceElementID(start, end), StartByte: start, EndByte: end}
+}
+
 // Render converts source into an HTML fragment. documentPath is the URL-style
 // path of the source document relative to the content root and is used to
 // rewrite document-relative links and assets to viewer routes.
@@ -251,13 +308,13 @@ func (r *Renderer) Render(source []byte, documentPath string) ([]byte, error) {
 }
 
 // RenderWithSourcePositions renders a review-mode fragment whose eligible text
-// spans carry Markdown byte ranges for exact browser selection mapping.
+// spans have semantic IDs for exact browser selection mapping.
 func (r *Renderer) RenderWithSourcePositions(source []byte, documentPath string) ([]byte, error) {
 	return r.render(r.reviewMarkdown, source, documentPath)
 }
 
 // RenderCode converts UTF-8 source into escaped, line-oriented HTML. Review
-// mode adds byte ranges only to visible content; line terminators remain gaps.
+// mode adds semantic IDs only to visible content; line terminators remain gaps.
 func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 	if !utf8.Valid(source) || bytes.IndexByte(source, 0) >= 0 {
 		return nil, ErrUnsupportedText
@@ -277,9 +334,9 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 		if contentEnd > start && source[contentEnd-1] == '\r' {
 			contentEnd--
 		}
-		fmt.Fprintf(&output, `<li class="source-line" data-line="%d"><span class="source-line-number" aria-hidden="true">%d</span><code>`, line, line)
+		fmt.Fprintf(&output, `<li id="source-line-%d" class="source-line"><span class="source-line-number" aria-hidden="true">%d</span><code>`, line, line)
 		if review {
-			fmt.Fprintf(&output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, contentEnd)
+			fmt.Fprintf(&output, `<span id="%s" class="source-text">`, sourceElementID(start, contentEnd))
 		}
 		output.WriteString(html.EscapeString(string(source[start:contentEnd])))
 		if review {
@@ -294,10 +351,22 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 		}
 	}
 	if len(source) == 0 {
-		output.WriteString(`<li class="source-line" data-line="1"><span class="source-line-number" aria-hidden="true">1</span><code></code></li>`)
+		output.WriteString(`<li id="source-line-1" class="source-line"><span class="source-line-number" aria-hidden="true">1</span><code></code></li>`)
 	}
 	output.WriteString(`</ol></div>`)
 	return []byte(output.String()), nil
+}
+
+// CodeSourceMap derives selectable line identities for the plain source view.
+func (r *Renderer) CodeSourceMap(source []byte) (SourceMap, error) {
+	if !utf8.Valid(source) || bytes.IndexByte(source, 0) >= 0 {
+		return SourceMap{}, ErrUnsupportedText
+	}
+	result := SourceMap{Nodes: []SourcePosition{}, Diagrams: []SourcePosition{}}
+	for _, value := range sourceRanges(source) {
+		result.Nodes = append(result.Nodes, sourcePosition(value[0], value[1]))
+	}
+	return result, nil
 }
 
 // RenderDiff converts aligned Git rows into a side-by-side view with the base
@@ -328,6 +397,24 @@ func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool
 	output.WriteString(currentPane.String())
 	output.WriteString(`</div></div></div>`)
 	return []byte(output.String()), nil
+}
+
+// DiffSourceMap derives selectable current-side identities for a validated
+// aligned diff.
+func (r *Renderer) DiffSourceMap(current []byte, diff gitdiff.FileDiff) (SourceMap, error) {
+	if !utf8.Valid(current) || bytes.IndexByte(current, 0) >= 0 {
+		return SourceMap{}, ErrUnsupportedText
+	}
+	if err := validateDiffRows(current, diff.Rows); err != nil {
+		return SourceMap{}, err
+	}
+	result := SourceMap{Nodes: []SourcePosition{}, Diagrams: []SourcePosition{}}
+	for _, row := range diff.Rows {
+		if row.NewLine > 0 {
+			result.Nodes = append(result.Nodes, sourcePosition(row.CurrentStart, row.CurrentEnd))
+		}
+	}
+	return result, nil
 }
 
 // validateDiffRows ensures renderer metadata cannot point outside or at the
@@ -401,7 +488,7 @@ func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, 
 	if line > 0 {
 		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
 		if review && side == "current" {
-			fmt.Fprintf(output, `<span class="source-text" data-source-start="%d" data-source-end="%d">`, start, end)
+			fmt.Fprintf(output, `<span id="%s" class="source-text">`, sourceElementID(start, end))
 		}
 		output.WriteString(html.EscapeString(content))
 		if review && side == "current" {

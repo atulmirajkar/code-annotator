@@ -1,10 +1,12 @@
-import type { AnnotationLocation } from "./review-fragments.js";
+import type { AnnotationBrowserState, SourcePosition } from "./viewer-state.js";
 
 interface AnnotationHighlighterOptions {
   markdown: HTMLElement;
   sourceSpan: (node: Node) => HTMLElement | null;
   sourceSpanRange: (startSpan: HTMLElement, endSpan: HTMLElement) => HTMLElement[] | null;
   utf8Length: (value: string) => number;
+  sourceNodes: ReadonlyMap<string, SourcePosition>;
+  diagrams: ReadonlyMap<string, SourcePosition>;
 }
 
 export function mergeIntervals(values: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
@@ -19,15 +21,15 @@ export function mergeIntervals(values: ReadonlyArray<readonly [number, number]>)
   }, [] as Array<[number, number]>);
 }
 
-export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }: AnnotationHighlighterOptions) {
+export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length, sourceNodes, diagrams }: AnnotationHighlighterOptions) {
   // Highlight only anchors resolved against the current document. Stale and
   // document-level annotations remain visible in the panel without a range.
-  function renderAnnotationHighlights(annotations: AnnotationLocation[]): void {
+  function renderAnnotationHighlights(annotations: ReadonlyArray<AnnotationBrowserState>): void {
     clearFallbackHighlights();
     renderDiagramHighlights(annotations);
     const ranges = annotations
       .filter(hasResolvedAnchor)
-      .map((annotation) => sourceRange(annotation.anchorStartByte, annotation.anchorEndByte))
+      .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
       .filter((range): range is Range => range !== null);
 
     if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
@@ -40,14 +42,14 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
 
   // Diagram annotations highlight the rendered region as a whole; their
   // hidden source ranges remain available for quote previews and fallback APIs.
-  function renderDiagramHighlights(annotations: AnnotationLocation[]): void {
+  function renderDiagramHighlights(annotations: ReadonlyArray<AnnotationBrowserState>): void {
     const activeRanges = annotations
       .filter(hasResolvedAnchor)
-      .map((annotation): [number, number] => [annotation.anchorStartByte, annotation.anchorEndByte]);
-    markdown.querySelectorAll<HTMLElement>(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
-      const start = Number.parseInt(diagram.dataset.sourceStart || "", 10);
-      const end = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
-      diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === start && range[1] === end));
+      .map((annotation): [number, number] => [annotation.anchor.startByte, annotation.anchor.endByte]);
+    diagrams.forEach((position) => {
+      const diagram = document.getElementById(position.elementId);
+      if (!diagram || !markdown.contains(diagram)) return;
+      diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === position.startByte && range[1] === position.endByte));
     });
   }
 
@@ -74,15 +76,16 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
   }
 
   function containsSourceOffset(span: HTMLElement, offset: number, endBoundary: boolean): boolean {
-    const start = Number.parseInt(span.dataset.sourceStart || "", 10);
-    const end = Number.parseInt(span.dataset.sourceEnd || "", 10);
-    return Number.isInteger(start) && Number.isInteger(end) && (endBoundary ? start < offset && offset <= end : start <= offset && offset < end);
+    const position = sourceNodes.get(span.id);
+    return Boolean(position) && (endBoundary
+      ? position!.startByte < offset && offset <= position!.endByte
+      : position!.startByte <= offset && offset < position!.endByte);
   }
 
   function byteOffsetToTextOffset(span: HTMLElement, sourceOffset: number): number {
-    const spanStart = Number.parseInt(span.dataset.sourceStart || "", 10);
-    const target = sourceOffset - spanStart;
-    if (!Number.isInteger(spanStart) || target < 0) return -1;
+    const position = sourceNodes.get(span.id);
+    if (!position) return -1;
+    const target = sourceOffset - position.startByte;
 
     let bytes = 0;
     let textOffset = 0;
@@ -145,9 +148,6 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
   };
 }
 
-function hasResolvedAnchor(annotation: AnnotationLocation): annotation is AnnotationLocation & { anchorStartByte: number; anchorEndByte: number } {
-  return annotation.anchorState !== null
-    && annotation.anchorState !== "stale"
-    && annotation.anchorStartByte !== null
-    && annotation.anchorEndByte !== null;
+function hasResolvedAnchor(annotation: AnnotationBrowserState): annotation is AnnotationBrowserState & { anchor: NonNullable<AnnotationBrowserState["anchor"]> } {
+  return annotation.anchor !== null && annotation.anchor.state !== "stale";
 }

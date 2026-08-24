@@ -4,8 +4,8 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit 7 review follow-up A is implemented
-and awaiting maintainer review. Follow-up B must not begin without explicit
+**Phase:** Server-rendered review UI commit 7 review follow-up B is implemented
+and awaiting maintainer review. Commit 8 must not begin without explicit
 approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
@@ -25,10 +25,12 @@ and every read or mutation now use those templates through HTMX. TypeScript is
 limited to authenticated transport configuration and browser-owned selection,
 highlight, navigation, panel, and lifecycle-field adapters; the superseded API,
 DOM renderer, action builder, and thread presentation modules are removed.
-Commit 7 is approved. The browser-state follow-ups now establish semantic IDs
-plus runtime-validated TypeScript state as the replacement for all authored
-custom HTML data. `/ui/viewer-state` is registered but inactive, and a shrinking
-per-file test baseline rejects new `data-*` attributes or dataset consumers.
+Commit 7 and review follow-up A are approved. Follow-up B activates semantic
+IDs plus runtime-validated TypeScript state for annotation cards, source spans,
+Mermaid diagrams, lifecycle behavior, revisions, document digests, selection,
+and navigation. `/ui/viewer-state` is fetched during initialization and after
+mutations. A shrinking per-file test baseline rejects new `data-*` attributes
+or dataset consumers; only document-tree/filter and comparison state remains.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
@@ -349,7 +351,7 @@ for explicit approval before starting the next item.
 - [x] Commit 7 review follow-up A: establish the inactive versioned viewer-state
   endpoint, runtime-validated TypeScript contract, and shrinking `data-*`
   enforcement baseline.
-- [ ] Commit 7 review follow-up B: migrate annotation, source, Mermaid,
+- [x] Commit 7 review follow-up B: migrate annotation, source, Mermaid,
   lifecycle, revision, digest, selection, and navigation state from custom
   attributes to semantic IDs and typed in-memory state.
 - [ ] Commit 8: server-render the document tree and counts; activate server
@@ -400,13 +402,13 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 7 is approved. Review follow-up A adds the inactive,
-versioned viewer-state endpoint, validates its unknown JSON payload into
-strongly typed TypeScript maps, and freezes all current authored custom data
-attributes in a shrinking per-file allowlist. Follow-up A is the current review
-gate. The next allowed slice is follow-up B, migrating annotation and source
-state to semantic IDs and typed memory; it must not begin until the maintainer
-explicitly approves.
+milestone. Commit 7 and review follow-up A are approved. Follow-up B activates
+the versioned viewer-state endpoint, validates its unknown JSON payload into
+strongly typed TypeScript maps, and removes annotation/source/Mermaid/lifecycle
+application state from HTML. Follow-up B is the current review gate. The next
+allowed slice is commit 8, server-rendering the document tree and evaluating
+server-side filtering against the documented benchmark; it must not begin
+until the maintainer explicitly approves.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

@@ -41,12 +41,13 @@ selection mapping, highlights, source navigation, panel controls, lifecycle
 field state, and the authenticated HTMX headers. The stable JSON API remains
 available for agents and other automation.
 
-Custom `data-*` attributes are now treated as migration debt rather than a
-browser-state contract. The inactive `/ui/viewer-state` foundation exposes a
-versioned Go JSON model, and `web/src/viewer-state.ts` validates unknown wire
-data before returning strongly typed state. A shrinking repository allowlist
-rejects new authored data attributes; reviewed follow-ups will replace the
-existing uses with semantic element IDs and typed in-memory maps.
+Custom `data-*` attributes are migration debt rather than a browser-state
+contract. Review pages now activate the versioned `/ui/viewer-state` boundary:
+`web/src/viewer-state.ts` validates unknown wire data before returning strongly
+typed source, diagram, annotation, lifecycle, revision, and digest state.
+Rendered review content carries semantic IDs only; TypeScript joins those IDs
+to typed in-memory maps. The remaining allowlisted attributes belong only to
+the document tree and comparison selector, which have separate review gates.
 
 ## Usage
 

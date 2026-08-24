@@ -21,21 +21,9 @@ func TestAuthoredDataAttributesAreExplicitBaseline(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string][]string{
-		"internal/render/renderer.go":           {"line", "source-end", "source-start"},
-		"web/src/document-tree.ts":              {"document-path", "filter-match"},
-		"web/src/mermaid.ts":                    {"source-end", "source-start"},
-		"web/src/review-fragments.ts":           {"activity", "activity-label", "anchor-end-byte", "anchor-start-byte", "anchor-state", "document-level", "needs-reattachment", "role", "source-start-byte"},
-		"web/src/review-highlights.ts":          {"source-end", "source-start"},
-		"web/src/review-htmx.ts":                {"revision"},
-		"web/src/review-navigation.ts":          {"annotation-navigation-tabindex", "source-end", "source-start"},
-		"web/src/review-selection.ts":           {"document-sha256", "end-byte", "exact", "source-end", "source-start", "start-byte"},
-		"web/src/review.ts":                     {"document", "show-inactive"},
-		"web/src/styles/_content.scss":          {"source-start"},
-		"web/src/viewer.ts":                     {"changed", "document-path", "filter-match"},
-		"web/templates/annotation-actions.html": {"activity", "activity-label", "role"},
-		"web/templates/annotation-card.html":    {"anchor-end-byte", "anchor-start-byte", "anchor-state", "annotation-id", "document-level", "inactive", "kind", "needs-reattachment", "role", "source-start-byte"},
-		"web/templates/annotation-panel.html":   {"document", "revision", "show-inactive"},
-		"web/templates/page.html":               {"active-commit", "changed", "document", "document-path", "document-sha256", "kind"},
+		"web/src/document-tree.ts": {"document-path", "filter-match"},
+		"web/src/viewer.ts":        {"changed", "document-path", "filter-match"},
+		"web/templates/page.html":  {"active-commit", "changed", "document-path", "kind"},
 	}
 
 	repository := repositoryRoot(t)

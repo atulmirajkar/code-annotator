@@ -1,9 +1,10 @@
-import { annotationLocation, annotationLocations, configureLifecycleForm } from "./review-fragments.js";
+import { configureLifecycleForm } from "./review-fragments.js";
 import { createAnnotationHighlighter } from "./review-highlights.js";
 import { configureReviewHTMX } from "./review-htmx.js";
 import { createAnnotationNavigator } from "./review-navigation.js";
 import { createReviewPanelController } from "./review-panel.js";
 import { createSelectionController } from "./review-selection.js";
+import { fetchViewerState } from "./viewer-state.js";
 function requiredElement(value, label) {
     if (!value)
         throw new Error(`Missing ${label} in review template`);
@@ -25,14 +26,24 @@ function writeSelection(form, selection) {
             input.value = value;
     });
 }
-(() => {
+function currentDocumentPath() {
+    const prefix = "/view/";
+    if (window.location.pathname.startsWith(prefix)) {
+        return decodeURIComponent(window.location.pathname.slice(prefix.length));
+    }
+    const activeDocument = document.querySelector('.documents a[aria-current="page"]');
+    const activePath = activeDocument ? new URL(activeDocument.href).pathname : "";
+    if (!activePath.startsWith(prefix))
+        throw new Error("Review page URL is invalid");
+    return decodeURIComponent(activePath.slice(prefix.length));
+}
+void (async () => {
     const panel = document.querySelector(".review-panel");
     if (!panel)
         return;
     const reviewPanel = panel;
-    const documentPath = reviewPanel.dataset.document;
-    if (!documentPath)
-        return;
+    const documentPath = currentDocumentPath();
+    const mode = new URLSearchParams(window.location.search).get("mode") === "diff" ? "diff" : "file";
     const markdown = requiredElement(document.querySelector(".markdown-body"), "markdown body");
     const preview = requiredElement(panel.querySelector(".selection-preview"), "selection preview");
     const previewQuote = requiredElement(panel.querySelector(".selection-quote"), "selection quote");
@@ -53,6 +64,29 @@ function writeSelection(form, selection) {
         resizeHandle: panel.querySelector(".review-panel-resize"),
         documentPath,
     });
+    let viewerState;
+    try {
+        viewerState = await fetchViewerState(documentPath, mode);
+    }
+    catch (_) {
+        panelController.setFormStatus("Could not load typed viewer state. Refresh to try again.", true);
+        return;
+    }
+    if (!viewerState.review) {
+        panelController.setFormStatus("Review state is unavailable for this document.", true);
+        return;
+    }
+    viewerState.document.diagrams.forEach((position) => {
+        const diagram = document.getElementById(position.elementId);
+        if (!diagram || !markdown.contains(diagram))
+            return;
+        diagram.classList.add("annotation-selectable");
+        const output = diagram.querySelector(".mermaid-output");
+        if (output) {
+            output.tabIndex = 0;
+            output.setAttribute("aria-label", "Rendered Mermaid diagram. Select the complete diagram for annotation.");
+        }
+    });
     let updateSelectionFields = () => { };
     const selectionController = createSelectionController({
         panel: reviewPanel,
@@ -62,11 +96,27 @@ function writeSelection(form, selection) {
         previewRange,
         selectionScope,
         documentScope,
+        documentSHA256: viewerState.document.sha256,
+        sourceNodes: viewerState.document.sourceNodes,
+        diagrams: viewerState.document.diagrams,
         onSelectionChanged: () => updateSelectionFields(),
     });
     const { currentSelection, forceClearSelectionPreview, sourceSpan, sourceSpanRange, utf8Length } = selectionController;
-    const { renderAnnotationHighlights, sourceRange } = createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length });
-    const { navigateFromAnnotation } = createAnnotationNavigator({ markdown, sourceRange, sourceSpan });
+    const { renderAnnotationHighlights, sourceRange } = createAnnotationHighlighter({
+        markdown,
+        sourceSpan,
+        sourceSpanRange,
+        utf8Length,
+        sourceNodes: viewerState.document.sourceNodes,
+        diagrams: viewerState.document.diagrams,
+    });
+    const { navigateFromAnnotation } = createAnnotationNavigator({
+        markdown,
+        sourceRange,
+        sourceSpan,
+        sourceNodes: viewerState.document.sourceNodes,
+        diagrams: viewerState.document.diagrams,
+    });
     updateSelectionFields = () => {
         writeSelection(form, selectionScope.checked ? currentSelection() : null);
         updateReattachForms();
@@ -88,23 +138,34 @@ function writeSelection(form, selection) {
                     : "Select replacement text in the document to enable reattachment.";
         });
     }
+    function annotationByElementId(elementId) {
+        return viewerState.review?.annotationsByElementId.get(elementId);
+    }
+    function visibleAnnotations(content) {
+        return Array.from(content.querySelectorAll(".annotation-card"))
+            .map((card) => annotationByElementId(card.id))
+            .filter((annotation) => annotation !== undefined);
+    }
     function initializePanel() {
         const content = reviewPanel.querySelector("#annotation-panel-content");
         if (!content)
             return;
-        showInactive.checked = content.dataset.showInactive === "true";
-        content.querySelectorAll(".annotation-lifecycle").forEach((lifecycleForm) => {
-            configureLifecycleForm(lifecycleForm, true);
+        visibleAnnotations(content).forEach((annotation) => {
+            const lifecycleForm = document.getElementById(annotation.lifecycleFormId);
+            if (lifecycleForm instanceof HTMLFormElement && content.contains(lifecycleForm)) {
+                configureLifecycleForm(lifecycleForm, annotation.transitions, true);
+            }
         });
         updateReattachForms();
-        renderAnnotationHighlights(annotationLocations(content));
+        renderAnnotationHighlights(visibleAnnotations(content));
     }
     reviewPanel.addEventListener("click", (event) => {
         const target = event.target instanceof Element ? event.target : null;
         const summary = target?.closest(".annotation-summary");
         const card = summary?.closest(".annotation-card");
-        if (summary && card)
-            navigateFromAnnotation(event, card, annotationLocation(card));
+        const annotation = card ? annotationByElementId(card.id) : undefined;
+        if (summary && card && annotation)
+            navigateFromAnnotation(event, card, annotation);
     });
     reviewPanel.addEventListener("change", (event) => {
         const target = event.target;
@@ -114,15 +175,27 @@ function writeSelection(form, selection) {
         }
         if (target instanceof HTMLSelectElement && target.name === "status") {
             const lifecycleForm = target.closest(".annotation-lifecycle");
-            if (lifecycleForm)
-                configureLifecycleForm(lifecycleForm, false);
+            const annotation = lifecycleForm ? viewerState.review?.annotationsByLifecycleFormId.get(lifecycleForm.id) : undefined;
+            if (lifecycleForm && annotation)
+                configureLifecycleForm(lifecycleForm, annotation.transitions, false);
         }
     });
     form.addEventListener("submit", () => panelController.setFormStatus("Saving…"));
     configureReviewHTMX({
         panel: reviewPanel,
         token: reviewToken,
-        onPanelChanged: (source, mutation, successful) => {
+        getRevision: () => viewerState.review?.revision || "",
+        onPanelChanged: async (source, mutation, successful) => {
+            if (mutation) {
+                try {
+                    viewerState = await fetchViewerState(documentPath, mode);
+                }
+                catch (_) {
+                    panelController.setFormStatus("Annotations changed, but viewer state could not be refreshed.", true);
+                    return;
+                }
+                showInactive.checked = false;
+            }
             initializePanel();
             if (!mutation)
                 return;

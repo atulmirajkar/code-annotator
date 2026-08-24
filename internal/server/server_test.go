@@ -151,7 +151,7 @@ func TestCodeAnnotationCatalog(t *testing.T) {
 		wantStatus int
 		contains   []string
 	}{
-		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `class="source-text" data-source-start="0" data-source-end="12"`, `name="code-annotator-review-token"`, `id="annotation-sidebar"`}},
+		{name: "source page has compact review layout", path: "/view/main.go", wantStatus: http.StatusOK, contains: []string{`class="document code-document"`, `id="source-0-12" class="source-text"`, `name="code-annotator-review-token"`, `id="annotation-sidebar"`}},
 		{name: "cataloged source has annotation endpoint", path: "/api/annotations?document=main.go", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`, `"annotations":[{`}},
 		{name: "agent queue includes source metadata", path: "/api/annotations?status=open", wantStatus: http.StatusOK, contains: []string{`"document":"main.go"`, `"kind":"code"`, `"language":"go"`}},
 		{name: "uncataloged asset has no annotation endpoint", path: "/api/annotations?document=notes.txt", wantStatus: http.StatusNotFound},
@@ -1643,11 +1643,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 		wantToken  bool
 		wantPanel  bool
 		wantSource bool
-		wantDigest bool
 		wantHTMX   bool
 	}{
 		{name: "read-only page omits token"},
-		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true, wantDigest: true, wantHTMX: true},
+		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true, wantHTMX: true},
 	}
 
 	for _, test := range tests {
@@ -1698,14 +1697,12 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if hasOpenCommentsFilter != test.wantPanel {
 				t.Fatalf("page contains open-comments filter = %t, want %t", hasOpenCommentsFilter, test.wantPanel)
 			}
-			hasSource := strings.Contains(response.Body.String(), `class="source-text" data-source-start=`)
+			hasSource := strings.Contains(response.Body.String(), `class="source-text"`) || strings.Contains(response.Body.String(), `class="source-text source-code-text"`)
 			if hasSource != test.wantSource {
 				t.Fatalf("page contains source metadata = %t, want %t", hasSource, test.wantSource)
 			}
-			digest := annotation.DocumentSHA256([]byte("# Home"))
-			hasDigest := strings.Contains(response.Body.String(), `data-document-sha256="`+digest+`"`)
-			if hasDigest != test.wantDigest {
-				t.Fatalf("page contains document digest = %t, want %t", hasDigest, test.wantDigest)
+			if strings.Contains(response.Body.String(), `data-document-sha256=`) {
+				t.Fatal("page leaks document digest into presentation HTML")
 			}
 		})
 	}
@@ -1722,8 +1719,8 @@ func TestStaticAssets(t *testing.T) {
 		wantType     string
 		wantContents []string
 	}{
-		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./review-fragments.js", "./review-highlights.js", "./review-htmx.js", "./review-navigation.js", "./review-panel.js", "./review-selection.js", "configureReviewHTMX"}},
-		{name: "get review fragments module", path: "/static/review-fragments.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotationLocation", "annotationLocations", "configureLifecycleForm"}},
+		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./review-fragments.js", "./review-highlights.js", "./review-htmx.js", "./review-navigation.js", "./review-panel.js", "./review-selection.js", "./viewer-state.js", "configureReviewHTMX"}},
+		{name: "get review fragments module", path: "/static/review-fragments.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"configureLifecycleForm", "behavior.activity", "behavior.role"}},
 		{name: "get review HTMX module", path: "/static/review-htmx.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"configureReviewHTMX", "htmx:configRequest", "htmx:beforeSwap", "X-Code-Annotator-Token", "If-Match"}},
 		{name: "get review highlights module", path: "/static/review-highlights.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationHighlighter", "renderAnnotationHighlights", "sourceRange"}},
 		{name: "get review navigation module", path: "/static/review-navigation.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationNavigator", "navigateFromAnnotation", "emphasizeNavigationTarget"}},

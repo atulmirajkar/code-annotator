@@ -2,9 +2,10 @@
 
 ## Status
 
-Implementation in progress. Commit gates 0 through 7, the commit 4 review
-follow-up, and the intervening role-only compatibility slice are approved.
-Commit 7 review follow-up A is implemented and awaiting maintainer review.
+Implementation in progress. Commit gates 0 through 7, commit 7 review
+follow-up A, the commit 4 review follow-up, and the intervening role-only
+compatibility slice are approved. Commit 7 review follow-up B is implemented
+and awaiting maintainer review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -623,7 +624,7 @@ annotation Playwright tests.
 
 ### Commit 7 review follow-up A: establish typed browser state
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -641,6 +642,8 @@ Go/race tests, vet, and diff checks.
 
 ### Commit 7 review follow-up B: migrate annotation and source state
 
+Status: implemented in the current review commit; awaiting maintainer approval.
+
 Scope:
 
 - give annotation cards, source spans, and diagrams semantic IDs;
@@ -652,6 +655,17 @@ Scope:
   `data-*` uses and shrink the enforcement baseline;
 - retain the verified HTMX, selection, highlight, navigation, lifecycle, and
   Mermaid behavior.
+
+Implementation notes:
+
+- `/ui/viewer-state` is now fetched during review initialization and after
+  annotation mutations; `mode=diff` returns the current-side diff source map;
+- renderer-owned `source-*` and `diagram-*` IDs are tested against the typed
+  source map, while annotation and lifecycle IDs are shared server helpers;
+- selection preview and temporary focus ownership stay in TypeScript memory;
+  they are never serialized into presentation HTML;
+- the only remaining custom-data baseline is document-tree/filter state and
+  the active comparison commit, reserved for commits 8 and 9.
 
 Checks: unit, renderer/server, `check:web`, Go/race, annotation and Mermaid
 Playwright tests.

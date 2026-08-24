@@ -22,7 +22,7 @@ function targetsPanel(event, detailValue) {
         || (detailValue.elt instanceof HTMLElement && detailValue.elt.id === "annotation-panel-content")
         || (event.target instanceof HTMLElement && event.target.id === "annotation-panel-content");
 }
-export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestError }) {
+export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged, onRequestError }) {
     if (typeof htmx === "undefined")
         throw new Error("HTMX is unavailable on a review page");
     htmx.config.allowEval = false;
@@ -40,10 +40,8 @@ export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestErr
         requestMethod = requestVerb(value);
         if (requestMethod !== "post" || typeof value.headers !== "object" || value.headers === null)
             return;
-        const fragment = panel.querySelector("#annotation-panel-content");
-        const revision = fragment?.dataset.revision || "";
         Reflect.set(value.headers, "X-Code-Annotator-Token", token);
-        Reflect.set(value.headers, "If-Match", JSON.stringify(revision));
+        Reflect.set(value.headers, "If-Match", JSON.stringify(getRevision()));
     });
     document.body.addEventListener("htmx:beforeSwap", (event) => {
         const value = detail(event);
@@ -57,7 +55,7 @@ export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestErr
         if (!value || !targetsPanel(event, value))
             return;
         const responseStatus = status(value);
-        onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
+        void onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
         requestSource = null;
         requestMethod = "";
     });

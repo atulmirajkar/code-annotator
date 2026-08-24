@@ -644,11 +644,11 @@ a {
   height: auto;
 }
 
-.mermaid-diagram[data-source-start] .mermaid-output {
+.mermaid-diagram.annotation-selectable .mermaid-output {
   cursor: pointer;
 }
 
-.mermaid-diagram[data-source-start] .mermaid-output:focus-visible {
+.mermaid-diagram.annotation-selectable .mermaid-output:focus-visible {
   outline: 0.2rem solid var(--accent);
   outline-offset: 0.3rem;
 }

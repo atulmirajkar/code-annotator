@@ -1,5 +1,5 @@
 {{define "annotation-card"}}
-<details class="annotation-card" data-annotation-id="{{.ID}}" data-document-level="{{.DocumentLevel}}" data-needs-reattachment="{{.NeedsReattach}}"{{if .HasAnchor}} data-anchor-state="{{.AnchorState}}" data-anchor-start-byte="{{.AnchorStartByte}}" data-anchor-end-byte="{{.AnchorEndByte}}"{{end}}{{if .HasSource}} data-source-start-byte="{{.SourceStartByte}}"{{end}}{{if .Inactive}} data-inactive="true"{{end}}>
+<details id="{{.ElementID}}" class="annotation-card">
   <summary class="annotation-summary" title="Show this annotation in the document">
     <span class="annotation-meta">
       <span class="annotation-badge">{{.IntentLabel}}</span>
@@ -23,7 +23,7 @@
     {{if .Thread}}
     <ol class="annotation-thread">
       {{range .Thread}}
-      <li class="annotation-thread-entry {{.Class}}" data-kind="{{.Kind}}" data-role="{{.Role}}">
+      <li class="annotation-thread-entry {{.Class}}">
         <div class="annotation-thread-header">
           <span class="annotation-thread-kind">{{.KindLabel}}</span>
           <span class="annotation-thread-author">{{.Role}}</span>

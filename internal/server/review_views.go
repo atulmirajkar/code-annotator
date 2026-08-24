@@ -13,10 +13,6 @@ import (
 type annotationPanelView struct {
 	// Document is the canonical path submitted by every mutation form.
 	Document string
-	// Revision is the sidecar revision used for optimistic concurrency.
-	Revision string
-	// ShowInactive records whether closed and rejected cards are included.
-	ShowInactive bool
 	// CountLabel is the ready-to-display active and total count summary.
 	CountLabel string
 	// EmptyMessage distinguishes an empty document from an active-only filter.
@@ -30,8 +26,9 @@ type annotationPanelView struct {
 
 // annotationCardView contains the display values for one annotation card.
 type annotationCardView struct {
-	// ID is the stable annotation identifier used by browser interaction hooks.
-	ID string
+	// ID is the stable annotation identifier; ElementID is its semantic DOM ID.
+	ID        string
+	ElementID string
 	// Intent and Status are validated domain values rendered as badges.
 	Intent      annotation.Intent
 	Status      annotation.Status
@@ -41,8 +38,6 @@ type annotationCardView struct {
 	// domain value used for both attribution and permissions.
 	Comment string
 	Role    annotation.Role
-	// Inactive marks closed and rejected annotations when they are visible.
-	Inactive bool
 	// SourceQuote and SourceLines describe a source-level annotation.
 	SourceQuote string
 	SourceLines string
@@ -53,15 +48,6 @@ type annotationCardView struct {
 	SelectionUnavailable bool
 	// AnchorStale adds the stale badge and permits a reattachment form.
 	AnchorStale bool
-	// Browser-only highlighting and navigation consume these validated values
-	// from data attributes instead of reconstructing annotation presentation.
-	AnchorState     annotation.AnchorState
-	AnchorStartByte int
-	AnchorEndByte   int
-	HasAnchor       bool
-	SourceStartByte int
-	HasSource       bool
-	NeedsReattach   bool
 	// Turn is the optional "waiting for" badge derived from recent activity.
 	Turn *annotationTurnView
 	// Thread omits redundant acknowledgement entries from the visible history.
@@ -79,8 +65,6 @@ type annotationTurnView struct {
 
 // annotationThreadView is one visible, presentation-ready thread entry.
 type annotationThreadView struct {
-	// Kind remains available as a stable data attribute for browser adapters.
-	Kind annotation.ThreadKind
 	// KindLabel and Class are the readable label and CSS presentation hook.
 	KindLabel string
 	Class     string
@@ -97,9 +81,10 @@ type annotationActionsView struct {
 	// Document is submitted so handlers can authorize catalog membership.
 	Document string
 	// The URLs are derived only from the validated annotation identifier.
-	ReplyURL      string
-	ReattachURL   string
-	TransitionURL string
+	ReplyURL        string
+	ReattachURL     string
+	TransitionURL   string
+	LifecycleFormID string
 	// CanReattach requires both a source selector and a currently stale anchor.
 	CanReattach bool
 	// CanQuickClose promotes the common applied-to-closed reviewer action.
@@ -155,7 +140,7 @@ var lifecycleActionDefinitions = [...]lifecycleActionDefinition{
 
 // newAnnotationPanelView applies active/inactive filtering once on the server
 // so templates only iterate presentation-ready cards.
-func newAnnotationPanelView(document, revision string, annotations []resolvedAnnotation, showInactive bool) annotationPanelView {
+func newAnnotationPanelView(document string, annotations []resolvedAnnotation, showInactive bool) annotationPanelView {
 	activeCount := 0
 	for _, item := range annotations {
 		if !isInactiveAnnotation(item.Status) {
@@ -164,11 +149,9 @@ func newAnnotationPanelView(document, revision string, annotations []resolvedAnn
 	}
 
 	view := annotationPanelView{
-		Document:     document,
-		Revision:     revision,
-		ShowInactive: showInactive,
-		CountLabel:   annotationCountLabel(activeCount, len(annotations)),
-		Cards:        make([]annotationCardView, 0, len(annotations)),
+		Document:   document,
+		CountLabel: annotationCountLabel(activeCount, len(annotations)),
+		Cards:      make([]annotationCardView, 0, len(annotations)),
 	}
 	for _, item := range annotations {
 		if !showInactive && isInactiveAnnotation(item.Status) {
@@ -189,19 +172,17 @@ func newAnnotationPanelView(document, revision string, annotations []resolvedAnn
 // newAnnotationCardView converts validated annotation and anchor data into the
 // labels and nested models consumed by annotation-card.html.
 func newAnnotationCardView(document string, item resolvedAnnotation) annotationCardView {
-	inactive := isInactiveAnnotation(item.Status)
 	view := annotationCardView{
-		ID:            item.ID,
-		Intent:        item.Intent,
-		Status:        item.Status,
-		IntentLabel:   humanizeAnnotationValue(string(item.Intent)),
-		StatusLabel:   humanizeAnnotationValue(string(item.Status)),
-		Comment:       item.Comment,
-		Role:          item.Role,
-		Inactive:      inactive,
-		Turn:          pendingTurnBadge(item.Annotation),
-		Thread:        annotationThread(item.Thread),
-		NeedsReattach: item.NeedsReattachment,
+		ID:          item.ID,
+		ElementID:   annotationElementID(item.ID),
+		Intent:      item.Intent,
+		Status:      item.Status,
+		IntentLabel: humanizeAnnotationValue(string(item.Intent)),
+		StatusLabel: humanizeAnnotationValue(string(item.Status)),
+		Comment:     item.Comment,
+		Role:        item.Role,
+		Turn:        pendingTurnBadge(item.Annotation),
+		Thread:      annotationThread(item.Thread),
 	}
 	if item.NeedsReattachment {
 		view.SelectionUnavailable = true
@@ -212,18 +193,16 @@ func newAnnotationCardView(document string, item resolvedAnnotation) annotationC
 		view.SourceLines = lineRangeLabel(item.Source.Selector.StartLine, item.Source.Selector.EndLine)
 	}
 	view.AnchorStale = item.Anchor != nil && item.Anchor.State == annotation.AnchorStale
-	if item.Anchor != nil {
-		view.AnchorState = item.Anchor.State
-		view.AnchorStartByte = item.Anchor.StartByte
-		view.AnchorEndByte = item.Anchor.EndByte
-		view.HasAnchor = true
-	}
-	if item.Source != nil {
-		view.SourceStartByte = item.Source.Selector.StartByte
-		view.HasSource = true
-	}
 	view.Actions = newAnnotationActionsView(document, item, view.AnchorStale)
 	return view
+}
+
+func annotationElementID(annotationID string) string {
+	return "annotation-" + annotationID
+}
+
+func lifecycleFormElementID(annotationID string) string {
+	return "annotation-lifecycle-" + annotationID
 }
 
 func humanizeAnnotationValue(value string) string {
@@ -237,14 +216,15 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 	escapedID := url.PathEscape(item.ID)
 	baseURL := "/ui/review/annotations/" + escapedID
 	view := annotationActionsView{
-		AnnotationID:  item.ID,
-		Document:      document,
-		ReplyURL:      baseURL + "/replies",
-		ReattachURL:   baseURL + "/reattach",
-		TransitionURL: baseURL + "/transition",
-		CanReattach:   (item.Source != nil || item.NeedsReattachment) && anchorStale,
-		CanQuickClose: item.Status == annotation.StatusApplied,
-		ReplyRole:     annotation.RoleReviewer,
+		AnnotationID:    item.ID,
+		Document:        document,
+		ReplyURL:        baseURL + "/replies",
+		ReattachURL:     baseURL + "/reattach",
+		TransitionURL:   baseURL + "/transition",
+		LifecycleFormID: lifecycleFormElementID(item.ID),
+		CanReattach:     (item.Source != nil || item.NeedsReattachment) && anchorStale,
+		CanQuickClose:   item.Status == annotation.StatusApplied,
+		ReplyRole:       annotation.RoleReviewer,
 	}
 	for _, definition := range lifecycleActionDefinitions {
 		if err := annotation.ValidateTransition(item.Status, definition.status, definition.role); err != nil {
@@ -282,7 +262,6 @@ func annotationThread(entries []annotation.ThreadEntry) []annotationThreadView {
 		}
 		kindLabel, class := threadKindPresentation(entry.Kind)
 		result = append(result, annotationThreadView{
-			Kind:      entry.Kind,
 			KindLabel: kindLabel,
 			Class:     class,
 			Role:      entry.Role,

@@ -23,7 +23,7 @@ func (s *Server) handleAnnotationPanel(response http.ResponseWriter, request *ht
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Revision)))
-	s.renderAnnotationPanel(response, newAnnotationPanelView(document, string(result.Revision), result.Annotations, showInactive), http.StatusOK)
+	s.renderAnnotationPanel(response, newAnnotationPanelView(document, result.Annotations, showInactive), http.StatusOK)
 }
 
 func (s *Server) handleCreateAnnotationForm(response http.ResponseWriter, request *http.Request) {
@@ -50,7 +50,7 @@ func (s *Server) handleCreateAnnotationForm(response http.ResponseWriter, reques
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
-	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
+	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, result.Document.Annotations, false), http.StatusOK)
 }
 
 func (s *Server) handleReplyAnnotationForm(response http.ResponseWriter, request *http.Request) {
@@ -74,7 +74,7 @@ func (s *Server) handleReplyAnnotationForm(response http.ResponseWriter, request
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
-	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
+	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, result.Document.Annotations, false), http.StatusOK)
 }
 
 type replyAnnotationForm struct {
@@ -126,7 +126,7 @@ func (s *Server) handleTransitionAnnotationForm(response http.ResponseWriter, re
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
-	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
+	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, result.Document.Annotations, false), http.StatusOK)
 }
 
 func (s *Server) handleReattachAnnotationForm(response http.ResponseWriter, request *http.Request) {
@@ -159,7 +159,7 @@ func (s *Server) handleReattachAnnotationForm(response http.ResponseWriter, requ
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
-	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
+	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, result.Document.Annotations, false), http.StatusOK)
 }
 
 type annotationMutationDraft struct {
@@ -289,7 +289,7 @@ func (s *Server) renderAnnotationPanelFeedback(response http.ResponseWriter, doc
 		writeAnnotationOperationError(response, err, true)
 		return
 	}
-	view := newAnnotationPanelView(document, string(result.Revision), result.Annotations, false)
+	view := newAnnotationPanelView(document, result.Annotations, false)
 	view.Feedback = message
 	view.FeedbackKind = kind
 	applyAnnotationMutationDraft(&view, annotationID, draft)

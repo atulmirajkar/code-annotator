@@ -17,10 +17,10 @@ func TestRenderCode(t *testing.T) {
 		contains []string
 		wantErr  error
 	}{
-		{name: "escapes source", source: []byte("if a < b && b > c {}\n"), contains: []string{`data-line="1"`, `if a &lt; b &amp;&amp; b &gt; c {}`}},
-		{name: "review byte ranges with CRLF gaps", source: []byte("café\r\nnext"), review: true, contains: []string{`data-source-start="0" data-source-end="5">café`, `data-source-start="7" data-source-end="11">next`}},
-		{name: "review empty line anchor", source: []byte("one\n\ntwo"), review: true, contains: []string{`data-source-start="4" data-source-end="4"></span>`}},
-		{name: "empty file", source: nil, contains: []string{`data-line="1"`, `<code></code>`}},
+		{name: "escapes source", source: []byte("if a < b && b > c {}\n"), contains: []string{`id="source-line-1"`, `if a &lt; b &amp;&amp; b &gt; c {}`}},
+		{name: "review byte ranges with CRLF gaps", source: []byte("café\r\nnext"), review: true, contains: []string{`id="source-0-5" class="source-text">café`, `id="source-7-11" class="source-text">next`}},
+		{name: "review empty line anchor", source: []byte("one\n\ntwo"), review: true, contains: []string{`id="source-4-4" class="source-text"></span>`}},
+		{name: "empty file", source: nil, contains: []string{`id="source-line-1"`, `<code></code>`}},
 		{name: "invalid UTF-8", source: []byte{0xff}, wantErr: ErrUnsupportedText},
 		{name: "NUL byte", source: []byte{'a', 0, 'b'}, wantErr: ErrUnsupportedText},
 	}
@@ -75,11 +75,11 @@ func TestRenderDiff(t *testing.T) {
 				`class="diff-cell diff-current diff-modified"`,
 				`class="diff-cell diff-base diff-deleted"`,
 				`class="diff-cell diff-current diff-added"`,
-				`data-source-start="5" data-source-end="16">new &lt;value&gt;</span>`,
+				`id="source-5-16" class="source-text">new &lt;value&gt;</span>`,
 				`removed &amp; gone`,
-				`data-source-start="17" data-source-end="29">added &amp; more</span>`,
+				`id="source-17-29" class="source-text">added &amp; more</span>`,
 			},
-			excludes: []string{`data-source-start="0" data-source-end="0"`, `>old &lt;value&gt;</span>`},
+			excludes: []string{`id="source-0-0"`, `>old &lt;value&gt;</span>`},
 		},
 		{
 			name:    "omits annotation metadata outside review mode",
@@ -98,7 +98,7 @@ func TestRenderDiff(t *testing.T) {
 				{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 1, BaseText: "a"},
 				{Kind: gitdiff.RowAdded, NewLine: 2, CurrentStart: 3, CurrentEnd: 3},
 			}},
-			contains: []string{`data-source-start="0" data-source-end="1">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code><span class="source-text" data-source-start="3" data-source-end="3"></span></code>`},
+			contains: []string{`id="source-0-1" class="source-text">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code><span id="source-3-3" class="source-text"></span></code>`},
 		},
 		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-pane diff-base-pane"></div>`, `<div class="diff-pane diff-current-pane"></div>`}},
 		{
@@ -269,32 +269,32 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 			name:   "plain UTF-8 text",
 			source: "# Plain café\n",
 			contains: []string{
-				`data-source-start="2" data-source-end="7">Plain</span>`,
-				`data-source-start="7" data-source-end="13"> café</span>`,
+				`id="source-2-7" class="source-text">Plain</span>`,
+				`id="source-7-13" class="source-text"> café</span>`,
 			},
 		},
 		{
 			name:   "formatted text has independent segments",
 			source: "Before **bold** after\n",
 			contains: []string{
-				`data-source-start="0" data-source-end="7">Before </span>`,
-				`data-source-start="9" data-source-end="13">bold</span>`,
-				`data-source-start="15" data-source-end="21"> after</span>`,
+				`id="source-0-7" class="source-text">Before </span>`,
+				`id="source-9-13" class="source-text">bold</span>`,
+				`id="source-15-21" class="source-text"> after</span>`,
 			},
 		},
 		{
 			name:   "soft line break remains source contiguous",
 			source: "first line\nsecond line\n",
 			contains: []string{
-				`data-source-start="5" data-source-end="11"> line`,
-				`data-source-start="11" data-source-end="17">second`,
+				`id="source-5-11" class="source-text"> line`,
+				`id="source-11-17" class="source-text">second`,
 			},
 		},
 		{
 			name:   "inline code content",
 			source: "Before `code` after",
 			contains: []string{
-				`<code><span class="source-text" data-source-start="8" data-source-end="12">code</span></code>`,
+				`<code><span id="source-8-12" class="source-text">code</span></code>`,
 			},
 		},
 		{
@@ -306,19 +306,19 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 			name:   "fenced code lines",
 			source: "```go\nfirst()\nsecond()\n```\n",
 			contains: []string{
-				`<pre><code class="language-go"><span class="source-text source-code-text" data-source-start="6" data-source-end="14">first()`,
-				`data-source-start="14" data-source-end="23">second()`,
+				`<pre><code class="language-go"><span id="source-6-14" class="source-text source-code-text">first()`,
+				`id="source-14-23" class="source-text source-code-text">second()`,
 			},
 		},
 		{
 			name:     "escaped text is not mapped",
 			source:   `Escaped \* marker`,
-			excludes: []string{`data-source-start="0"`},
+			excludes: []string{`id="source-0-`},
 		},
 		{
 			name:     "entity text is not mapped",
 			source:   `Copyright &copy;`,
-			excludes: []string{`data-source-start="10"`},
+			excludes: []string{`id="source-10-`},
 		},
 	}
 
@@ -341,6 +341,52 @@ func TestRenderSourcePositionMetadata(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSourceMapsMatchRenderedSemanticIDs(t *testing.T) {
+	t.Parallel()
+
+	renderer := New()
+	markdown := []byte("Before `code`\n\n```mermaid\ngraph TD\n  A-->B\n```\n")
+	markdownHTML, err := renderer.RenderWithSourcePositions(markdown, "README.md")
+	if err != nil {
+		t.Fatalf("RenderWithSourcePositions() error = %v", err)
+	}
+	assertSourceMapIDs(t, string(markdownHTML), renderer.MarkdownSourceMap(markdown))
+
+	code := []byte("first\n\nthird")
+	codeHTML, err := renderer.RenderCode(code, true)
+	if err != nil {
+		t.Fatalf("RenderCode() error = %v", err)
+	}
+	codeMap, err := renderer.CodeSourceMap(code)
+	if err != nil {
+		t.Fatalf("CodeSourceMap() error = %v", err)
+	}
+	assertSourceMapIDs(t, string(codeHTML), codeMap)
+
+	diff := gitdiff.FileDiff{Rows: []gitdiff.Row{
+		{Kind: gitdiff.RowModified, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 5, BaseText: "older"},
+		{Kind: gitdiff.RowAdded, NewLine: 2, CurrentStart: 6, CurrentEnd: 6},
+	}}
+	diffHTML, err := renderer.RenderDiff([]byte("first\n\n"), diff, true)
+	if err != nil {
+		t.Fatalf("RenderDiff() error = %v", err)
+	}
+	diffMap, err := renderer.DiffSourceMap([]byte("first\n\n"), diff)
+	if err != nil {
+		t.Fatalf("DiffSourceMap() error = %v", err)
+	}
+	assertSourceMapIDs(t, string(diffHTML), diffMap)
+}
+
+func assertSourceMapIDs(t *testing.T, html string, sourceMap SourceMap) {
+	t.Helper()
+	for _, position := range append(sourceMap.Nodes, sourceMap.Diagrams...) {
+		if !strings.Contains(html, `id="`+position.ElementID+`"`) {
+			t.Errorf("rendered HTML is missing source-map element %q:\n%s", position.ElementID, html)
+		}
 	}
 }
 
@@ -377,8 +423,8 @@ func TestRenderFencedCodeBlocks(t *testing.T) {
 			source: "```mermaid\ngraph TD\n  A-->B\n```\n",
 			review: true,
 			wantContains: []string{
-				`<div class="mermaid-diagram" data-source-start="11" data-source-end="28">`,
-				`class="source-text source-code-text" data-source-start="11"`,
+				`<div id="diagram-11-28" class="mermaid-diagram">`,
+				`id="source-11-20" class="source-text source-code-text"`,
 			},
 		},
 		{
@@ -388,7 +434,7 @@ func TestRenderFencedCodeBlocks(t *testing.T) {
 			wantContains: []string{
 				`<div class="mermaid-diagram">`,
 			},
-			wantNotContain: []string{`data-source-start=`},
+			wantNotContain: []string{`id="source-`},
 		},
 		{
 			name:   "ordinary fence remains code",

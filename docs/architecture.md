@@ -85,15 +85,18 @@ one-commit-at-a-time review gates are defined in
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.
 
-Application state must not gain new custom HTML `data-*` channels. The
-currently inactive `GET /ui/viewer-state?document={path}` endpoint establishes
-the replacement boundary: a versioned Go response reports document identity,
-kind, digest, optional review revision, resolved annotation locations, and
-lifecycle behavior. `web/src/viewer-state.ts` accepts the HTTP body as
-`unknown`, validates every nested field and enum, rejects duplicate semantic
-IDs, and returns typed maps. Existing dataset uses remain temporarily
-allowlisted by file in `web/data_attributes_test.go`; each migration slice must
-shrink that list. HTML will retain presentation, semantic IDs, accessibility
+Application state must not gain new custom HTML `data-*` channels.
+`GET /ui/viewer-state?document={path}&mode={file|diff}` is the active boundary
+for review-page browser state: a versioned Go response reports document
+identity, kind, digest, source-node and diagram ranges, optional review
+revision, resolved annotation locations, and lifecycle behavior.
+`web/src/viewer-state.ts` accepts the HTTP body as `unknown`, validates every
+nested field and enum, rejects duplicate semantic IDs, and returns typed maps.
+Source spans, diagrams, annotation cards, and lifecycle forms expose only
+semantic IDs; selection, highlighting, navigation, Mermaid interaction, HTMX
+revision headers, and lifecycle fields join those IDs to typed state. The
+remaining dataset uses are temporarily allowlisted for the document tree and
+comparison selector. HTML retains presentation, semantic IDs, accessibility
 attributes, links, and normal form semantics—not application state encoded in
 custom attributes.
 

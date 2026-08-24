@@ -26,11 +26,11 @@
       <button type="submit">Add reply</button>
     </form>
     {{if .Transitions}}
-    <form class="annotation-lifecycle" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+    <form id="{{.LifecycleFormID}}" class="annotation-lifecycle" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Action
         <select name="status" required>
-          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.Role}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
+          {{range .Transitions}}<option value="{{.Status}}"{{if .Selected}} selected{{end}}>{{.Label}}</option>{{end}}
         </select>
       </label>
       <label>Role

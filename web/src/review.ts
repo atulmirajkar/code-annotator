@@ -1,10 +1,12 @@
-import { annotationLocation, annotationLocations, configureLifecycleForm } from "./review-fragments.js";
+import { configureLifecycleForm } from "./review-fragments.js";
 import { createAnnotationHighlighter } from "./review-highlights.js";
 import { configureReviewHTMX } from "./review-htmx.js";
 import { createAnnotationNavigator } from "./review-navigation.js";
 import { createReviewPanelController } from "./review-panel.js";
 import { createSelectionController } from "./review-selection.js";
+import { fetchViewerState } from "./viewer-state.js";
 import type { SelectionPayload } from "./types.js";
+import type { AnnotationBrowserState, ViewerState } from "./viewer-state.js";
 
 function requiredElement<T extends Element>(value: T | null, label: string): T {
   if (!value) throw new Error(`Missing ${label} in review template`);
@@ -28,12 +30,23 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
   });
 }
 
-(() => {
+function currentDocumentPath(): string {
+  const prefix = "/view/";
+  if (window.location.pathname.startsWith(prefix)) {
+    return decodeURIComponent(window.location.pathname.slice(prefix.length));
+  }
+  const activeDocument = document.querySelector<HTMLAnchorElement>('.documents a[aria-current="page"]');
+  const activePath = activeDocument ? new URL(activeDocument.href).pathname : "";
+  if (!activePath.startsWith(prefix)) throw new Error("Review page URL is invalid");
+  return decodeURIComponent(activePath.slice(prefix.length));
+}
+
+void (async () => {
   const panel = document.querySelector<HTMLElement>(".review-panel");
   if (!panel) return;
   const reviewPanel = panel;
-  const documentPath = reviewPanel.dataset.document;
-  if (!documentPath) return;
+  const documentPath = currentDocumentPath();
+  const mode = new URLSearchParams(window.location.search).get("mode") === "diff" ? "diff" : "file";
 
   const markdown = requiredElement(document.querySelector<HTMLElement>(".markdown-body"), "markdown body");
   const preview = requiredElement(panel.querySelector<HTMLElement>(".selection-preview"), "selection preview");
@@ -57,6 +70,29 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
     documentPath,
   });
 
+  let viewerState: ViewerState;
+  try {
+    viewerState = await fetchViewerState(documentPath, mode);
+  } catch (_) {
+    panelController.setFormStatus("Could not load typed viewer state. Refresh to try again.", true);
+    return;
+  }
+  if (!viewerState.review) {
+    panelController.setFormStatus("Review state is unavailable for this document.", true);
+    return;
+  }
+
+  viewerState.document.diagrams.forEach((position) => {
+    const diagram = document.getElementById(position.elementId);
+    if (!diagram || !markdown.contains(diagram)) return;
+    diagram.classList.add("annotation-selectable");
+    const output = diagram.querySelector<HTMLElement>(".mermaid-output");
+    if (output) {
+      output.tabIndex = 0;
+      output.setAttribute("aria-label", "Rendered Mermaid diagram. Select the complete diagram for annotation.");
+    }
+  });
+
   let updateSelectionFields = (): void => {};
   const selectionController = createSelectionController({
     panel: reviewPanel,
@@ -66,11 +102,27 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
     previewRange,
     selectionScope,
     documentScope,
+    documentSHA256: viewerState.document.sha256,
+    sourceNodes: viewerState.document.sourceNodes,
+    diagrams: viewerState.document.diagrams,
     onSelectionChanged: () => updateSelectionFields(),
   });
   const { currentSelection, forceClearSelectionPreview, sourceSpan, sourceSpanRange, utf8Length } = selectionController;
-  const { renderAnnotationHighlights, sourceRange } = createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length });
-  const { navigateFromAnnotation } = createAnnotationNavigator({ markdown, sourceRange, sourceSpan });
+  const { renderAnnotationHighlights, sourceRange } = createAnnotationHighlighter({
+    markdown,
+    sourceSpan,
+    sourceSpanRange,
+    utf8Length,
+    sourceNodes: viewerState.document.sourceNodes,
+    diagrams: viewerState.document.diagrams,
+  });
+  const { navigateFromAnnotation } = createAnnotationNavigator({
+    markdown,
+    sourceRange,
+    sourceSpan,
+    sourceNodes: viewerState.document.sourceNodes,
+    diagrams: viewerState.document.diagrams,
+  });
 
   updateSelectionFields = (): void => {
     writeSelection(form, selectionScope.checked ? currentSelection() : null);
@@ -92,22 +144,35 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
     });
   }
 
+  function annotationByElementId(elementId: string): AnnotationBrowserState | undefined {
+    return viewerState.review?.annotationsByElementId.get(elementId);
+  }
+
+  function visibleAnnotations(content: ParentNode): AnnotationBrowserState[] {
+    return Array.from(content.querySelectorAll<HTMLElement>(".annotation-card"))
+      .map((card) => annotationByElementId(card.id))
+      .filter((annotation): annotation is AnnotationBrowserState => annotation !== undefined);
+  }
+
   function initializePanel(): void {
     const content = reviewPanel.querySelector<HTMLElement>("#annotation-panel-content");
     if (!content) return;
-    showInactive.checked = content.dataset.showInactive === "true";
-    content.querySelectorAll<HTMLFormElement>(".annotation-lifecycle").forEach((lifecycleForm) => {
-      configureLifecycleForm(lifecycleForm, true);
+    visibleAnnotations(content).forEach((annotation) => {
+      const lifecycleForm = document.getElementById(annotation.lifecycleFormId);
+      if (lifecycleForm instanceof HTMLFormElement && content.contains(lifecycleForm)) {
+        configureLifecycleForm(lifecycleForm, annotation.transitions, true);
+      }
     });
     updateReattachForms();
-    renderAnnotationHighlights(annotationLocations(content));
+    renderAnnotationHighlights(visibleAnnotations(content));
   }
 
   reviewPanel.addEventListener("click", (event) => {
     const target = event.target instanceof Element ? event.target : null;
     const summary = target?.closest<HTMLElement>(".annotation-summary");
     const card = summary?.closest<HTMLDetailsElement>(".annotation-card");
-    if (summary && card) navigateFromAnnotation(event, card, annotationLocation(card));
+    const annotation = card ? annotationByElementId(card.id) : undefined;
+    if (summary && card && annotation) navigateFromAnnotation(event, card, annotation);
   });
 
   reviewPanel.addEventListener("change", (event) => {
@@ -118,7 +183,8 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
     }
     if (target instanceof HTMLSelectElement && target.name === "status") {
       const lifecycleForm = target.closest<HTMLFormElement>(".annotation-lifecycle");
-      if (lifecycleForm) configureLifecycleForm(lifecycleForm, false);
+      const annotation = lifecycleForm ? viewerState.review?.annotationsByLifecycleFormId.get(lifecycleForm.id) : undefined;
+      if (lifecycleForm && annotation) configureLifecycleForm(lifecycleForm, annotation.transitions, false);
     }
   });
 
@@ -126,7 +192,17 @@ function writeSelection(form: HTMLFormElement, selection: SelectionPayload | nul
   configureReviewHTMX({
     panel: reviewPanel,
     token: reviewToken,
-    onPanelChanged: (source, mutation, successful) => {
+    getRevision: () => viewerState.review?.revision || "",
+    onPanelChanged: async (source, mutation, successful) => {
+      if (mutation) {
+        try {
+          viewerState = await fetchViewerState(documentPath, mode);
+        } catch (_) {
+          panelController.setFormStatus("Annotations changed, but viewer state could not be refreshed.", true);
+          return;
+        }
+        showInactive.checked = false;
+      }
       initializePanel();
       if (!mutation) return;
       if (!successful) {

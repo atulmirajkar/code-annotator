@@ -166,7 +166,7 @@ test.describe("annotation review interactions", () => {
     await expect(card.locator('.annotation-lifecycle select[name="role"] option')).toHaveText(["Agent"]);
     await card.locator('.annotation-lifecycle button[type="submit"]').click();
     await expect(card.locator(".annotation-badge")).toContainText(["change request", "acknowledged"]);
-    await expect(card.locator('.annotation-thread-entry[data-kind="acknowledgement"]')).toHaveCount(0);
+    await expect(card.locator(".annotation-thread-entry.acknowledgement")).toHaveCount(0);
 
     await card.locator(".annotation-summary").click();
     await card.locator(".annotation-actions > summary").click();

@@ -15,7 +15,8 @@ declare const htmx: HtmxAPI;
 interface ReviewHTMXOptions {
   panel: HTMLElement;
   token: string;
-  onPanelChanged: (source: Element | null, mutation: boolean, successful: boolean) => void;
+  getRevision: () => string;
+  onPanelChanged: (source: Element | null, mutation: boolean, successful: boolean) => void | Promise<void>;
   onRequestError: () => void;
 }
 
@@ -54,7 +55,7 @@ function targetsPanel(event: Event, detailValue: HtmxRequestDetail): boolean {
     || (event.target instanceof HTMLElement && event.target.id === "annotation-panel-content");
 }
 
-export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestError }: ReviewHTMXOptions): void {
+export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged, onRequestError }: ReviewHTMXOptions): void {
   if (typeof htmx === "undefined") throw new Error("HTMX is unavailable on a review page");
   htmx.config.allowEval = false;
   htmx.config.allowNestedOobSwaps = false;
@@ -70,10 +71,8 @@ export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestErr
     requestSource = value.elt instanceof Element ? value.elt : null;
     requestMethod = requestVerb(value);
     if (requestMethod !== "post" || typeof value.headers !== "object" || value.headers === null) return;
-    const fragment = panel.querySelector<HTMLElement>("#annotation-panel-content");
-    const revision = fragment?.dataset.revision || "";
     Reflect.set(value.headers, "X-Code-Annotator-Token", token);
-    Reflect.set(value.headers, "If-Match", JSON.stringify(revision));
+    Reflect.set(value.headers, "If-Match", JSON.stringify(getRevision()));
   });
 
   document.body.addEventListener("htmx:beforeSwap", (event) => {
@@ -87,7 +86,7 @@ export function configureReviewHTMX({ panel, token, onPanelChanged, onRequestErr
     const value = detail(event);
     if (!value || !targetsPanel(event, value)) return;
     const responseStatus = status(value);
-    onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
+    void onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
     requestSource = null;
     requestMethod = "";
   });

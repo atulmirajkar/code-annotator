@@ -58,11 +58,14 @@ func TestViewerState(t *testing.T) {
 	if state.SchemaVersion != viewerStateSchemaVersion || state.Document.Path != "README.md" || state.Document.Kind != content.KindMarkdown || state.Document.SHA256 != annotation.DocumentSHA256([]byte(source)) {
 		t.Fatalf("document state = %#v", state)
 	}
+	if len(state.Document.SourceNodes) == 0 || len(state.Document.Diagrams) != 0 {
+		t.Fatalf("source state = %#v", state.Document)
+	}
 	if state.Review == nil || state.Review.Revision != string(revision) || len(state.Review.Annotations) != 1 {
 		t.Fatalf("review state = %#v", state.Review)
 	}
 	item := state.Review.Annotations[0]
-	if item.ID != "ann_transition_test" || !item.DocumentLevel || item.Anchor != nil || item.SourceStartByte != nil || len(item.Transitions) != 1 || item.Transitions[0].Status != annotation.StatusOpen {
+	if item.ID != "ann_transition_test" || item.ElementID != "annotation-ann_transition_test" || item.LifecycleFormID != "annotation-lifecycle-ann_transition_test" || !item.DocumentLevel || item.Anchor != nil || item.SourceStartByte != nil || len(item.Transitions) != 1 || item.Transitions[0].Status != annotation.StatusOpen {
 		t.Fatalf("annotation state = %#v", item)
 	}
 }

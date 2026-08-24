@@ -1,3 +1,20 @@
+function parseSourcePositions(value, label) {
+    if (!Array.isArray(value))
+        throw new Error(`${label} must be an array`);
+    const result = new Map();
+    value.forEach((positionValue, index) => {
+        const position = requireRecord(positionValue, `${label}[${index}]`);
+        const elementId = requireString(position.elementId, `${label}[${index}].elementId`);
+        const startByte = requireInteger(position.startByte, `${label}[${index}].startByte`);
+        const endByte = requireInteger(position.endByte, `${label}[${index}].endByte`);
+        if (!elementId || result.has(elementId))
+            throw new Error(`${label} element IDs must be non-empty and unique`);
+        if (endByte < startByte)
+            throw new Error(`${label}[${index}] range is reversed`);
+        result.set(elementId, { elementId, startByte, endByte });
+    });
+    return result;
+}
 function requireRecord(value, label) {
     if (typeof value !== "object" || value === null || Array.isArray(value))
         throw new Error(`${label} must be an object`);
@@ -54,6 +71,8 @@ function parseAnnotation(value, index) {
         throw new Error("annotation.transitions must be an array");
     return {
         id: requireString(item.id, "annotation.id"),
+        elementId: requireString(item.elementId, "annotation.elementId"),
+        lifecycleFormId: requireString(item.lifecycleFormId, "annotation.lifecycleFormId"),
         documentLevel: requireBoolean(item.documentLevel, "annotation.documentLevel"),
         needsReattachment: requireBoolean(item.needsReattachment, "annotation.needsReattachment"),
         sourceStartByte: nullableInteger(item.sourceStartByte, "annotation.sourceStartByte"),
@@ -78,13 +97,26 @@ export function parseViewerState(value) {
         if (!Array.isArray(reviewValue.annotations))
             throw new Error("review.annotations must be an array");
         const annotations = new Map();
+        const annotationsByElementId = new Map();
+        const annotationsByLifecycleFormId = new Map();
         reviewValue.annotations.forEach((annotationValue, index) => {
             const annotation = parseAnnotation(annotationValue, index);
             if (!annotation.id || annotations.has(annotation.id))
                 throw new Error("annotation IDs must be non-empty and unique");
+            if (!annotation.elementId || annotationsByElementId.has(annotation.elementId))
+                throw new Error("annotation element IDs must be non-empty and unique");
+            if (!annotation.lifecycleFormId || annotationsByLifecycleFormId.has(annotation.lifecycleFormId))
+                throw new Error("annotation lifecycle form IDs must be non-empty and unique");
             annotations.set(annotation.id, annotation);
+            annotationsByElementId.set(annotation.elementId, annotation);
+            annotationsByLifecycleFormId.set(annotation.lifecycleFormId, annotation);
         });
-        review = { revision: requireString(reviewValue.revision, "review.revision"), annotations };
+        review = {
+            revision: requireString(reviewValue.revision, "review.revision"),
+            annotations,
+            annotationsByElementId,
+            annotationsByLifecycleFormId,
+        };
     }
     return {
         schemaVersion: 1,
@@ -92,12 +124,16 @@ export function parseViewerState(value) {
             path,
             kind: requireMember(documentValue.kind, ["markdown", "code"], "document.kind"),
             sha256,
+            sourceNodes: parseSourcePositions(documentValue.sourceNodes, "document.sourceNodes"),
+            diagrams: parseSourcePositions(documentValue.diagrams, "document.diagrams"),
         },
         review,
     };
 }
-export async function fetchViewerState(documentPath) {
+export async function fetchViewerState(documentPath, mode = "file") {
     const query = new URLSearchParams({ document: documentPath });
+    if (mode === "diff")
+        query.set("mode", mode);
     const response = await fetch(`/ui/viewer-state?${query.toString()}`, { headers: { Accept: "application/json" } });
     if (!response.ok)
         throw new Error(`viewer state request failed: ${response.status}`);

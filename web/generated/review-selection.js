@@ -1,4 +1,4 @@
-export function createSelectionController({ panel, markdown, preview, previewQuote, previewRange, selectionScope, documentScope, onSelectionChanged, }) {
+export function createSelectionController({ panel, markdown, preview, previewQuote, previewRange, selectionScope, documentScope, documentSHA256, sourceNodes, diagrams, onSelectionChanged, }) {
     let pendingSelection = null;
     let diagramSelectionActive = false;
     let preserveSelection = false;
@@ -13,6 +13,9 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         markdown.addEventListener("pointerdown", clearDiagramSelectionOnPointerdown);
         markdown.addEventListener("click", captureDiagramClick);
         markdown.addEventListener("keydown", captureDiagramKeydown);
+        // Viewer state is loaded asynchronously. Reconcile a native range that a
+        // fast reviewer created before the typed controller finished binding.
+        updateSelectionPreview();
     }
     // Beginning a different interaction explicitly releases a synthetic diagram
     // selection. Pointer events inside the diagram itself are handled on click.
@@ -43,12 +46,11 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
     function captureDiagramSelection(diagram) {
         if (!diagram)
             return;
-        const startByte = Number.parseInt(diagram.dataset.sourceStart || "", 10);
-        const endByte = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
-        const documentSHA256 = markdown.dataset.documentSha256;
+        const position = diagrams.get(diagram.id);
         const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
-        if (!Number.isInteger(startByte) || !Number.isInteger(endByte) || endByte <= startByte || !documentSHA256 || !exact)
+        if (!position || position.endByte <= position.startByte || !documentSHA256 || !exact)
             return;
+        const { startByte, endByte } = position;
         // Diagram selection is synthetic: the SVG has no DOM text range that maps
         // safely to Markdown. Keep it active across delayed collapsed
         // selectionchange events until the reviewer starts another interaction.
@@ -56,10 +58,6 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         window.getSelection()?.removeAllRanges();
         markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
         diagram.classList.add("annotation-selection");
-        preview.dataset.startByte = String(startByte);
-        preview.dataset.endByte = String(endByte);
-        preview.dataset.exact = exact;
-        preview.dataset.documentSha256 = documentSHA256;
         pendingSelection = { startByte, endByte, documentSHA256 };
         selectionScope.disabled = false;
         selectionScope.checked = true;
@@ -88,27 +86,22 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
             clearSelectionPreview();
             return;
         }
-        const sourceStart = Number.parseInt(startSpan.dataset.sourceStart || "", 10);
-        const sourceEnd = Number.parseInt(endSpan.dataset.sourceEnd || "", 10);
+        const startPosition = sourceNodes.get(startSpan.id);
+        const endPosition = sourceNodes.get(endSpan.id);
         const spans = sourceSpanRange(startSpan, endSpan);
-        const documentSHA256 = markdown.dataset.documentSha256;
         const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
         const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
         const exact = selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset);
-        if (!Number.isInteger(sourceStart) || !Number.isInteger(sourceEnd) || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
+        if (!startPosition || !endPosition || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
             clearSelectionPreview();
             return;
         }
-        const startByte = sourceStart + utf8Length((startSpan.textContent || "").slice(0, startOffset));
-        const endByte = Number.parseInt(endSpan.dataset.sourceStart || "", 10) + utf8Length((endSpan.textContent || "").slice(0, endOffset));
-        if (endByte > sourceEnd) {
+        const startByte = startPosition.startByte + utf8Length((startSpan.textContent || "").slice(0, startOffset));
+        const endByte = endPosition.startByte + utf8Length((endSpan.textContent || "").slice(0, endOffset));
+        if (endByte > endPosition.endByte) {
             clearSelectionPreview();
             return;
         }
-        preview.dataset.startByte = String(startByte);
-        preview.dataset.endByte = String(endByte);
-        preview.dataset.exact = exact;
-        preview.dataset.documentSha256 = documentSHA256;
         pendingSelection = { startByte, endByte, documentSHA256 };
         selectionScope.disabled = false;
         selectionScope.checked = true;
@@ -210,10 +203,6 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         diagramSelectionActive = false;
         markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
         preview.hidden = true;
-        delete preview.dataset.startByte;
-        delete preview.dataset.endByte;
-        delete preview.dataset.exact;
-        delete preview.dataset.documentSha256;
         previewQuote.textContent = "";
         previewRange.textContent = "";
         selectionScope.disabled = true;

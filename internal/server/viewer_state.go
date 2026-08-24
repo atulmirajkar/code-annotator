@@ -7,6 +7,7 @@ import (
 
 	"atulm/code-annotator/internal/annotation"
 	"atulm/code-annotator/internal/content"
+	mdrender "atulm/code-annotator/internal/render"
 )
 
 const viewerStateSchemaVersion = 1
@@ -22,9 +23,17 @@ type viewerStateResponse struct {
 }
 
 type viewerDocumentState struct {
-	Path   string       `json:"path"`
-	Kind   content.Kind `json:"kind"`
-	SHA256 string       `json:"sha256"`
+	Path        string                 `json:"path"`
+	Kind        content.Kind           `json:"kind"`
+	SHA256      string                 `json:"sha256"`
+	SourceNodes []viewerSourcePosition `json:"sourceNodes"`
+	Diagrams    []viewerSourcePosition `json:"diagrams"`
+}
+
+type viewerSourcePosition struct {
+	ElementID string `json:"elementId"`
+	StartByte int    `json:"startByte"`
+	EndByte   int    `json:"endByte"`
 }
 
 type viewerReviewState struct {
@@ -34,6 +43,8 @@ type viewerReviewState struct {
 
 type viewerAnnotationState struct {
 	ID                string                     `json:"id"`
+	ElementID         string                     `json:"elementId"`
+	LifecycleFormID   string                     `json:"lifecycleFormId"`
 	DocumentLevel     bool                       `json:"documentLevel"`
 	NeedsReattachment bool                       `json:"needsReattachment"`
 	SourceStartByte   *int                       `json:"sourceStartByte"`
@@ -70,6 +81,13 @@ func (s *Server) handleViewerState(response http.ResponseWriter, request *http.R
 			SHA256: annotation.DocumentSHA256(document),
 		},
 	}
+	sourceMap, err := s.viewerSourceMap(request, document, catalogDocument)
+	if err != nil {
+		s.writeContentError(response, err)
+		return
+	}
+	state.Document.SourceNodes = viewerSourcePositions(sourceMap.Nodes)
+	state.Document.Diagrams = viewerSourcePositions(sourceMap.Diagrams)
 	if s.annotations != nil {
 		result, operationErr := s.readAnnotationDocumentOperation(documentPath)
 		if operationErr != nil {
@@ -85,6 +103,38 @@ func (s *Server) handleViewerState(response http.ResponseWriter, request *http.R
 	_ = json.NewEncoder(response).Encode(state)
 }
 
+func (s *Server) viewerSourceMap(request *http.Request, document []byte, catalogDocument content.Document) (mdrender.SourceMap, error) {
+	mode := request.URL.Query().Get("mode")
+	if mode != "" && mode != "file" && mode != "diff" {
+		return mdrender.SourceMap{}, content.ErrInvalidPath
+	}
+	if mode == "diff" {
+		active := s.activeComparison()
+		if active == nil {
+			return mdrender.SourceMap{}, content.ErrInvalidPath
+		}
+		diff, err := active.BuildFileDiff(request.Context(), catalogDocument.Path, document)
+		if err != nil {
+			// The page renders a Changes-unavailable message with no selectable
+			// source in this case, so its typed state is intentionally empty.
+			return mdrender.SourceMap{Nodes: []mdrender.SourcePosition{}, Diagrams: []mdrender.SourcePosition{}}, nil
+		}
+		return s.renderer.DiffSourceMap(document, diff)
+	}
+	if catalogDocument.Kind == content.KindCode {
+		return s.renderer.CodeSourceMap(document)
+	}
+	return s.renderer.MarkdownSourceMap(document), nil
+}
+
+func viewerSourcePositions(values []mdrender.SourcePosition) []viewerSourcePosition {
+	result := make([]viewerSourcePosition, 0, len(values))
+	for _, value := range values {
+		result = append(result, viewerSourcePosition{ElementID: value.ElementID, StartByte: value.StartByte, EndByte: value.EndByte})
+	}
+	return result
+}
+
 func newViewerReviewState(result annotationDocumentResult) *viewerReviewState {
 	state := &viewerReviewState{
 		Revision:    string(result.Revision),
@@ -93,6 +143,8 @@ func newViewerReviewState(result annotationDocumentResult) *viewerReviewState {
 	for _, item := range result.Annotations {
 		view := viewerAnnotationState{
 			ID:                item.ID,
+			ElementID:         annotationElementID(item.ID),
+			LifecycleFormID:   lifecycleFormElementID(item.ID),
 			DocumentLevel:     item.Source == nil && !item.NeedsReattachment,
 			NeedsReattachment: item.NeedsReattachment,
 			Transitions:       []viewerTransitionBehavior{},

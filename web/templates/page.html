@@ -68,11 +68,11 @@
           <span class="diff-comparison-status" role="status" aria-live="polite"></span>
         </div>{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
       </nav>{{end}}
-      <article class="markdown-body"{{if .DocumentSHA256}} data-document-sha256="{{.DocumentSHA256}}"{{end}}>{{.Content}}</article>
+      <article class="markdown-body">{{.Content}}</article>
       {{end}}
     </main>
     {{if .ReviewToken}}
-    <aside class="review-panel" id="annotation-sidebar" data-document="{{.Selected}}" aria-labelledby="review-heading">
+    <aside class="review-panel" id="annotation-sidebar" aria-labelledby="review-heading">
       <div class="review-panel-resize" role="separator" aria-orientation="vertical" aria-label="Resize annotations panel" tabindex="0"></div>
       <div class="review-panel-scroll">
         <div class="review-heading-row">

@@ -18,7 +18,6 @@ import (
 	"strings"
 	"time"
 
-	"atulm/code-annotator/internal/annotation"
 	annotationstore "atulm/code-annotator/internal/annotation/store"
 	"atulm/code-annotator/internal/content"
 	"atulm/code-annotator/internal/gitdiff"
@@ -120,7 +119,6 @@ type pageData struct {
 	Empty           bool
 	ReviewToken     string
 	ComparisonToken string
-	DocumentSHA256  string
 	HasMermaid      bool
 	IsCode          bool
 	DiffBase        string
@@ -509,7 +507,7 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(request.Context(), response, index, "", nil, "", false, s.activeComparison())
+		s.renderPage(request.Context(), response, index, "", nil, false, s.activeComparison())
 		return
 	}
 
@@ -607,14 +605,10 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		http.Error(response, "could not render document", http.StatusInternalServerError)
 		return
 	}
-	digest := ""
-	if s.review != nil {
-		digest = annotation.DocumentSHA256(source)
-	}
-	s.renderPage(ctx, response, index, documentPath, fragment, digest, diffMode, active)
+	s.renderPage(ctx, response, index, documentPath, fragment, diffMode, active)
 }
 
-func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, documentSHA256 string, diffMode bool, active *gitdiff.Config) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, diffMode bool, active *gitdiff.Config) {
 	changed := make(map[string]struct{})
 	changedReady := false
 	changedError := false
@@ -655,20 +649,19 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 	}
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := pageData{
-		Root:           s.root.Path(),
-		Selected:       selected,
-		Documents:      documents,
-		Content:        template.HTML(fragment), // goldmark output with safe defaults.
-		Empty:          len(index.Documents) == 0,
-		DocumentSHA256: documentSHA256,
-		HasMermaid:     hasMermaid,
-		IsCode:         isCode,
-		ChangedReady:   changedReady,
-		ChangedError:   changedError,
-		DiffMode:       diffMode,
-		DiffAvailable:  active != nil,
-		FileURL:        routeURL("/view/", selected),
-		ChangesURL:     routeURL("/view/", selected) + "?mode=diff",
+		Root:          s.root.Path(),
+		Selected:      selected,
+		Documents:     documents,
+		Content:       template.HTML(fragment), // goldmark output with safe defaults.
+		Empty:         len(index.Documents) == 0,
+		HasMermaid:    hasMermaid,
+		IsCode:        isCode,
+		ChangedReady:  changedReady,
+		ChangedError:  changedError,
+		DiffMode:      diffMode,
+		DiffAvailable: active != nil,
+		FileURL:       routeURL("/view/", selected),
+		ChangesURL:    routeURL("/view/", selected) + "?mode=diff",
 	}
 	if active != nil {
 		data.DiffBase = active.RequestedBase
@@ -687,7 +680,7 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 				writeAnnotationOperationError(response, err, true)
 				return
 			}
-			panel = newAnnotationPanelView(selected, string(result.Revision), result.Annotations, false)
+			panel = newAnnotationPanelView(selected, result.Annotations, false)
 		}
 		data.AnnotationPanel = &panel
 	}
