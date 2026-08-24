@@ -79,11 +79,10 @@
           <h2 id="review-heading">Annotations</h2>
           <div class="review-heading-actions">
             <button type="button" class="add-annotation-toggle" aria-controls="annotation-form" aria-expanded="false">Add comment</button>
-            <span class="annotation-count" aria-live="polite"></span>
           </div>
         </div>
         <label class="annotation-visibility">
-          <input type="checkbox" class="show-inactive-annotations">
+          <input type="checkbox" class="show-inactive-annotations" name="show_inactive" value="true" hx-get="/ui/review/annotations?document={{.Selected}}" hx-trigger="change" hx-target="#annotation-panel-content" hx-swap="outerHTML">
           Show closed and rejected
         </label>
         <section class="selection-preview" hidden aria-live="polite">
@@ -92,7 +91,11 @@
           <span class="selection-range"></span>
         </section>
         <p class="annotation-form-status" role="status" aria-live="polite"></p>
-        <form class="annotation-form" id="annotation-form" hidden>
+        <form class="annotation-form" id="annotation-form" method="post" action="/ui/review/annotations" hx-post="/ui/review/annotations" hx-target="#annotation-panel-content" hx-swap="outerHTML" hidden>
+          <input type="hidden" name="document" value="{{.Selected}}">
+          <input type="hidden" name="selection_start_byte">
+          <input type="hidden" name="selection_end_byte">
+          <input type="hidden" name="document_sha256">
           <div class="annotation-form-header">
             <h3>New comment</h3>
             <button type="button" class="annotation-form-close" aria-label="Close new comment form">×</button>
@@ -124,9 +127,7 @@
           </fieldset>
           <button type="submit">Add</button>
         </form>
-        <div class="annotation-list" aria-live="polite">
-          <p class="review-message">Loading annotations…</p>
-        </div>
+        {{template "annotation-panel" .AnnotationPanel}}
       </div>
     </aside>
     {{end}}
@@ -134,6 +135,7 @@
   <script type="module" src="/static/viewer.js"></script>
   {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
   <script src="/static/mermaid.js" defer></script>{{end}}
-  {{if .ReviewToken}}<script type="module" src="/static/review.js"></script>{{end}}
+  {{if .ReviewToken}}<script src="/static/htmx.min.js" defer></script>
+  <script type="module" src="/static/review.js"></script>{{end}}
 </body>
 </html>

@@ -32,16 +32,14 @@ CDN or runtime network dependency. In review mode, clicking a rendered diagram
 selects its complete source definition for annotation; its collapsible source
 remains available for line-level comments.
 
-HTMX 2.0.10 is also pinned, licensed, and embedded for the planned
-server-rendered review UI. The server exposes it at `/static/htmx.min.js`, but
-no viewer page loads it yet; the existing TypeScript review UI remains the
-production runtime until its later activation gate. Provenance and checksums
-are recorded in [`web/vendor/htmx/README.md`](web/vendor/htmx/README.md).
-The full page and inactive annotation panel/card/action fragments are parsed as
-one Go template set under `web/templates/`. In review mode, inactive
-`GET /ui/review/annotations` and `POST /ui/review/annotations` routes now read
-and create annotations through the same application operations as the stable
-JSON API. Viewer pages do not call these routes yet.
+HTMX 2.0.10 is pinned, licensed, embedded, and loaded only on review pages for
+the server-rendered annotation UI. Provenance and checksums are recorded in
+[`web/vendor/htmx/README.md`](web/vendor/htmx/README.md). The initial page and
+every annotation read or mutation render the same escaped panel/card/action Go
+templates under `web/templates/`. Small TypeScript adapters retain only native
+selection mapping, highlights, source navigation, panel controls, lifecycle
+field state, and the authenticated HTMX headers. The stable JSON API remains
+available for agents and other automation.
 
 ## Usage
 
@@ -404,9 +402,10 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 The manual-refresh MVP, annotation review workflow, agent handoff, embedded
 Mermaid rendering, and code review with side-by-side Git diff comparison are
-implemented and browser-tested. A staged server-rendered review UI and
-TypeScript testability rewrite is approved but not yet implemented; the current
-imperative TypeScript frontend remains the production runtime. See the
+implemented and browser-tested. The annotation panel now uses server-rendered
+HTML fragments and HTMX instead of reconstructing cards and mutation forms in
+the browser. The remaining staged frontend simplification is proceeding one
+reviewed commit at a time. See the
 [approved design](docs/designs/server-rendered-review-ui.md) and
 [`project_status.md`](project_status.md) for the exact reviewed commit gate,
 release readiness, and subsequent milestones.

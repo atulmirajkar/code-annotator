@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/url"
+	"strings"
 
 	"atulm/code-annotator/internal/annotation"
 )
@@ -32,8 +33,10 @@ type annotationCardView struct {
 	// ID is the stable annotation identifier used by browser interaction hooks.
 	ID string
 	// Intent and Status are validated domain values rendered as badges.
-	Intent annotation.Intent
-	Status annotation.Status
+	Intent      annotation.Intent
+	Status      annotation.Status
+	IntentLabel string
+	StatusLabel string
 	// Comment is untrusted text escaped by html/template. Role is a validated
 	// domain value used for both attribution and permissions.
 	Comment string
@@ -50,6 +53,15 @@ type annotationCardView struct {
 	SelectionUnavailable bool
 	// AnchorStale adds the stale badge and permits a reattachment form.
 	AnchorStale bool
+	// Browser-only highlighting and navigation consume these validated values
+	// from data attributes instead of reconstructing annotation presentation.
+	AnchorState     annotation.AnchorState
+	AnchorStartByte int
+	AnchorEndByte   int
+	HasAnchor       bool
+	SourceStartByte int
+	HasSource       bool
+	NeedsReattach   bool
 	// Turn is the optional "waiting for" badge derived from recent activity.
 	Turn *annotationTurnView
 	// Thread omits redundant acknowledgement entries from the visible history.
@@ -179,14 +191,17 @@ func newAnnotationPanelView(document, revision string, annotations []resolvedAnn
 func newAnnotationCardView(document string, item resolvedAnnotation) annotationCardView {
 	inactive := isInactiveAnnotation(item.Status)
 	view := annotationCardView{
-		ID:       item.ID,
-		Intent:   item.Intent,
-		Status:   item.Status,
-		Comment:  item.Comment,
-		Role:     item.Role,
-		Inactive: inactive,
-		Turn:     pendingTurnBadge(item.Annotation),
-		Thread:   annotationThread(item.Thread),
+		ID:            item.ID,
+		Intent:        item.Intent,
+		Status:        item.Status,
+		IntentLabel:   humanizeAnnotationValue(string(item.Intent)),
+		StatusLabel:   humanizeAnnotationValue(string(item.Status)),
+		Comment:       item.Comment,
+		Role:          item.Role,
+		Inactive:      inactive,
+		Turn:          pendingTurnBadge(item.Annotation),
+		Thread:        annotationThread(item.Thread),
+		NeedsReattach: item.NeedsReattachment,
 	}
 	if item.NeedsReattachment {
 		view.SelectionUnavailable = true
@@ -197,8 +212,22 @@ func newAnnotationCardView(document string, item resolvedAnnotation) annotationC
 		view.SourceLines = lineRangeLabel(item.Source.Selector.StartLine, item.Source.Selector.EndLine)
 	}
 	view.AnchorStale = item.Anchor != nil && item.Anchor.State == annotation.AnchorStale
+	if item.Anchor != nil {
+		view.AnchorState = item.Anchor.State
+		view.AnchorStartByte = item.Anchor.StartByte
+		view.AnchorEndByte = item.Anchor.EndByte
+		view.HasAnchor = true
+	}
+	if item.Source != nil {
+		view.SourceStartByte = item.Source.Selector.StartByte
+		view.HasSource = true
+	}
 	view.Actions = newAnnotationActionsView(document, item, view.AnchorStale)
 	return view
+}
+
+func humanizeAnnotationValue(value string) string {
+	return strings.ReplaceAll(value, "_", " ")
 }
 
 // newAnnotationActionsView derives form availability from domain lifecycle

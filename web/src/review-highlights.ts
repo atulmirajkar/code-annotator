@@ -1,5 +1,4 @@
-import { element } from "./review-dom.js";
-import type { Annotation } from "./types.js";
+import type { AnnotationLocation } from "./review-fragments.js";
 
 interface AnnotationHighlighterOptions {
   markdown: HTMLElement;
@@ -23,12 +22,12 @@ export function mergeIntervals(values: ReadonlyArray<readonly [number, number]>)
 export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }: AnnotationHighlighterOptions) {
   // Highlight only anchors resolved against the current document. Stale and
   // document-level annotations remain visible in the panel without a range.
-  function renderAnnotationHighlights(annotations: Annotation[]): void {
+  function renderAnnotationHighlights(annotations: AnnotationLocation[]): void {
     clearFallbackHighlights();
     renderDiagramHighlights(annotations);
     const ranges = annotations
-      .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation) => sourceRange(annotation.anchor!.startByte, annotation.anchor!.endByte))
+      .filter(hasResolvedAnchor)
+      .map((annotation) => sourceRange(annotation.anchorStartByte, annotation.anchorEndByte))
       .filter((range): range is Range => range !== null);
 
     if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
@@ -41,10 +40,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
 
   // Diagram annotations highlight the rendered region as a whole; their
   // hidden source ranges remain available for quote previews and fallback APIs.
-  function renderDiagramHighlights(annotations: Annotation[]): void {
+  function renderDiagramHighlights(annotations: AnnotationLocation[]): void {
     const activeRanges = annotations
-      .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-      .map((annotation): [number, number] => [annotation.anchor!.startByte, annotation.anchor!.endByte]);
+      .filter(hasResolvedAnchor)
+      .map((annotation): [number, number] => [annotation.anchorStartByte, annotation.anchorEndByte]);
     markdown.querySelectorAll<HTMLElement>(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
       const start = Number.parseInt(diagram.dataset.sourceStart || "", 10);
       const end = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
@@ -126,7 +125,8 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         const range = document.createRange();
         range.setStart(textNode, start);
         range.setEnd(textNode, end);
-        const mark = element("mark", "annotation-highlight-fallback");
+        const mark = document.createElement("mark");
+        mark.className = "annotation-highlight-fallback";
         range.surroundContents(mark);
       });
     });
@@ -143,4 +143,11 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     renderAnnotationHighlights,
     sourceRange,
   };
+}
+
+function hasResolvedAnchor(annotation: AnnotationLocation): annotation is AnnotationLocation & { anchorStartByte: number; anchorEndByte: number } {
+  return annotation.anchorState !== null
+    && annotation.anchorState !== "stale"
+    && annotation.anchorStartByte !== null
+    && annotation.anchorEndByte !== null;
 }

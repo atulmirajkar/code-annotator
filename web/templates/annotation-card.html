@@ -1,11 +1,11 @@
 {{define "annotation-card"}}
-<details class="annotation-card" data-annotation-id="{{.ID}}"{{if .Inactive}} data-inactive="true"{{end}}>
+<details class="annotation-card" data-annotation-id="{{.ID}}" data-document-level="{{.DocumentLevel}}" data-needs-reattachment="{{.NeedsReattach}}"{{if .HasAnchor}} data-anchor-state="{{.AnchorState}}" data-anchor-start-byte="{{.AnchorStartByte}}" data-anchor-end-byte="{{.AnchorEndByte}}"{{end}}{{if .HasSource}} data-source-start-byte="{{.SourceStartByte}}"{{end}}{{if .Inactive}} data-inactive="true"{{end}}>
   <summary class="annotation-summary" title="Show this annotation in the document">
     <span class="annotation-meta">
-      <span class="badge">{{.Intent}}</span>
-      <span class="badge">{{.Status}}</span>
-      {{with .Turn}}<span class="badge {{.Class}}">{{.Label}}</span>{{end}}
-      {{if .AnchorStale}}<span class="badge stale">stale</span>{{end}}
+      <span class="annotation-badge">{{.IntentLabel}}</span>
+      <span class="annotation-badge">{{.StatusLabel}}</span>
+      {{with .Turn}}<span class="annotation-badge {{.Class}}">{{.Label}}</span>{{end}}
+      {{if .AnchorStale}}<span class="annotation-badge stale">stale</span>{{end}}
     </span>
     <span class="annotation-summary-comment">{{.Comment}}</span>
   </summary>

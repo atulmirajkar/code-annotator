@@ -3,8 +3,8 @@
 ## Status
 
 Implementation in progress. Commit gates 0 through 6, the commit 4 review
-follow-up, and the intervening role-only compatibility slice are implemented.
-Commit 6 is awaiting maintainer review before gate 7 may begin.
+follow-up, and the intervening role-only compatibility slice are approved.
+Commit 7 is implemented and awaiting maintainer review before gate 8 may begin.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -593,7 +593,7 @@ Checks: annotation domain, API, UI handler, full Go, and affected race tests.
 
 ### Commit 6: share reattach operations and complete UI mutation coverage
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -605,6 +605,8 @@ Scope:
 Checks: annotation, renderer/server, full Go, and affected race tests.
 
 ### Commit 7: activate the HTMX annotation panel
+
+Status: implemented in the current review commit; awaiting maintainer approval.
 
 Scope:
 

@@ -129,7 +129,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		`&lt;svg onload=&#34;source()&#34;&gt;`,
 		`&lt;b onclick=&#34;reply()&#34;&gt;reply&lt;/b&gt;`,
 		`Lines 4–6`,
-		`class="badge stale"`,
+		`class="annotation-badge stale"`,
 		`class="annotation-reattach"`,
 		`open → acknowledged`,
 	} {

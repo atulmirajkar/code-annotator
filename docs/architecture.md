@@ -64,26 +64,23 @@ the existing `/static/*.js` URLs and native ES-module import structure, while
 [`docs/designs/typescript-migration.md`](designs/typescript-migration.md) for
 the frontend dependency graph, typing rules, and compiler configuration.
 
-The current browser still renders annotation cards and actions imperatively.
-The first infrastructure slices of an approved migration have added the
-TypeScript unit-test harness and a pinned, embedded HTMX 2.0.10 runtime. The
-server exposes HTMX at `/static/htmx.min.js` under the existing same-origin CSP,
-but `web/templates/page.html` intentionally does not load it, so runtime
-behavior is unchanged. The page and inactive annotation panel, card, and
+Review pages load the pinned, embedded HTMX 2.0.10 runtime under the existing
+same-origin CSP. The initial page and replaceable annotation panel, card, and
 action fragments are parsed from `web/templates/*.html` as one template set.
 Presentation-specific Go view models derive active filtering, counts, source
 labels, threads, stale-anchor state, and permitted lifecycle actions; action
 authorization delegates to `internal/annotation` transition validation.
 Typed, transport-neutral application operations now own catalog/source reads,
 sidecar loading, anchor resolution, annotation creation, and optimistic saves.
-The JSON read/create handlers and inactive HTML read/create handlers call those
-same operations. Review-mode servers register `GET` and `POST`
-`/ui/review/annotations`; the GET renders the panel fragment and the secured
-form POST returns refreshed authoritative panel HTML. The current page does not
-request either route, and HTMX remains unloaded. Later reviewed slices will
-share the remaining mutations and retain browser-only interaction in testable
-TypeScript. The invariants, route plan, test strategy, documentation contract,
-and one-commit-at-a-time review gates are defined in
+The stable JSON API and active HTML form handlers call those same operations.
+HTMX swaps complete authoritative panel fragments after reads and mutations;
+expected `409` and `422` responses also swap without automatic retry. A typed
+adapter supplies the review token and current strong revision and reruns only
+browser-owned selection, highlighting, source navigation, lifecycle-field,
+and panel behavior after swaps. The former browser API, card renderer, action
+builder, DOM helper, and thread presentation modules have been removed. The
+invariants, route plan, test strategy, documentation contract, and remaining
+one-commit-at-a-time review gates are defined in
 [`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.
@@ -205,7 +202,7 @@ requires both endpoints to share that block and never includes its fences.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current document bytes rather
 than trusting hashes or context supplied by the browser. JSON creation retains
-its `201`, `Location`, JSON body, and ETag contract. The inactive form route
+its `201`, `Location`, JSON body, and ETag contract. The active form route
 accepts only URL-encoded bodies under the same 64 KiB limit and returns the
 complete annotation panel with `200` after the shared operation succeeds.
 The browser creation form uses the revision from its latest annotation read,
@@ -230,29 +227,28 @@ endpoint. On a revision conflict, the browser reloads the authoritative list
 and asks the user to review the new state before retrying.
 
 Reply and lifecycle mutations now have transport-neutral application
-operations shared by the stable JSON API and inactive server-rendered form
+operations shared by the stable JSON API and active server-rendered form
 routes. The form routes return the complete authoritative annotation panel:
 successful mutations use `200`, domain validation uses `422`, and revision
 conflicts use `409` with the current ETag. Expected error fragments preserve
 submitted reply or transition values through escaped template fields and never
-retry a stale mutation automatically. The browser continues using the JSON
-routes until the HTMX activation gate.
+retry a stale mutation automatically. HTMX swaps these fragments in place.
 
 Reattachment uses the same transport-neutral pattern. The shared operation
 accepts only typed current-document byte offsets, verifies the document digest,
 requires an existing stale or pending selector, rebuilds the source, and saves
-optimistically. The inactive form route safely parses its hidden selection
+optimistically. The active form route safely parses its hidden selection
 fields and returns the authoritative panel for success, `422` range errors,
 semantic `409` state/document conflicts, and sidecar revision conflicts.
 Obsolete selections are cleared after semantic conflicts; a selection that is
 still valid after only a sidecar revision conflict remains escaped in the form
 for an explicit retry. Creation errors now follow the same fragment contract.
 
-The browser treats `closed` and `rejected` as inactive presentation states.
-They remain in the API response and sidecar, but the default panel filters out
-their cards before rendering and passes only active annotations to the highlight
-renderer. A history toggle rerenders the same authoritative payload with all
-annotations, preserving access to audit history and reopen transitions.
+The server treats `closed` and `rejected` as inactive presentation states.
+They remain in the API response and sidecar, but the default panel fragment
+filters out their cards. A history-toggle HTMX request renders all annotations,
+preserving access to audit history and reopen transitions; the browser
+highlighter consumes only location metadata on the returned visible cards.
 
 Annotation cards use native disclosure controls: the default summary contains
 status badges and a two-line comment preview, while source context, discussion,

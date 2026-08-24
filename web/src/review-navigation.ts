@@ -1,4 +1,4 @@
-import type { Annotation } from "./types.js";
+import type { AnnotationLocation } from "./review-fragments.js";
 
 interface AnnotationNavigatorOptions {
   markdown: HTMLElement;
@@ -9,7 +9,7 @@ interface AnnotationNavigatorOptions {
 export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }: AnnotationNavigatorOptions) {
   let navigationTargetTimer = 0;
 
-  function navigateFromAnnotation(event: MouseEvent, card: HTMLDetailsElement, annotation: Annotation): void {
+  function navigateFromAnnotation(event: MouseEvent, card: HTMLDetailsElement, annotation: AnnotationLocation): void {
     if (window.getSelection()?.toString()) return;
     event.preventDefault();
     if (card.open) {
@@ -32,23 +32,22 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
     emphasizeNavigationTarget(result.target);
   }
 
-  function annotationNavigationTarget(annotation: Annotation): { target: HTMLElement | null; approximate: boolean } {
+  function annotationNavigationTarget(annotation: AnnotationLocation): { target: HTMLElement | null; approximate: boolean } {
     if (annotation.needsReattachment) {
       return { target: null, approximate: true };
     }
-    if (!annotation.source || !annotation.source.selector) {
+    if (annotation.documentLevel) {
       return { target: markdown.querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6") || markdown, approximate: false };
     }
 
-    if (annotation.anchor && annotation.anchor.state !== "stale") {
-      const diagram = diagramForRange(annotation.anchor.startByte, annotation.anchor.endByte);
+    if (annotation.anchorState !== null && annotation.anchorState !== "stale" && annotation.anchorStartByte !== null && annotation.anchorEndByte !== null) {
+      const diagram = diagramForRange(annotation.anchorStartByte, annotation.anchorEndByte);
       if (diagram) return { target: diagram, approximate: false };
-      const range = sourceRange(annotation.anchor.startByte, annotation.anchor.endByte);
+      const range = sourceRange(annotation.anchorStartByte, annotation.anchorEndByte);
       if (range) return { target: sourceSpan(range.startContainer), approximate: false };
     }
 
-    const originalOffset = annotation.source.selector.startByte;
-    return { target: nearestSourceTarget(originalOffset), approximate: true };
+    return { target: annotation.sourceStartByte === null ? null : nearestSourceTarget(annotation.sourceStartByte), approximate: true };
   }
 
   function diagramForRange(startByte: number, endByte: number): HTMLElement | null {

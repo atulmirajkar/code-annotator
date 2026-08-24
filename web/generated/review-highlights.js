@@ -1,4 +1,3 @@
-import { element } from "./review-dom.js";
 export function mergeIntervals(values) {
     const sorted = values
         .map(([start, end]) => [start, end])
@@ -19,8 +18,8 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         clearFallbackHighlights();
         renderDiagramHighlights(annotations);
         const ranges = annotations
-            .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-            .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
+            .filter(hasResolvedAnchor)
+            .map((annotation) => sourceRange(annotation.anchorStartByte, annotation.anchorEndByte))
             .filter((range) => range !== null);
         if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
             CSS.highlights.delete("code-annotator-annotations");
@@ -34,8 +33,8 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     // hidden source ranges remain available for quote previews and fallback APIs.
     function renderDiagramHighlights(annotations) {
         const activeRanges = annotations
-            .filter((annotation) => annotation.anchor && annotation.anchor.state !== "stale")
-            .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
+            .filter(hasResolvedAnchor)
+            .map((annotation) => [annotation.anchorStartByte, annotation.anchorEndByte]);
         markdown.querySelectorAll(".mermaid-diagram[data-source-start][data-source-end]").forEach((diagram) => {
             const start = Number.parseInt(diagram.dataset.sourceStart || "", 10);
             const end = Number.parseInt(diagram.dataset.sourceEnd || "", 10);
@@ -117,7 +116,8 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
                 const range = document.createRange();
                 range.setStart(textNode, start);
                 range.setEnd(textNode, end);
-                const mark = element("mark", "annotation-highlight-fallback");
+                const mark = document.createElement("mark");
+                mark.className = "annotation-highlight-fallback";
                 range.surroundContents(mark);
             });
         });
@@ -132,4 +132,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         renderAnnotationHighlights,
         sourceRange,
     };
+}
+function hasResolvedAnchor(annotation) {
+    return annotation.anchorState !== null
+        && annotation.anchorState !== "stale"
+        && annotation.anchorStartByte !== null
+        && annotation.anchorEndByte !== null;
 }

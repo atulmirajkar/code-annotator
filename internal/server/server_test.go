@@ -1644,9 +1644,10 @@ func TestReviewPageEmbedding(t *testing.T) {
 		wantPanel  bool
 		wantSource bool
 		wantDigest bool
+		wantHTMX   bool
 	}{
 		{name: "read-only page omits token"},
-		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true, wantDigest: true},
+		{name: "review page embeds controls", review: true, wantToken: true, wantPanel: true, wantSource: true, wantDigest: true, wantHTMX: true},
 	}
 
 	for _, test := range tests {
@@ -1677,14 +1678,15 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `class="document-search"`) || !strings.Contains(body, `src="/static/viewer.js"`) {
 				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
 			}
-			if body := response.Body.String(); strings.Contains(body, `src="/static/htmx.min.js"`) {
-				t.Fatalf("page loads HTMX before the activation gate:\n%s", body)
+			hasHTMX := strings.Contains(response.Body.String(), `src="/static/htmx.min.js"`)
+			if hasHTMX != test.wantHTMX {
+				t.Fatalf("page loads HTMX = %t, want %t", hasHTMX, test.wantHTMX)
 			}
 			hasToken := strings.Contains(response.Body.String(), `name="code-annotator-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
 			}
-			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `class="show-inactive-annotations"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
+			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `class="show-inactive-annotations"`) && strings.Contains(response.Body.String(), `id="annotation-panel-content"`) && strings.Contains(response.Body.String(), `hx-post="/ui/review/annotations"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
 			if hasPanel != test.wantPanel {
 				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
 			}
@@ -1720,16 +1722,13 @@ func TestStaticAssets(t *testing.T) {
 		wantType     string
 		wantContents []string
 	}{
-		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./review-actions.js", "./review-api.js", "./review-highlights.js", "./review-navigation.js", "./review-panel.js", "./review-render.js", "./review-selection.js", "submitAnnotation"}},
-		{name: "get review actions module", path: "/static/review-actions.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationActions", "createReattachForm", "createReplyForm", "createLifecycleForm", "updateReattachControls"}},
-		{name: "get review API module", path: "/static/review-api.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"fetchAnnotations", "createAnnotation", "reattachAnnotation", "replyToAnnotation", "updateAnnotation"}},
-		{name: "get review DOM module", path: "/static/review-dom.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"export function badge", "export function element"}},
+		{name: "get review script", path: "/static/review.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./review-fragments.js", "./review-highlights.js", "./review-htmx.js", "./review-navigation.js", "./review-panel.js", "./review-selection.js", "configureReviewHTMX"}},
+		{name: "get review fragments module", path: "/static/review-fragments.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"annotationLocation", "annotationLocations", "configureLifecycleForm"}},
+		{name: "get review HTMX module", path: "/static/review-htmx.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"configureReviewHTMX", "htmx:configRequest", "htmx:beforeSwap", "X-Code-Annotator-Token", "If-Match"}},
 		{name: "get review highlights module", path: "/static/review-highlights.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationHighlighter", "renderAnnotationHighlights", "sourceRange"}},
 		{name: "get review navigation module", path: "/static/review-navigation.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationNavigator", "navigateFromAnnotation", "emphasizeNavigationTarget"}},
 		{name: "get review panel module", path: "/static/review-panel.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createReviewPanelController", "setAnnotationFormVisible", "startReviewPanelResize"}},
-		{name: "get review render module", path: "/static/review-render.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationRenderer", "createCard", "annotation-summary", "annotation-actions"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
-		{name: "get review thread module", path: "/static/review-thread.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"replyRoles", "transitionOptions", "annotationTurnBadge"}},
 		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-tree.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
 		{name: "get document tree module", path: "/static/document-tree.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "updateTreeVisibility", "document-tree-expanded"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},

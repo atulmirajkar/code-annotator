@@ -4,23 +4,27 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit gate 6 is implemented and awaiting
-maintainer review. Gate 7 must not begin without explicit approval.
+**Phase:** Server-rendered review UI commit gate 7 is implemented and awaiting
+maintainer review. Gate 8 must not begin without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
 `/static/htmx.min.js`, with provenance and checksums under `web/vendor/htmx/`.
-It is intentionally not loaded by viewer pages. Review-mode servers now
-register the complete inactive HTML annotation mutation surface. Typed
+Review pages load it with evaluation, script insertion, nested out-of-band
+swaps, cross-origin requests, and history caching disabled. Review-mode servers
+provide the active HTML annotation mutation surface. Typed
 application operations share catalog/source reads, sidecar loading, anchor
 resolution, creation, replies, lifecycle transitions, reattachment, and
 optimistic saves between those routes and the unchanged JSON API. The complete
-page and inactive annotation panel, card, and action
+page and annotation panel, card, and action
 fragments form one parsed template set. Presentation view models derive
 filtering, counts, threads, source/anchor display, and lifecycle action
-availability without request or store dependencies. The current
-imperative TypeScript frontend remains the production runtime until the
-corresponding reviewed gates are merged. Every milestone 17 commit must update
+availability without request or store dependencies. Initial annotation HTML
+and every read or mutation now use those templates through HTMX. TypeScript is
+limited to authenticated transport configuration and browser-owned selection,
+highlight, navigation, panel, and lifecycle-field adapters; the superseded API,
+DOM renderer, action builder, and thread presentation modules are removed.
+Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
 Reviewer lifecycle permissions include dismissing an irrelevant or accidental
@@ -335,7 +339,7 @@ for explicit approval before starting the next item.
   responses while preserving JSON behavior.
 - [x] Commit 6: share reattach operations and complete the inactive HTML
   mutation surface.
-- [ ] Commit 7: activate the HTMX annotation panel, retain browser-only
+- [x] Commit 7: activate the HTMX annotation panel, retain browser-only
   selection/highlight/navigation adapters, and remove superseded DOM renderers.
 - [ ] Commit 8: server-render the document tree and counts; activate server
   filtering only if the documented 5,000-path benchmark passes.
@@ -385,14 +389,13 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 6 shares reattachment application logic between the stable
-JSON API and the inactive server-rendered form route, including safe hidden
-selection parsing and authoritative validation, semantic-conflict, and
-revision-conflict fragments. The inactive HTML mutation surface is complete.
-Commit 6 is the current review gate. The next allowed implementation slice is
-commit 7, activating the HTMX annotation panel while retaining browser-only
-selection, highlighting, and navigation adapters; it must not begin until the
-maintainer explicitly approves proceeding.
+milestone. Commit 7 activates the server-rendered annotation panel through
+HTMX, keeps selection, highlighting, navigation, panel controls, and lifecycle
+field behavior in small TypeScript adapters, and removes the superseded JSON
+transport, DOM renderer, action builder, and thread presentation modules.
+Commit 7 is the current review gate. The next allowed implementation slice is
+commit 8, server-rendering the document tree and benchmarking server-side
+filtering; it must not begin until the maintainer explicitly approves.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.
