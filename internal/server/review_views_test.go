@@ -12,7 +12,7 @@ import (
 func TestAnnotationPanelViewFiltersInactiveCards(t *testing.T) {
 	t.Parallel()
 
-	items := []annotationView{
+	items := []resolvedAnnotation{
 		{Annotation: annotation.Annotation{ID: "ann_open", Status: annotation.StatusOpen}},
 		{Annotation: annotation.Annotation{ID: "ann_closed", Status: annotation.StatusClosed}},
 		{Annotation: annotation.Annotation{ID: "ann_rejected", Status: annotation.StatusRejected}},
@@ -64,7 +64,7 @@ func TestAnnotationActionAvailabilityUsesLifecycleRules(t *testing.T) {
 	for _, test := range tests {
 		t.Run(string(test.status), func(t *testing.T) {
 			t.Parallel()
-			item := annotationView{Annotation: annotation.Annotation{ID: "ann_actions", Status: test.status}}
+			item := resolvedAnnotation{Annotation: annotation.Annotation{ID: "ann_actions", Status: test.status}}
 			view := newAnnotationActionsView("README.md", item, false)
 			if got := transitionStatuses(view.Transitions); !slices.Equal(got, test.wantStatuses) {
 				t.Fatalf("transition statuses = %v, want %v", got, test.wantStatuses)
@@ -92,7 +92,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		}
 	}
 
-	item := annotationView{
+	item := resolvedAnnotation{
 		Annotation: annotation.Annotation{
 			ID:      "ann_fragment",
 			Intent:  annotation.IntentChangeRequest,
@@ -112,7 +112,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		},
 		Anchor: &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleNotFound},
 	}
-	view := newAnnotationPanelView("README.md", "revision-1", []annotationView{item}, false)
+	view := newAnnotationPanelView("README.md", "revision-1", []resolvedAnnotation{item}, false)
 	var output bytes.Buffer
 	if err := templates.ExecuteTemplate(&output, "annotation-panel", view); err != nil {
 		t.Fatalf("ExecuteTemplate() error = %v", err)
@@ -161,7 +161,7 @@ func TestAnnotationReattachActionRequiresStaleSourceAnchor(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			item := annotationView{Annotation: annotation.Annotation{ID: "ann_anchor", Status: annotation.StatusOpen, Source: test.source}, Anchor: test.anchor}
+			item := resolvedAnnotation{Annotation: annotation.Annotation{ID: "ann_anchor", Status: annotation.StatusOpen, Source: test.source}, Anchor: test.anchor}
 			if got := newAnnotationCardView("README.md", item).Actions.CanReattach; got != test.want {
 				t.Fatalf("CanReattach = %t, want %t", got, test.want)
 			}

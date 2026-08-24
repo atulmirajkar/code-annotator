@@ -17,22 +17,27 @@ import (
 	"atulm/code-annotator/internal/content"
 )
 
-// annotationView extends one persisted annotation with its location derived
-// from the current document source. Document-level annotations have no anchor.
-type annotationView struct {
+// resolvedAnnotation combines persisted annotation data with the anchor
+// location derived from the current document bytes. It is shared by API
+// responses and presentation-model construction; it is not an HTML view model.
+// Document-level annotations have no anchor.
+type resolvedAnnotation struct {
+	// Annotation is the validated record loaded from the document sidecar.
 	annotation.Annotation
+	// Anchor is resolved against current document bytes and is nil for
+	// document-level annotations.
 	Anchor *annotation.AnchorResult `json:"anchor,omitempty"`
 }
 
 // annotationListResponse is the wire representation returned by the read API.
 // Revision is also emitted as the HTTP ETag for later optimistic mutations.
 type annotationListResponse struct {
-	SchemaVersion int              `json:"schemaVersion"`
-	Document      string           `json:"document"`
-	Kind          content.Kind     `json:"kind"`
-	Language      string           `json:"language"`
-	Revision      string           `json:"revision"`
-	Annotations   []annotationView `json:"annotations"`
+	SchemaVersion int                  `json:"schemaVersion"`
+	Document      string               `json:"document"`
+	Kind          content.Kind         `json:"kind"`
+	Language      string               `json:"language"`
+	Revision      string               `json:"revision"`
+	Annotations   []resolvedAnnotation `json:"annotations"`
 }
 
 // annotationQueueResponse groups actionable annotations by document. Each
@@ -64,8 +69,8 @@ type annotationSelection struct {
 // createAnnotationResponse returns the created annotation and the sidecar
 // revision required by the caller's next mutation.
 type createAnnotationResponse struct {
-	Annotation annotationView `json:"annotation"`
-	Revision   string         `json:"revision"`
+	Annotation resolvedAnnotation `json:"annotation"`
+	Revision   string             `json:"revision"`
 }
 
 // replyAnnotationRequest contains the reviewer or agent-authored content for an
@@ -78,8 +83,8 @@ type replyAnnotationRequest struct {
 
 // replyAnnotationResponse returns the updated annotation and sidecar revision.
 type replyAnnotationResponse struct {
-	Annotation annotationView `json:"annotation"`
-	Revision   string         `json:"revision"`
+	Annotation resolvedAnnotation `json:"annotation"`
+	Revision   string             `json:"revision"`
 }
 
 // transitionAnnotationRequest describes one lifecycle transition and any
@@ -97,8 +102,8 @@ type transitionAnnotationRequest struct {
 // transitionAnnotationResponse returns the transitioned annotation and the new
 // sidecar revision.
 type transitionAnnotationResponse struct {
-	Annotation annotationView `json:"annotation"`
-	Revision   string         `json:"revision"`
+	Annotation resolvedAnnotation `json:"annotation"`
+	Revision   string             `json:"revision"`
 }
 
 // reattachAnnotationRequest identifies a new verified source range for an
@@ -111,8 +116,8 @@ type reattachAnnotationRequest struct {
 // reattachAnnotationResponse returns the newly anchored annotation and sidecar
 // revision.
 type reattachAnnotationResponse struct {
-	Annotation annotationView `json:"annotation"`
-	Revision   string         `json:"revision"`
+	Annotation resolvedAnnotation `json:"annotation"`
+	Revision   string             `json:"revision"`
 }
 
 // handleAnnotations returns persisted annotations plus anchor locations derived
@@ -133,9 +138,9 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 		return
 	}
 
-	annotations := make([]annotationView, 0, len(sidecar.Annotations))
+	annotations := make([]resolvedAnnotation, 0, len(sidecar.Annotations))
 	for _, item := range sidecar.Annotations {
-		view, err := resolveAnnotationView(source, item)
+		view, err := resolveAnnotation(source, item)
 		if err != nil {
 			http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
 			return
@@ -214,14 +219,14 @@ func (s *Server) handleAnnotationQueue(response http.ResponseWriter, request *ht
 			s.writeAnnotationReadError(response, err)
 			return
 		}
-		views := make([]annotationView, 0, len(candidate.sidecar.Annotations))
+		views := make([]resolvedAnnotation, 0, len(candidate.sidecar.Annotations))
 		for _, item := range candidate.sidecar.Annotations {
 			if len(statuses) > 0 {
 				if _, wanted := statuses[item.Status]; !wanted {
 					continue
 				}
 			}
-			view, err := resolveAnnotationView(source, item)
+			view, err := resolveAnnotation(source, item)
 			if err != nil {
 				http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
 				return
@@ -391,7 +396,7 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		return
 	}
 
-	view := annotationView{Annotation: created, Anchor: anchor}
+	view := resolvedAnnotation{Annotation: created, Anchor: anchor}
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	response.Header().Set("ETag", strconv.Quote(string(revision)))
 	response.Header().Set("Location", "/api/annotations/"+created.ID)
@@ -456,7 +461,7 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		http.Error(response, "could not validate updated annotation", http.StatusInternalServerError)
 		return
 	}
-	view, err := resolveAnnotationView(document, *updated)
+	view, err := resolveAnnotation(document, *updated)
 	if err != nil {
 		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
 		return
@@ -539,7 +544,7 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 		http.Error(response, "could not validate transitioned annotation", http.StatusInternalServerError)
 		return
 	}
-	view, err := resolveAnnotationView(document, *updated)
+	view, err := resolveAnnotation(document, *updated)
 	if err != nil {
 		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
 		return
@@ -646,7 +651,7 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
 	response.Header().Set("ETag", strconv.Quote(string(revision)))
 	_ = json.NewEncoder(response).Encode(reattachAnnotationResponse{
-		Annotation: annotationView{Annotation: *updated, Anchor: &newAnchor},
+		Annotation: resolvedAnnotation{Annotation: *updated, Anchor: &newAnchor},
 		Revision:   string(revision),
 	})
 }
@@ -668,16 +673,16 @@ func findAnnotation(sidecar annotation.Sidecar, identifier string) int {
 	return -1
 }
 
-// resolveAnnotationView derives current anchor state without changing the
+// resolveAnnotation derives current anchor state without changing the
 // persisted annotation. Document-level annotations have no derived anchor.
-func resolveAnnotationView(document []byte, item annotation.Annotation) (annotationView, error) {
-	view := annotationView{Annotation: item}
+func resolveAnnotation(document []byte, item annotation.Annotation) (resolvedAnnotation, error) {
+	view := resolvedAnnotation{Annotation: item}
 	if item.Source == nil {
 		return view, nil
 	}
 	anchor, err := annotation.ResolveAnchor(document, *item.Source)
 	if err != nil {
-		return annotationView{}, err
+		return resolvedAnnotation{}, err
 	}
 	view.Anchor = &anchor
 	return view, nil

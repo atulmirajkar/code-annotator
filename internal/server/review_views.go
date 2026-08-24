@@ -11,64 +11,107 @@ import (
 // annotationPanelView is the presentation-only model for the replaceable
 // annotation panel fragment. It contains no request or storage dependencies.
 type annotationPanelView struct {
-	Document     string
-	Revision     string
+	// Document is the canonical path submitted by every mutation form.
+	Document string
+	// Revision is the sidecar revision used for optimistic concurrency.
+	Revision string
+	// ShowInactive records whether closed and rejected cards are included.
 	ShowInactive bool
-	CountLabel   string
+	// CountLabel is the ready-to-display active and total count summary.
+	CountLabel string
+	// EmptyMessage distinguishes an empty document from an active-only filter.
 	EmptyMessage string
-	Cards        []annotationCardView
+	// Cards contains only annotations visible under ShowInactive.
+	Cards []annotationCardView
 }
 
+// annotationCardView contains the display values for one annotation card.
 type annotationCardView struct {
-	ID            string
-	Intent        annotation.Intent
-	Status        annotation.Status
-	Comment       string
-	Author        string
-	Inactive      bool
-	SourceQuote   string
-	SourceLines   string
+	// ID is the stable annotation identifier used by browser interaction hooks.
+	ID string
+	// Intent and Status are validated domain values rendered as badges.
+	Intent annotation.Intent
+	Status annotation.Status
+	// Comment and Author are untrusted text escaped by html/template.
+	Comment string
+	Author  string
+	// Inactive marks closed and rejected annotations when they are visible.
+	Inactive bool
+	// SourceQuote and SourceLines describe a source-level annotation.
+	SourceQuote string
+	SourceLines string
+	// DocumentLevel selects the whole-document label instead of a source quote.
 	DocumentLevel bool
-	AnchorStale   bool
-	Turn          *annotationTurnView
-	Thread        []annotationThreadView
-	Actions       annotationActionsView
+	// AnchorStale adds the stale badge and permits a reattachment form.
+	AnchorStale bool
+	// Turn is the optional "waiting for" badge derived from recent activity.
+	Turn *annotationTurnView
+	// Thread omits redundant acknowledgement entries from the visible history.
+	Thread []annotationThreadView
+	// Actions contains only lifecycle operations allowed from the current state.
+	Actions annotationActionsView
 }
 
+// annotationTurnView describes who is expected to act next on active work.
 type annotationTurnView struct {
+	// Label is user-facing text; Class selects the existing status-badge style.
 	Label string
 	Class string
 }
 
+// annotationThreadView is one visible, presentation-ready thread entry.
 type annotationThreadView struct {
-	Kind      annotation.ThreadKind
+	// Kind remains available as a stable data attribute for browser adapters.
+	Kind annotation.ThreadKind
+	// KindLabel and Class are the readable label and CSS presentation hook.
 	KindLabel string
 	Class     string
+	// ActorRole is authorization identity (agent or reviewer), when recorded.
+	// It differs from Author, which is the human-facing name attached to the
+	// entry; for example, both "reviewer" and "author" use the reviewer role.
 	ActorRole annotation.ActorRole
-	Author    string
-	Text      string
+	// Author and Text are untrusted display strings escaped by html/template.
+	Author string
+	Text   string
 }
 
+// annotationActionsView supplies URLs and state for forms on one card.
 type annotationActionsView struct {
-	AnnotationID  string
-	Document      string
+	// AnnotationID is used in accessible labels and browser interaction hooks.
+	AnnotationID string
+	// Document is submitted so handlers can authorize catalog membership.
+	Document string
+	// The URLs are derived only from the validated annotation identifier.
 	ReplyURL      string
 	ReattachURL   string
 	TransitionURL string
-	CanReattach   bool
+	// CanReattach requires both a source selector and a currently stale anchor.
+	CanReattach bool
+	// CanQuickClose promotes the common applied-to-closed reviewer action.
 	CanQuickClose bool
-	Transitions   []annotationTransitionView
+	// Transitions contains the remaining domain-authorized lifecycle actions.
+	Transitions []annotationTransitionView
 }
 
+// annotationTransitionView describes one option rendered in the lifecycle
+// form. ActorRole authorizes the state change; the separately submitted author
+// is the display identity recorded in the thread.
 type annotationTransitionView struct {
-	Status        annotation.Status
-	Label         string
-	ActorRole     annotation.ActorRole
+	// Status is the requested target lifecycle state.
+	Status annotation.Status
+	// Label is the option text shown to the reviewer or agent.
+	Label string
+	// ActorRole identifies which domain role may perform this transition.
+	ActorRole annotation.ActorRole
+	// Activity and ActivityLabel describe optional message/summary input.
 	Activity      string
 	ActivityLabel string
 }
 
-type transitionCandidate struct {
+// lifecycleActionDefinition is presentation metadata for a possible domain
+// transition. The complete list below is only a display catalog: each card
+// still calls annotation.ValidateTransition and exposes authorized entries.
+type lifecycleActionDefinition struct {
 	status        annotation.Status
 	label         string
 	actorRole     annotation.ActorRole
@@ -76,7 +119,7 @@ type transitionCandidate struct {
 	activityLabel string
 }
 
-var annotationTransitionCandidates = [...]transitionCandidate{
+var lifecycleActionDefinitions = [...]lifecycleActionDefinition{
 	{status: annotation.StatusAcknowledged, label: "Acknowledge", actorRole: annotation.RoleAgent},
 	{status: annotation.StatusApplied, label: "Mark applied", actorRole: annotation.RoleAgent, activity: "summary", activityLabel: "Summary"},
 	{status: annotation.StatusRejected, label: "Reject", actorRole: annotation.RoleAgent, activity: "message", activityLabel: "Message"},
@@ -85,7 +128,9 @@ var annotationTransitionCandidates = [...]transitionCandidate{
 	{status: annotation.StatusOpen, label: "Reopen", actorRole: annotation.RoleReviewer},
 }
 
-func newAnnotationPanelView(document, revision string, annotations []annotationView, showInactive bool) annotationPanelView {
+// newAnnotationPanelView applies active/inactive filtering once on the server
+// so templates only iterate presentation-ready cards.
+func newAnnotationPanelView(document, revision string, annotations []resolvedAnnotation, showInactive bool) annotationPanelView {
 	activeCount := 0
 	for _, item := range annotations {
 		if !isInactiveAnnotation(item.Status) {
@@ -116,7 +161,9 @@ func newAnnotationPanelView(document, revision string, annotations []annotationV
 	return view
 }
 
-func newAnnotationCardView(document string, item annotationView) annotationCardView {
+// newAnnotationCardView converts validated annotation and anchor data into the
+// labels and nested models consumed by annotation-card.html.
+func newAnnotationCardView(document string, item resolvedAnnotation) annotationCardView {
 	inactive := isInactiveAnnotation(item.Status)
 	view := annotationCardView{
 		ID:       item.ID,
@@ -125,7 +172,7 @@ func newAnnotationCardView(document string, item annotationView) annotationCardV
 		Comment:  item.Comment,
 		Author:   item.Author,
 		Inactive: inactive,
-		Turn:     annotationTurn(item.Annotation),
+		Turn:     pendingTurnBadge(item.Annotation),
 		Thread:   annotationThread(item.Thread),
 	}
 	if item.Source == nil {
@@ -139,7 +186,10 @@ func newAnnotationCardView(document string, item annotationView) annotationCardV
 	return view
 }
 
-func newAnnotationActionsView(document string, item annotationView, anchorStale bool) annotationActionsView {
+// newAnnotationActionsView derives form availability from domain lifecycle
+// validation. Quick Close is separated from the less-common lifecycle menu,
+// which avoids rendering the same applied-to-closed action twice.
+func newAnnotationActionsView(document string, item resolvedAnnotation, anchorStale bool) annotationActionsView {
 	escapedID := url.PathEscape(item.ID)
 	baseURL := "/ui/review/annotations/" + escapedID
 	view := annotationActionsView{
@@ -151,28 +201,30 @@ func newAnnotationActionsView(document string, item annotationView, anchorStale 
 		CanReattach:   item.Source != nil && anchorStale,
 		CanQuickClose: item.Status == annotation.StatusApplied,
 	}
-	for _, candidate := range annotationTransitionCandidates {
-		if err := annotation.ValidateTransition(item.Status, candidate.status, candidate.actorRole); err != nil {
+	for _, definition := range lifecycleActionDefinitions {
+		if err := annotation.ValidateTransition(item.Status, definition.status, definition.actorRole); err != nil {
 			continue
 		}
-		if view.CanQuickClose && candidate.status == annotation.StatusClosed {
+		if view.CanQuickClose && definition.status == annotation.StatusClosed {
 			continue
 		}
-		label := candidate.label
-		if item.Status == annotation.StatusNeedsChanges && candidate.status == annotation.StatusAcknowledged {
+		label := definition.label
+		if item.Status == annotation.StatusNeedsChanges && definition.status == annotation.StatusAcknowledged {
 			label = "Acknowledge retry"
 		}
 		view.Transitions = append(view.Transitions, annotationTransitionView{
-			Status:        candidate.status,
+			Status:        definition.status,
 			Label:         label,
-			ActorRole:     candidate.actorRole,
-			Activity:      candidate.activity,
-			ActivityLabel: candidate.activityLabel,
+			ActorRole:     definition.actorRole,
+			Activity:      definition.activity,
+			ActivityLabel: definition.activityLabel,
 		})
 	}
 	return view
 }
 
+// annotationThread removes acknowledgement events because the following status
+// change already communicates the same fact in the visible history.
 func annotationThread(entries []annotation.ThreadEntry) []annotationThreadView {
 	result := make([]annotationThreadView, 0, len(entries))
 	for _, entry := range entries {
@@ -218,12 +270,16 @@ func threadEntryText(entry annotation.ThreadEntry) string {
 	}
 }
 
-func annotationTurn(item annotation.Annotation) *annotationTurnView {
+// pendingTurnBadge infers who should respond next for statuses that represent
+// active work. The most recent classifiable entry wins: agent activity waits
+// for reviewer feedback, while reviewer activity waits for an agent response.
+// Completed or inactive states do not display a turn badge.
+func pendingTurnBadge(item annotation.Annotation) *annotationTurnView {
 	if item.Status != annotation.StatusOpen && item.Status != annotation.StatusNeedsChanges {
 		return nil
 	}
 	for index := len(item.Thread) - 1; index >= 0; index-- {
-		role := threadActorRole(item.Thread[index], item.Author)
+		role := inferThreadActorRole(item.Thread[index], item.Author)
 		switch role {
 		case annotation.RoleAgent:
 			return &annotationTurnView{Label: "waiting for reviewer", Class: "pending-review"}
@@ -234,7 +290,10 @@ func annotationTurn(item annotation.Annotation) *annotationTurnView {
 	return nil
 }
 
-func threadActorRole(entry annotation.ThreadEntry, reviewer string) annotation.ActorRole {
+// inferThreadActorRole prefers the structured role stored on lifecycle events.
+// Ordinary replies predate that field, so their conventional author names are
+// mapped as a display fallback. Unknown names intentionally produce no badge.
+func inferThreadActorRole(entry annotation.ThreadEntry, reviewer string) annotation.ActorRole {
 	if entry.ActorRole == annotation.RoleAgent || entry.ActorRole == annotation.RoleReviewer {
 		return entry.ActorRole
 	}
