@@ -8,6 +8,18 @@ interface AnnotationHighlighterOptions {
   utf8Length: (value: string) => number;
 }
 
+export function mergeIntervals(values: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+  const sorted = values
+    .map(([start, end]): [number, number] => [start, end])
+    .sort((left, right) => left[0] - right[0]);
+  return sorted.reduce((merged, current) => {
+    const previous = merged[merged.length - 1];
+    if (previous && current[0] <= previous[1]) previous[1] = Math.max(previous[1], current[1]);
+    else merged.push(current);
+    return merged;
+  }, [] as Array<[number, number]>);
+}
+
 export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }: AnnotationHighlighterOptions) {
   // Highlight only anchors resolved against the current document. Stale and
   // document-level annotations remain visible in the panel without a range.
@@ -118,16 +130,6 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         range.surroundContents(mark);
       });
     });
-  }
-
-  function mergeIntervals(values: Array<[number, number]>): Array<[number, number]> {
-    const sorted = values.sort((left, right) => left[0] - right[0]);
-    return sorted.reduce((merged, current) => {
-      const previous = merged[merged.length - 1];
-      if (previous && current[0] <= previous[1]) previous[1] = Math.max(previous[1], current[1]);
-      else merged.push([...current]);
-      return merged;
-    }, [] as Array<[number, number]>);
   }
 
   function clearFallbackHighlights() {

@@ -4,8 +4,8 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI design is approved; implementation is
-waiting at commit gate 1.
+**Phase:** Server-rendered review UI commit gate 1 is implemented and awaiting
+maintainer review. Gate 2 must not begin without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 No HTMX or server-rendered fragment implementation is present yet. The current
@@ -303,7 +303,7 @@ for explicit approval before starting the next item.
 
 - [x] Commit 0: approve the architecture, documentation authority, milestones,
   acceptance criteria, and one-commit-at-a-time review protocol.
-- [ ] Commit 1: add Vitest/`happy-dom`, `test:unit`, and the first surviving
+- [x] Commit 1: add Vitest/`happy-dom`, `test:unit`, and the first surviving
   pure TypeScript extraction without changing runtime behavior.
 - [ ] Commit 2: vendor, license, embed, and serve HTMX 2.0.10 without loading it
   in the page.
@@ -364,10 +364,11 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 0 contains the approved design and review gates. The next
-allowed implementation slice is commit 1, the TypeScript unit-test harness and
-first behavior-preserving pure extraction; it must not begin until the
-maintainer approves proceeding.
+milestone. Commit 1 adds the TypeScript unit-test harness and a tested,
+behavior-preserving interval-merge extraction. It is awaiting maintainer
+review. The next allowed implementation slice is commit 2, vendoring and
+serving HTMX without loading it; it must not begin until the maintainer
+explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented; final suite

@@ -73,6 +73,14 @@ documentation contract, and one-commit-at-a-time review gates are defined in
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.
 
+Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
+away from the CommonJS Playwright suite in `browser-tests/`. The production
+TypeScript configuration excludes test files from `web/generated/`, while
+`tsconfig.test.json` typechecks both production and test sources. Pure browser
+rules use the Node test environment; `happy-dom` is available only for simple
+DOM adapter contracts and does not replace real-browser selection or layout
+coverage.
+
 `internal/server` owns the concurrency-safe active Git comparison base: a
 single explicit commit behind a mutex, seeded at startup from the resolved
 `--diff-base` commit. It never moves on its own. A browser selection request

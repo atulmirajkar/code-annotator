@@ -1,4 +1,17 @@
 import { element } from "./review-dom.js";
+export function mergeIntervals(values) {
+    const sorted = values
+        .map(([start, end]) => [start, end])
+        .sort((left, right) => left[0] - right[0]);
+    return sorted.reduce((merged, current) => {
+        const previous = merged[merged.length - 1];
+        if (previous && current[0] <= previous[1])
+            previous[1] = Math.max(previous[1], current[1]);
+        else
+            merged.push(current);
+        return merged;
+    }, []);
+}
 export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length }) {
     // Highlight only anchors resolved against the current document. Stale and
     // document-level annotations remain visible in the panel without a range.
@@ -108,17 +121,6 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
                 range.surroundContents(mark);
             });
         });
-    }
-    function mergeIntervals(values) {
-        const sorted = values.sort((left, right) => left[0] - right[0]);
-        return sorted.reduce((merged, current) => {
-            const previous = merged[merged.length - 1];
-            if (previous && current[0] <= previous[1])
-                previous[1] = Math.max(previous[1], current[1]);
-            else
-                merged.push([...current]);
-            return merged;
-        }, []);
     }
     function clearFallbackHighlights() {
         markdown.querySelectorAll("mark.annotation-highlight-fallback").forEach((mark) => {

@@ -2,7 +2,8 @@
 
 ## Status
 
-Approved for staged implementation. Implementation has not started.
+Implementation in progress. Commit gates 0 and 1 are implemented; commit 1 is
+awaiting maintainer review before gate 2 may begin.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the

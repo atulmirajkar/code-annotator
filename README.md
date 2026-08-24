@@ -65,12 +65,13 @@ tests:
 | `npm ci` | Removes `node_modules` and installs the exact versions from `package-lock.json`. | Clean local setup, CI, or before a reproducible build. |
 | `npm install` | Resolves dependencies and updates `package-lock.json` when dependencies change. | Adding or intentionally updating a package. |
 | `npm run typecheck` | Checks all TypeScript without writing generated files. | Fast feedback while editing frontend code. |
+| `npm run test:unit` | Runs co-located `web/src/**/*.test.ts` tests with Vitest. | Fast coverage for pure TypeScript rules and simple DOM adapters. |
 | `npm run build:styles` | Compiles `web/src/styles.scss` and its partials into `web/generated/styles.css`. | Regenerating the embedded stylesheet. |
 | `npm run build:web` | Compiles TypeScript and Sass into `web/generated/`. | Regenerating all embedded browser assets. |
 | `npm run format:styles` | Formats the Sass entrypoint and partials with Prettier. | Normalizing stylesheet source before review. |
 | `npm run watch:web` | Continuously compiles TypeScript when source files change. | Frontend development while the Go viewer is running. |
 | `npm run watch:styles` | Continuously compiles Sass when stylesheet files change. | Styling development while the Go viewer is running. |
-| `npm run check:web` | Runs `typecheck`, then `build:web`. | Standard frontend validation before Go builds or commits. |
+| `npm run check:web` | Runs `typecheck`, `test:unit`, then `build:web`. | Standard frontend validation before Go builds or commits. |
 | `npm run test:browser` | Runs the Playwright browser regression suite. | Verifying UI behavior with Microsoft Edge available. |
 
 After changing TypeScript, use:

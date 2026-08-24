@@ -57,6 +57,12 @@ The TypeScript compiler writes browser JavaScript and Sass writes CSS to
 Go build itself does not need Node or npm. Generated assets are checked in and
 CI verifies that the frontend build does not leave a diff.
 
+`npm run check:web` typechecks production and test TypeScript, runs the
+co-located `web/src/**/*.test.ts` Vitest suite, then regenerates JavaScript and
+CSS. Vitest uses a Node environment by default. `happy-dom` is reserved for
+simple DOM adapter tests; Playwright remains authoritative for selection,
+layout, scrolling, pointer, CSS Highlight, and Mermaid behavior.
+
 During frontend development, use the compiler watcher in one terminal and the
 Sass watcher in another:
 
@@ -215,6 +221,18 @@ The agent client obtains the ephemeral review token from the supplied loopback
 viewer page and never accesses sidecar storage directly.
 
 ## Verify
+
+Run the fast frontend checks and reproducible asset build:
+
+```sh
+npm run check:web
+```
+
+Run only the co-located TypeScript unit tests while editing:
+
+```sh
+npm run test:unit
+```
 
 Format and test the code:
 
