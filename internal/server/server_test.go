@@ -894,15 +894,15 @@ func TestLiveAgentHandoffAPI(t *testing.T) {
 		wantState    annotation.Status
 		keepRevision bool
 	}{
-		{name: "agent acknowledges", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
-		{name: "stale browser revision conflicts", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","author":"reviewer","message":"Concurrent note"}`, stale: true, wantStatus: http.StatusConflict, keepRevision: true},
-		{name: "agent replies with current revision", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","author":"codex","message":"I retained the existing behavior."}`, wantStatus: http.StatusCreated, wantState: annotation.StatusAcknowledged},
-		{name: "agent applies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","actorRole":"agent","author":"codex","summary":"Updated the documentation.","commit":"abc1234"}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
-		{name: "agent cannot close", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusBadRequest, keepRevision: true},
-		{name: "reviewer requests changes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"needs_changes","actorRole":"reviewer","author":"atul","message":"Keep the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusNeedsChanges},
-		{name: "agent acknowledges retry", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","actorRole":"agent","author":"codex"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
-		{name: "agent reapplies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","actorRole":"agent","author":"codex","summary":"Restored the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
-		{name: "reviewer closes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","actorRole":"reviewer","author":"atul"}`, wantStatus: http.StatusOK, wantState: annotation.StatusClosed},
+		{name: "agent acknowledges", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","role":"agent"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
+		{name: "stale browser revision conflicts", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","role":"reviewer","message":"Concurrent note"}`, stale: true, wantStatus: http.StatusConflict, keepRevision: true},
+		{name: "agent replies with current revision", method: http.MethodPost, path: "/api/annotations/ann_transition_test/replies", body: `{"document":"README.md","role":"agent","message":"I retained the existing behavior."}`, wantStatus: http.StatusCreated, wantState: annotation.StatusAcknowledged},
+		{name: "agent applies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","role":"agent","summary":"Updated the documentation.","commit":"abc1234"}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
+		{name: "agent cannot close", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","role":"agent"}`, wantStatus: http.StatusBadRequest, keepRevision: true},
+		{name: "reviewer requests changes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"needs_changes","role":"reviewer","message":"Keep the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusNeedsChanges},
+		{name: "agent acknowledges retry", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"acknowledged","role":"agent"}`, wantStatus: http.StatusOK, wantState: annotation.StatusAcknowledged},
+		{name: "agent reapplies", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"applied","role":"agent","summary":"Restored the compatibility note."}`, wantStatus: http.StatusOK, wantState: annotation.StatusApplied},
+		{name: "reviewer closes", method: http.MethodPatch, path: "/api/annotations/ann_transition_test", body: `{"document":"README.md","status":"closed","role":"reviewer"}`, wantStatus: http.StatusOK, wantState: annotation.StatusClosed},
 	}
 
 	for _, step := range steps {
@@ -958,9 +958,9 @@ func TestCreateAnnotationAPI(t *testing.T) {
 		selectedDocument = "Before **selected** after"
 	)
 	digest := annotation.DocumentSHA256([]byte(selectedDocument))
-	selectedBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":9,"endByte":17,"documentSHA256":"` + digest + `"}}`
-	crossTagBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","author":"reviewer","selection":{"startByte":0,"endByte":19,"documentSHA256":"` + digest + `"}}`
-	documentBody := `{"document":"README.md","intent":"question","comment":"Why this document?","author":"reviewer"}`
+	selectedBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","role":"reviewer","selection":{"startByte":9,"endByte":17,"documentSHA256":"` + digest + `"}}`
+	crossTagBody := `{"document":"README.md","intent":"change_request","comment":"Update this.","role":"reviewer","selection":{"startByte":0,"endByte":19,"documentSHA256":"` + digest + `"}}`
+	documentBody := `{"document":"README.md","intent":"question","comment":"Why this document?","role":"reviewer"}`
 	tests := []struct {
 		name         string
 		body         string
@@ -1118,7 +1118,7 @@ func TestReplyAnnotationAPI(t *testing.T) {
 		origin = "http://127.0.0.1:8080"
 		token  = "0123456789abcdef0123456789abcdef"
 	)
-	validBody := `{"document":"README.md","message":"Please also update the example.","author":"reviewer"}`
+	validBody := `{"document":"README.md","message":"Please also update the example.","role":"reviewer"}`
 	tests := []struct {
 		name         string
 		annotationID string
@@ -1131,7 +1131,7 @@ func TestReplyAnnotationAPI(t *testing.T) {
 		{name: "append reply", annotationID: "ann_api_test", body: validBody, useCurrent: true, wantStatus: http.StatusCreated},
 		{name: "annotation missing", annotationID: "ann_missing", body: validBody, useCurrent: true, wantStatus: http.StatusNotFound},
 		{name: "empty message", annotationID: "ann_api_test", body: strings.Replace(validBody, "Please also update the example.", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
-		{name: "empty author", annotationID: "ann_api_test", body: strings.Replace(validBody, "reviewer", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
+		{name: "empty role", annotationID: "ann_api_test", body: strings.Replace(validBody, "reviewer", "", 1), useCurrent: true, wantStatus: http.StatusBadRequest},
 		{name: "unknown field", annotationID: "ann_api_test", body: strings.TrimSuffix(validBody, "}") + `,"kind":"resolution"}`, useCurrent: true, wantStatus: http.StatusBadRequest},
 		{name: "missing revision", annotationID: "ann_api_test", body: validBody, omitIfMatch: true, wantStatus: http.StatusPreconditionRequired},
 		{name: "stale revision", annotationID: "ann_api_test", body: validBody, wantStatus: http.StatusConflict, wantConflict: true},
@@ -1218,19 +1218,19 @@ func TestTransitionEntries(t *testing.T) {
 		wantKinds []annotation.ThreadKind
 		wantErr   string
 	}{
-		{name: "acknowledge open", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent"}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
-		{name: "acknowledge retry", from: annotation.StatusNeedsChanges, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent"}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
-		{name: "report applied", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, ActorRole: annotation.RoleAgent, Author: "agent", Summary: "Implemented", Commit: "abc1234"}, wantKinds: []annotation.ThreadKind{annotation.ThreadResolution, annotation.ThreadStatusChange}},
-		{name: "request changes", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, ActorRole: annotation.RoleReviewer, Author: "reviewer", Message: "Keep the default."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReview, annotation.ThreadStatusChange}},
-		{name: "reject request", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, ActorRole: annotation.RoleAgent, Author: "agent", Message: "Conflicts with policy."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReply, annotation.ThreadStatusChange}},
-		{name: "reviewer dismisses open", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusClosed, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
-		{name: "close applied", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusClosed, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
-		{name: "reopen closed", from: annotation.StatusClosed, input: transitionAnnotationRequest{Status: annotation.StatusOpen, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
-		{name: "missing resolution summary", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, ActorRole: annotation.RoleAgent, Author: "agent"}, wantErr: "summary"},
-		{name: "missing review message", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, ActorRole: annotation.RoleReviewer, Author: "reviewer"}, wantErr: "message"},
-		{name: "missing rejection reason", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, ActorRole: annotation.RoleAgent, Author: "agent"}, wantErr: "message"},
-		{name: "metadata on acknowledgement", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: "agent", Message: "unexpected"}, wantErr: "does not accept"},
-		{name: "blank author", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, ActorRole: annotation.RoleAgent, Author: " "}, wantErr: "author"},
+		{name: "acknowledge open", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, Role: annotation.RoleAgent}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
+		{name: "acknowledge retry", from: annotation.StatusNeedsChanges, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, Role: annotation.RoleAgent}, wantKinds: []annotation.ThreadKind{annotation.ThreadAcknowledgement, annotation.ThreadStatusChange}},
+		{name: "report applied", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, Role: annotation.RoleAgent, Summary: "Implemented", Commit: "abc1234"}, wantKinds: []annotation.ThreadKind{annotation.ThreadResolution, annotation.ThreadStatusChange}},
+		{name: "request changes", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, Role: annotation.RoleReviewer, Message: "Keep the default."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReview, annotation.ThreadStatusChange}},
+		{name: "reject request", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, Role: annotation.RoleAgent, Message: "Conflicts with policy."}, wantKinds: []annotation.ThreadKind{annotation.ThreadReply, annotation.ThreadStatusChange}},
+		{name: "reviewer dismisses open", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusClosed, Role: annotation.RoleReviewer}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
+		{name: "close applied", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusClosed, Role: annotation.RoleReviewer}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
+		{name: "reopen closed", from: annotation.StatusClosed, input: transitionAnnotationRequest{Status: annotation.StatusOpen, Role: annotation.RoleReviewer}, wantKinds: []annotation.ThreadKind{annotation.ThreadStatusChange}},
+		{name: "missing resolution summary", from: annotation.StatusAcknowledged, input: transitionAnnotationRequest{Status: annotation.StatusApplied, Role: annotation.RoleAgent}, wantErr: "summary"},
+		{name: "missing review message", from: annotation.StatusApplied, input: transitionAnnotationRequest{Status: annotation.StatusNeedsChanges, Role: annotation.RoleReviewer}, wantErr: "message"},
+		{name: "missing rejection reason", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusRejected, Role: annotation.RoleAgent}, wantErr: "message"},
+		{name: "metadata on acknowledgement", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, Role: annotation.RoleAgent, Message: "unexpected"}, wantErr: "does not accept"},
+		{name: "blank role", from: annotation.StatusOpen, input: transitionAnnotationRequest{Status: annotation.StatusAcknowledged, Role: " "}, wantErr: "role"},
 	}
 
 	for _, test := range tests {
@@ -1256,7 +1256,7 @@ func TestTransitionEntries(t *testing.T) {
 				}
 			}
 			statusChange := entries[len(entries)-1]
-			if statusChange.FromStatus != test.from || statusChange.ToStatus != test.input.Status || statusChange.ActorRole != test.input.ActorRole {
+			if statusChange.FromStatus != test.from || statusChange.ToStatus != test.input.Status || statusChange.Role != test.input.Role {
 				t.Fatalf("status change = %#v", statusChange)
 			}
 		})
@@ -1270,7 +1270,7 @@ func TestTransitionAnnotationAPI(t *testing.T) {
 		origin = "http://127.0.0.1:8080"
 		token  = "0123456789abcdef0123456789abcdef"
 	)
-	validBody := `{"document":"README.md","status":"needs_changes","actorRole":"reviewer","author":"reviewer","message":"Keep the loopback default."}`
+	validBody := `{"document":"README.md","status":"needs_changes","role":"reviewer","message":"Keep the loopback default."}`
 	tests := []struct {
 		name         string
 		annotationID string
@@ -1474,7 +1474,7 @@ func saveReattachAnnotation(t *testing.T, store *annotationstore.Store, sourceMo
 				Intent:    annotation.IntentChangeRequest,
 				Status:    annotation.StatusOpen,
 				Comment:   "Update this selection.",
-				Author:    "reviewer",
+				Role:      "reviewer",
 				CreatedAt: createdAt,
 				UpdatedAt: createdAt,
 				Source:    source,
@@ -1503,7 +1503,7 @@ func saveTransitionAnnotation(t *testing.T, store *annotationstore.Store, status
 				Intent:    annotation.IntentChangeRequest,
 				Status:    status,
 				Comment:   "Keep the default.",
-				Author:    "reviewer",
+				Role:      "reviewer",
 				CreatedAt: created,
 				UpdatedAt: created,
 				Thread:    []annotation.ThreadEntry{},
@@ -1719,7 +1719,7 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get review panel module", path: "/static/review-panel.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createReviewPanelController", "setAnnotationFormVisible", "startReviewPanelResize"}},
 		{name: "get review render module", path: "/static/review-render.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationRenderer", "createCard", "annotation-summary", "annotation-actions"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
-		{name: "get review thread module", path: "/static/review-thread.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"replyActors", "transitionOptions", "annotationTurnBadge"}},
+		{name: "get review thread module", path: "/static/review-thread.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"replyRoles", "transitionOptions", "annotationTurnBadge"}},
 		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-tree.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
 		{name: "get document tree module", path: "/static/document-tree.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "updateTreeVisibility", "document-tree-expanded"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
@@ -1814,7 +1814,7 @@ func saveTestAnnotation(t *testing.T, store *annotationstore.Store, document, so
 				Intent:    annotation.IntentChangeRequest,
 				Status:    annotation.StatusOpen,
 				Comment:   "Update this selection.",
-				Author:    "reviewer",
+				Role:      "reviewer",
 				CreatedAt: now,
 				UpdatedAt: now,
 				Source:    &source,

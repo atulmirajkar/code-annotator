@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"atulm/code-annotator/internal/annotation"
 	"atulm/code-annotator/internal/discovery"
 )
 
@@ -34,7 +35,6 @@ type agentConfig struct {
 	document string
 	revision string
 	id       string
-	author   string
 	role     string
 	message  string
 	summary  string
@@ -62,7 +62,7 @@ func RunAgent(args []string, stdout, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
-	body := map[string]string{"document": configuration.document, "author": configuration.author}
+	body := map[string]string{"document": configuration.document, "role": configuration.role}
 	method := http.MethodPatch
 	path := "/api/annotations/" + url.PathEscape(configuration.id)
 	if configuration.command == "reply" {
@@ -71,7 +71,6 @@ func RunAgent(args []string, stdout, stderr io.Writer) error {
 		body["message"] = configuration.message
 	} else {
 		body["status"] = configuration.status
-		body["actorRole"] = configuration.role
 		for name, value := range map[string]string{"message": configuration.message, "summary": configuration.summary, "commit": configuration.commit} {
 			if value != "" {
 				body[name] = value
@@ -97,8 +96,7 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 	document := flags.String("document", "", "reviewable document path")
 	revision := flags.String("revision", "", "current document sidecar revision")
 	identifier := flags.String("id", "", "annotation identifier")
-	author := flags.String("author", "", "agent name")
-	role := flags.String("role", "", "actor role")
+	role := flags.String("role", "", "role (agent or reviewer)")
 	message := flags.String("message", "", "discussion or rejection message")
 	summary := flags.String("summary", "", "applied-work summary")
 	commit := flags.String("commit", "", "optional applied-work commit")
@@ -132,14 +130,13 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 			{name: "--document", value: *document},
 			{name: "--revision", value: *revision},
 			{name: "--id", value: *identifier},
-			{name: "--author", value: *author},
+			{name: "--role", value: *role},
 		}
 		if configuration.command == "reply" {
 			required = append(required, struct{ name, value string }{name: "--message", value: *message})
 		} else {
 			required = append(required,
 				struct{ name, value string }{name: "--status", value: *status},
-				struct{ name, value string }{name: "--role", value: *role},
 			)
 		}
 		for _, field := range required {
@@ -147,10 +144,12 @@ func parseAgentConfig(args []string, stderr io.Writer) (agentConfig, error) {
 				return agentConfig{}, fmt.Errorf("%s is required", field.name)
 			}
 		}
+		if !annotation.Role(*role).Valid() {
+			return agentConfig{}, fmt.Errorf("invalid annotation role %q", *role)
+		}
 		configuration.document = *document
 		configuration.revision = *revision
 		configuration.id = *identifier
-		configuration.author = *author
 		configuration.status = *status
 		configuration.role = *role
 		configuration.message = *message

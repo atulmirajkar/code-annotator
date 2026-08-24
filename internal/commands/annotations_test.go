@@ -112,7 +112,7 @@ func seedCodeCommandAnnotation(t *testing.T, rootPath, annotationsDir string) {
 	if err != nil {
 		t.Fatalf("annotation.NewSource() error = %v", err)
 	}
-	sidecar := annotation.Sidecar{SchemaVersion: annotation.SchemaVersion, Document: "main.go", Annotations: []annotation.Annotation{{ID: "ann_code", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Check comparison", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &selected, Thread: []annotation.ThreadEntry{}}}}
+	sidecar := annotation.Sidecar{SchemaVersion: annotation.SchemaVersion, Document: "main.go", Annotations: []annotation.Annotation{{ID: "ann_code", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Check comparison", Role: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &selected, Thread: []annotation.ThreadEntry{}}}}
 	if _, err := store.Save(sidecar, ""); err != nil {
 		t.Fatalf("Store.Save() error = %v", err)
 	}
@@ -276,8 +276,8 @@ func seedCommandAnnotations(t *testing.T, directory string) {
 		t.Fatalf("annotation.NewSource() error = %v", err)
 	}
 	sidecars := []annotation.Sidecar{
-		{SchemaVersion: annotation.SchemaVersion, Document: "guide.md", Annotations: []annotation.Annotation{{ID: "ann_guide", Intent: annotation.IntentQuestion, Status: annotation.StatusNeedsChanges, Comment: "Clarify", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Thread: []annotation.ThreadEntry{}}}},
-		{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{{ID: "ann_readme", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Update ``` example", Author: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &source, Thread: []annotation.ThreadEntry{{ID: "msg_reply", Kind: annotation.ThreadReply, Message: "First line\nsecond line", Author: "reviewer", CreatedAt: now}}}}},
+		{SchemaVersion: annotation.SchemaVersion, Document: "guide.md", Annotations: []annotation.Annotation{{ID: "ann_guide", Intent: annotation.IntentQuestion, Status: annotation.StatusNeedsChanges, Comment: "Clarify", Role: "reviewer", CreatedAt: now, UpdatedAt: now, Thread: []annotation.ThreadEntry{}}}},
+		{SchemaVersion: annotation.SchemaVersion, Document: "README.md", Annotations: []annotation.Annotation{{ID: "ann_readme", Intent: annotation.IntentChangeRequest, Status: annotation.StatusOpen, Comment: "Update ``` example", Role: "reviewer", CreatedAt: now, UpdatedAt: now, Source: &source, Thread: []annotation.ThreadEntry{{ID: "msg_reply", Kind: annotation.ThreadReply, Message: "First line\nsecond line", Role: "reviewer", CreatedAt: now}}}}},
 	}
 	for _, sidecar := range sidecars {
 		if _, err := store.Save(sidecar, ""); err != nil {

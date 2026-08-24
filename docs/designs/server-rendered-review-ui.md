@@ -300,7 +300,7 @@ in loaded fragments, disable the history cache for review pages, and set
 - Validation errors return `422 Unprocessable Entity` with the submitted form
   and escaped field-level or form-level feedback.
 - Revision conflicts return `409 Conflict` with the latest authoritative panel
-  and a conflict banner. The fragment rehydrates submitted author, intent, and
+  and a conflict banner. The fragment rehydrates submitted role, intent, and
   draft text from the validated form input and escapes them through the
   template; a source selection whose revision is stale must be captured again.
 - A small `htmx:beforeSwap` adapter permits HTML fragment swaps for expected
@@ -414,8 +414,8 @@ production emission but included in the test TypeScript configuration.
 
 Use `httptest` plus focused golden or structural assertions for:
 
-- escaping comments, authors, source quotes, and thread activity;
-- actions visible for every annotation status and actor role;
+- escaping comments, source quotes, and thread activity;
+- actions visible for every annotation status and role;
 - active/inactive filtering and counts;
 - form validation and retained safe draft values;
 - `If-Match`, origin, token, media type, and size failures;

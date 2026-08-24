@@ -105,7 +105,7 @@ open -> acknowledged -> applied -> closed
 closed or rejected -> open
 ```
 
-`applied` means an agent or author reports that work was performed. `closed`
+`applied` means an agent reports that work was performed. `closed`
 means the reviewer accepted the outcome. Keeping those states distinct prevents
 an agent from closing its own review request implicitly. `needs_changes` means
 an attempted resolution was not satisfactory and remains actionable. It is not
@@ -118,9 +118,9 @@ requiring an agent response. When a reviewer selects
 `applied` to `needs_changes`. The next agent attempt reuses the same annotation
 ID rather than creating a replacement annotation.
 
-The domain model validates transitions against the actor role:
+The domain model validates transitions against the role:
 
-| Actor | Allowed transitions |
+| Role | Allowed transitions |
 | --- | --- |
 | Agent | `open -> acknowledged`, `open -> rejected` |
 | Agent | `acknowledged -> applied`, `acknowledged -> rejected` |
@@ -131,7 +131,7 @@ The domain model validates transitions against the actor role:
 | Reviewer | `closed -> open`, `rejected -> open` |
 
 Skipping acknowledgement, repeating the current status, or having an agent close
-its own work is invalid. Status-change thread entries record the actor role and
+its own work is invalid. Status-change thread entries record the role and
 the previous and next statuses so the transition can be validated again when a
 sidecar is loaded.
 
@@ -152,7 +152,7 @@ and avoids one highly contended repository-wide database file.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "document": "designs/architecture.md",
   "annotations": [
     {
@@ -160,7 +160,7 @@ and avoids one highly contended repository-wide database file.
       "intent": "change_request",
       "status": "open",
       "comment": "Make the listen address configurable while preserving loopback as the default.",
-      "author": "atul",
+      "role": "reviewer",
       "createdAt": "2026-08-20T19:30:00Z",
       "updatedAt": "2026-08-20T19:30:00Z",
       "source": {
@@ -186,6 +186,14 @@ Timestamps use UTC RFC 3339. Relative document paths always use `/` separators.
 Unknown fields must be preserved when rewriting a supported schema version so
 future agent metadata is not silently discarded.
 
+Schema version 2 replaces free-text `author` values and lifecycle-only
+`actorRole` values with one required `role` field. Its only values are `agent`
+and `reviewer`; that value is both the displayed attribution and the permission
+identity. The store reads schema version 1 for compatibility. During loading it
+prefers a valid legacy `actorRole`, maps `agent`, `codex`, and `claude` authors
+to `agent`, and maps other non-empty authors to `reviewer`. The next successful
+optimistic save writes schema version 2 while preserving unknown fields.
+
 ### Threaded activity and resolution attempts
 
 The original `comment` remains immutable review context. Follow-up discussion
@@ -198,7 +206,7 @@ agent reporting an applied change may append:
   "kind": "resolution",
   "summary": "Added --listen while retaining 127.0.0.1 as the default.",
   "commit": "abc1234",
-  "author": "codex",
+  "role": "agent",
   "createdAt": "2026-08-20T20:15:00Z"
 }
 ```
@@ -211,7 +219,7 @@ appends a reply:
   "id": "msg_01J7Z0N4S8B6H3Q2C9D5F7K1M0",
   "kind": "review",
   "message": "The implementation replaced the loopback default. Keep 127.0.0.1 unless the flag is supplied.",
-  "author": "atul",
+  "role": "reviewer",
   "createdAt": "2026-08-20T20:30:00Z"
 }
 ```
@@ -222,9 +230,9 @@ ordinary replies carry a message. Existing thread entries are append-only.
 Corrections are represented by another entry so the review history is not
 silently rewritten.
 
-Each thread entry has its own `msg_` identifier, author, UTC timestamp, and kind.
-`status_change` entries additionally contain `actorRole`, `fromStatus`, and
-`toStatus`. Thread entries must be chronological, cannot predate the annotation,
+Each thread entry has its own `msg_` identifier, role, UTC timestamp, and kind.
+`status_change` entries additionally contain `fromStatus` and `toStatus`.
+Thread entries must be chronological, cannot predate the annotation,
 and cannot be newer than the annotation's `updatedAt`. Annotation and thread IDs
 must be unique within a sidecar.
 
@@ -412,7 +420,7 @@ sidecar that does not exist yet. Missing preconditions return `428`; a stale
 revision returns `409` with the current ETag so the client can reload instead of
 overwriting another writer's annotations.
 
-The create body contains `document`, `intent`, `comment`, `author`, and an
+The create body contains `document`, `intent`, `comment`, `role`, and an
 optional `selection` with `startByte`, exclusive `endByte`, and
 `documentSHA256`. The server reads the current Markdown, rejects a stale digest,
 then derives the exact source quote, context, and line range from those offsets.
@@ -422,14 +430,14 @@ UTC timestamps, empty thread, and sortable collision-resistant `ann_` ID.
 Unknown request fields and multiple JSON values are rejected.
 
 The reply route also requires `If-Match` and accepts only `document`, `message`,
-and `author`. The server assigns the `msg_` ID, UTC timestamp, and `reply` kind,
+and `role`. The server assigns the `msg_` ID, UTC timestamp, and `reply` kind,
 then appends the entry without changing the annotation status or any earlier
 thread entry. Clients cannot use this route to manufacture `resolution`,
 `review`, or `status_change` events; lifecycle endpoints create those events
 atomically with their corresponding validated transition.
 
-The transition route accepts `document`, target `status`, `actorRole`, `author`,
-and transition-specific activity. It validates the actor and current state,
+The transition route accepts `document`, target `status`, `role`, and
+transition-specific activity. It validates the role and current state,
 then appends the activity event followed by a `status_change` event in the same
 optimistic sidecar save:
 
@@ -550,7 +558,7 @@ state is unknown, the agent must ask before choosing this mode.
 code-annotator annotations list --root ./docs --status open,needs_changes --format json
 code-annotator annotations export --root ./docs --status open,needs_changes --format markdown
 code-annotator annotations resolve --root ./docs --id ann_... \
-  --status applied --role agent --author codex \
+  --status applied --role agent \
   --commit abc1234 --summary "Implemented request"
 ```
 
@@ -577,7 +585,7 @@ loaded during lookup so a concurrent sidecar edit is rejected rather than
 overwritten.
 
 Offline `resolve` uses the same domain transition builder as the HTTP API. It
-requires an explicit `agent` or `reviewer` role plus author name, creates the
+requires an explicit `agent` or `reviewer` role, creates the
 target-specific activity and status-change entries together, validates the
 complete sidecar, and saves against the loaded revision.
 
@@ -685,7 +693,7 @@ correct. Browser coverage includes exact, moved, not-found, ambiguous,
 keyboard, nested-control, collapsed-sidebar, and reduced-motion cases.
 
 Lifecycle controls appear within each annotation card and expose only valid
-next states. The selected action determines the actor role sent to the server
+next states. The selected action determines the role sent to the server
 and whether a message or resolution summary is required; an applied action may
 also include a commit reference. Every update carries the review token and the
 latest sidecar revision. The server still owns validation and atomic thread
@@ -694,7 +702,7 @@ creation. If another browser or agent writes first, the stale request receives
 to review the latest state before retrying. Ordinary inline discussion replies
 remain a separate control because they do not change lifecycle state.
 
-The reply form records an author and message and posts them to the dedicated
+The reply form records a role and message and posts them to the dedicated
 reply endpoint with the review token and current sidecar revision. A successful
 append reloads the complete authoritative thread. A concurrent-write conflict
 reloads the latest thread before the reviewer retries, preventing an older
@@ -710,7 +718,7 @@ A document or sidecar conflict reloads annotations and requires a fresh
 selection so an outdated range cannot be applied silently.
 
 Cards are collapsed by default to a status-and-comment summary and expand on
-click to show source context, authorship, and thread history. Reply,
+click to show source context, role attribution, and thread history. Reply,
 reattachment, and lifecycle forms sit inside a nested collapsed `Actions`
 section. This keeps long threads and primarily agent-oriented operations out of
 the scanning path without removing access to them.

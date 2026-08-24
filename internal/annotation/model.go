@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-// SchemaVersion is the sidecar schema version supported by this package.
-const SchemaVersion = 1
+// SchemaVersion is the role-only sidecar schema version supported by this package.
+const SchemaVersion = 2
 
 // Intent describes what kind of response a reviewer expects.
 type Intent string
@@ -35,12 +35,13 @@ const (
 	StatusRejected     Status = "rejected"
 )
 
-// ActorRole controls which lifecycle transitions an actor may perform.
-type ActorRole string
+// Role identifies the participant category recorded on annotations and thread
+// entries. It also controls which lifecycle transitions may be performed.
+type Role string
 
 const (
-	RoleAgent    ActorRole = "agent"
-	RoleReviewer ActorRole = "reviewer"
+	RoleAgent    Role = "agent"
+	RoleReviewer Role = "reviewer"
 )
 
 // ThreadKind describes an append-only event in an annotation discussion.
@@ -68,7 +69,7 @@ type Annotation struct {
 	Intent    Intent        `json:"intent"`
 	Status    Status        `json:"status"`
 	Comment   string        `json:"comment"`
-	Author    string        `json:"author"`
+	Role      Role          `json:"role"`
 	CreatedAt time.Time     `json:"createdAt"`
 	UpdatedAt time.Time     `json:"updatedAt"`
 	Source    *Source       `json:"source,omitempty"`
@@ -101,14 +102,13 @@ type ThreadEntry struct {
 	Message    string     `json:"message,omitempty"`
 	Summary    string     `json:"summary,omitempty"`
 	Commit     string     `json:"commit,omitempty"`
-	Author     string     `json:"author"`
-	ActorRole  ActorRole  `json:"actorRole,omitempty"`
+	Role       Role       `json:"role"`
 	FromStatus Status     `json:"fromStatus,omitempty"`
 	ToStatus   Status     `json:"toStatus,omitempty"`
 	CreatedAt  time.Time  `json:"createdAt"`
 }
 
-// Validate checks a complete sidecar against schema version 1.
+// Validate checks a complete sidecar against the current schema version.
 func (s Sidecar) Validate() error {
 	if s.SchemaVersion != SchemaVersion {
 		return fmt.Errorf("unsupported annotation schema version %d", s.SchemaVersion)
@@ -151,8 +151,8 @@ func (a Annotation) Validate() error {
 	if strings.TrimSpace(a.Comment) == "" {
 		return errors.New("comment is required")
 	}
-	if strings.TrimSpace(a.Author) == "" {
-		return errors.New("author is required")
+	if !a.Role.Valid() {
+		return fmt.Errorf("invalid annotation role %q", a.Role)
 	}
 	if a.CreatedAt.IsZero() || a.UpdatedAt.IsZero() {
 		return errors.New("createdAt and updatedAt are required")
@@ -207,8 +207,8 @@ func (e ThreadEntry) Validate() error {
 	if !e.Kind.Valid() {
 		return fmt.Errorf("invalid kind %q", e.Kind)
 	}
-	if strings.TrimSpace(e.Author) == "" {
-		return errors.New("author is required")
+	if !e.Role.Valid() {
+		return fmt.Errorf("invalid role %q", e.Role)
 	}
 	if e.CreatedAt.IsZero() {
 		return errors.New("createdAt is required")
@@ -223,7 +223,7 @@ func (e ThreadEntry) Validate() error {
 			return errors.New("summary is required")
 		}
 	case ThreadStatusChange:
-		if err := ValidateTransition(e.FromStatus, e.ToStatus, e.ActorRole); err != nil {
+		if err := ValidateTransition(e.FromStatus, e.ToStatus, e.Role); err != nil {
 			return fmt.Errorf("status change: %w", err)
 		}
 	}
@@ -260,22 +260,27 @@ func (k ThreadKind) Valid() bool {
 	}
 }
 
+// Valid reports whether r is a supported participant and permission role.
+func (r Role) Valid() bool {
+	return r == RoleAgent || r == RoleReviewer
+}
+
 // ValidateTransition checks whether actor may move an annotation between two
 // lifecycle states. Reviewers may dismiss open work, and only reviewers may
 // close or return applied work for changes.
-func ValidateTransition(from, to Status, actor ActorRole) error {
+func ValidateTransition(from, to Status, role Role) error {
 	if !from.Valid() || !to.Valid() {
 		return fmt.Errorf("invalid annotation transition %q -> %q", from, to)
 	}
-	if actor != RoleAgent && actor != RoleReviewer {
-		return fmt.Errorf("invalid annotation actor role %q", actor)
+	if !role.Valid() {
+		return fmt.Errorf("invalid annotation role %q", role)
 	}
 	if from == to {
 		return fmt.Errorf("annotation is already %q", to)
 	}
 
 	allowed := false
-	switch actor {
+	switch role {
 	case RoleAgent:
 		allowed = (from == StatusOpen && (to == StatusAcknowledged || to == StatusRejected)) ||
 			(from == StatusAcknowledged && (to == StatusApplied || to == StatusRejected)) ||
@@ -286,7 +291,7 @@ func ValidateTransition(from, to Status, actor ActorRole) error {
 			((from == StatusClosed || from == StatusRejected) && to == StatusOpen)
 	}
 	if !allowed {
-		return fmt.Errorf("role %q cannot transition annotation from %q to %q", actor, from, to)
+		return fmt.Errorf("role %q cannot transition annotation from %q to %q", role, from, to)
 	}
 	return nil
 }

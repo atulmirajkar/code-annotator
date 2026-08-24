@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"atulm/code-annotator/internal/annotation"
 )
@@ -137,8 +138,8 @@ func (s *Store) load(document string) (annotation.Sidecar, Revision, error) {
 		}, "", nil
 	}
 
-	var sidecar annotation.Sidecar
-	if err := json.Unmarshal(data, &sidecar); err != nil {
+	sidecar, err := decodeSidecar(data)
+	if err != nil {
 		return annotation.Sidecar{}, "", fmt.Errorf("decode annotation sidecar: %w", err)
 	}
 	if err := sidecar.Validate(); err != nil {
@@ -148,6 +149,112 @@ func (s *Store) load(document string) (annotation.Sidecar, Revision, error) {
 		return annotation.Sidecar{}, "", fmt.Errorf("annotation sidecar document %q does not match requested %q", sidecar.Document, document)
 	}
 	return sidecar, revision, nil
+}
+
+// Schema version 1 stored arbitrary author strings and a separate actorRole on
+// lifecycle events. Loading maps those records into the role-only version 2
+// model without rewriting bytes; the next successful Save performs the durable
+// migration under the caller's original revision.
+func decodeSidecar(data []byte) (annotation.Sidecar, error) {
+	var envelope struct {
+		SchemaVersion int `json:"schemaVersion"`
+	}
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		return annotation.Sidecar{}, err
+	}
+	if envelope.SchemaVersion == annotation.SchemaVersion {
+		var sidecar annotation.Sidecar
+		if err := json.Unmarshal(data, &sidecar); err != nil {
+			return annotation.Sidecar{}, err
+		}
+		return sidecar, nil
+	}
+	if envelope.SchemaVersion != 1 {
+		return annotation.Sidecar{}, fmt.Errorf("unsupported annotation schema version %d", envelope.SchemaVersion)
+	}
+
+	var legacy legacySidecar
+	if err := json.Unmarshal(data, &legacy); err != nil {
+		return annotation.Sidecar{}, err
+	}
+	return migrateLegacySidecar(legacy)
+}
+
+type legacySidecar struct {
+	SchemaVersion int                `json:"schemaVersion"`
+	Document      string             `json:"document"`
+	Annotations   []legacyAnnotation `json:"annotations"`
+}
+
+type legacyAnnotation struct {
+	ID        string              `json:"id"`
+	Intent    annotation.Intent   `json:"intent"`
+	Status    annotation.Status   `json:"status"`
+	Comment   string              `json:"comment"`
+	Author    string              `json:"author"`
+	CreatedAt time.Time           `json:"createdAt"`
+	UpdatedAt time.Time           `json:"updatedAt"`
+	Source    *annotation.Source  `json:"source,omitempty"`
+	Thread    []legacyThreadEntry `json:"thread"`
+}
+
+type legacyThreadEntry struct {
+	ID         string                `json:"id"`
+	Kind       annotation.ThreadKind `json:"kind"`
+	Message    string                `json:"message,omitempty"`
+	Summary    string                `json:"summary,omitempty"`
+	Commit     string                `json:"commit,omitempty"`
+	Author     string                `json:"author"`
+	ActorRole  annotation.Role       `json:"actorRole,omitempty"`
+	FromStatus annotation.Status     `json:"fromStatus,omitempty"`
+	ToStatus   annotation.Status     `json:"toStatus,omitempty"`
+	CreatedAt  time.Time             `json:"createdAt"`
+}
+
+func migrateLegacySidecar(legacy legacySidecar) (annotation.Sidecar, error) {
+	result := annotation.Sidecar{
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      legacy.Document,
+		Annotations:   make([]annotation.Annotation, 0, len(legacy.Annotations)),
+	}
+	for _, item := range legacy.Annotations {
+		role, err := legacyRole(item.Author, "")
+		if err != nil {
+			return annotation.Sidecar{}, fmt.Errorf("annotation %q: %w", item.ID, err)
+		}
+		migrated := annotation.Annotation{
+			ID: item.ID, Intent: item.Intent, Status: item.Status, Comment: item.Comment,
+			Role: role, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt, Source: item.Source,
+			Thread: make([]annotation.ThreadEntry, 0, len(item.Thread)),
+		}
+		for _, entry := range item.Thread {
+			entryRole, err := legacyRole(entry.Author, entry.ActorRole)
+			if err != nil {
+				return annotation.Sidecar{}, fmt.Errorf("annotation %q thread %q: %w", item.ID, entry.ID, err)
+			}
+			migrated.Thread = append(migrated.Thread, annotation.ThreadEntry{
+				ID: entry.ID, Kind: entry.Kind, Message: entry.Message, Summary: entry.Summary,
+				Commit: entry.Commit, Role: entryRole, FromStatus: entry.FromStatus,
+				ToStatus: entry.ToStatus, CreatedAt: entry.CreatedAt,
+			})
+		}
+		result.Annotations = append(result.Annotations, migrated)
+	}
+	return result, nil
+}
+
+func legacyRole(author string, structured annotation.Role) (annotation.Role, error) {
+	if structured.Valid() {
+		return structured, nil
+	}
+	normalized := strings.ToLower(strings.TrimSpace(author))
+	if normalized == "" {
+		return "", errors.New("legacy author is required")
+	}
+	if normalized == "agent" || normalized == "codex" || normalized == "claude" {
+		return annotation.RoleAgent, nil
+	}
+	return annotation.RoleReviewer, nil
 }
 
 // targetPath maps a canonical document path to its mirrored sidecar path. It
@@ -365,12 +472,12 @@ func mergeUnknownJSON(existing, updated []byte) ([]byte, error) {
 var (
 	knownRootFields       = fieldSet("schemaVersion", "document", "annotations")
 	knownAnnotationFields = fieldSet(
-		"id", "intent", "status", "comment", "author", "createdAt", "updatedAt", "source", "thread",
+		"id", "intent", "status", "comment", "role", "author", "createdAt", "updatedAt", "source", "thread",
 	)
 	knownSourceFields   = fieldSet("sha256", "selector")
 	knownSelectorFields = fieldSet("exact", "prefix", "suffix", "startByte", "endByte", "startLine", "endLine")
 	knownThreadFields   = fieldSet(
-		"id", "kind", "message", "summary", "commit", "author", "actorRole", "fromStatus", "toStatus", "createdAt",
+		"id", "kind", "message", "summary", "commit", "role", "author", "actorRole", "fromStatus", "toStatus", "createdAt",
 	)
 )
 

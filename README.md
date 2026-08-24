@@ -239,9 +239,9 @@ List annotations for agents or local tooling without starting the server:
 code-annotator annotations list --root ./docs --status open,needs_changes
 code-annotator annotations export --root ./docs --status open,needs_changes
 code-annotator annotations reply --root ./docs --id ann_... \
-  --author reviewer --message "Please retain the default."
+  --role reviewer --message "Please retain the default."
 code-annotator annotations resolve --root ./docs --id ann_... \
-  --status applied --role agent --author codex \
+  --status applied --role agent \
   --summary "Implemented request" --commit abc1234
 ```
 
@@ -255,7 +255,7 @@ file. Omitting `--status` includes every lifecycle state.
 `reply` appends an ordinary discussion entry directly to the matching sidecar
 and returns the updated annotation and revision as JSON. It does not change the
 annotation lifecycle state.
-`resolve` performs the same actor-validated lifecycle transitions as the HTTP
+`resolve` performs the same role-validated lifecycle transitions as the HTTP
 API and records both structured activity and status history atomically.
 
 When the review server is running, agents use the live HTTP client instead of
@@ -265,7 +265,7 @@ the offline commands so browser and agent writes share one revision authority:
 code-annotator agent queue --url http://127.0.0.1:54321
 code-annotator agent resolve --url http://127.0.0.1:54321 \
   --document README.md --revision <revision> --id ann_... \
-  --status applied --role agent --author codex --summary "Implemented request"
+  --status applied --role agent --summary "Implemented request"
 ```
 
 The client accepts only a loopback viewer URL, obtains the temporary review

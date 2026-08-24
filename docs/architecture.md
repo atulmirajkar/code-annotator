@@ -211,7 +211,7 @@ merged before markup is introduced. Stale and document-level records remain
 panel-only.
 
 Each annotation card derives its available lifecycle controls from the current
-status. The chosen transition supplies the required actor role and determines
+status. The chosen transition supplies the required role and determines
 whether the form must collect a resolution summary or review message. Mutations
 send the review token and the latest sidecar revision to the shared transition
 endpoint. On a revision conflict, the browser reloads the authoritative list
@@ -225,7 +225,7 @@ annotations, preserving access to audit history and reopen transitions.
 
 Annotation cards use native disclosure controls: the default summary contains
 status badges and a two-line comment preview, while source context, discussion,
-and author details appear after expansion. Mutation forms live under a second
+and role attribution appear after expansion. Mutation forms live under a second
 collapsed `Actions` disclosure so infrequent agent and lifecycle operations do
 not dominate routine document review.
 

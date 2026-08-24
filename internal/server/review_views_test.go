@@ -50,15 +50,15 @@ func TestAnnotationActionAvailabilityUsesLifecycleRules(t *testing.T) {
 	tests := []struct {
 		status         annotation.Status
 		wantStatuses   []annotation.Status
-		wantRoles      []annotation.ActorRole
+		wantRoles      []annotation.Role
 		wantQuickClose bool
 	}{
-		{status: annotation.StatusOpen, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected, annotation.StatusClosed}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent, annotation.RoleReviewer}},
-		{status: annotation.StatusAcknowledged, wantStatuses: []annotation.Status{annotation.StatusApplied, annotation.StatusRejected}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent}},
-		{status: annotation.StatusNeedsChanges, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent}},
-		{status: annotation.StatusApplied, wantStatuses: []annotation.Status{annotation.StatusNeedsChanges}, wantRoles: []annotation.ActorRole{annotation.RoleReviewer}, wantQuickClose: true},
-		{status: annotation.StatusClosed, wantStatuses: []annotation.Status{annotation.StatusOpen}, wantRoles: []annotation.ActorRole{annotation.RoleReviewer}},
-		{status: annotation.StatusRejected, wantStatuses: []annotation.Status{annotation.StatusOpen}, wantRoles: []annotation.ActorRole{annotation.RoleReviewer}},
+		{status: annotation.StatusOpen, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected, annotation.StatusClosed}, wantRoles: []annotation.Role{annotation.RoleAgent, annotation.RoleAgent, annotation.RoleReviewer}},
+		{status: annotation.StatusAcknowledged, wantStatuses: []annotation.Status{annotation.StatusApplied, annotation.StatusRejected}, wantRoles: []annotation.Role{annotation.RoleAgent, annotation.RoleAgent}},
+		{status: annotation.StatusNeedsChanges, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected}, wantRoles: []annotation.Role{annotation.RoleAgent, annotation.RoleAgent}},
+		{status: annotation.StatusApplied, wantStatuses: []annotation.Status{annotation.StatusNeedsChanges}, wantRoles: []annotation.Role{annotation.RoleReviewer}, wantQuickClose: true},
+		{status: annotation.StatusClosed, wantStatuses: []annotation.Status{annotation.StatusOpen}, wantRoles: []annotation.Role{annotation.RoleReviewer}},
+		{status: annotation.StatusRejected, wantStatuses: []annotation.Status{annotation.StatusOpen}, wantRoles: []annotation.Role{annotation.RoleReviewer}},
 	}
 
 	for _, test := range tests {
@@ -98,16 +98,16 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 			Intent:  annotation.IntentChangeRequest,
 			Status:  annotation.StatusOpen,
 			Comment: `<script>alert("comment")</script>`,
-			Author:  `<img src=x onerror="author()">`,
+			Role:    `<img src=x onerror="role()">`,
 			Source: &annotation.Source{Selector: annotation.Selector{
 				Exact:     `<svg onload="source()">`,
 				StartLine: 4,
 				EndLine:   6,
 			}},
 			Thread: []annotation.ThreadEntry{
-				{Kind: annotation.ThreadAcknowledgement, Author: "agent"},
-				{Kind: annotation.ThreadReply, Author: "reviewer", Message: `<b onclick="reply()">reply</b>`},
-				{Kind: annotation.ThreadStatusChange, Author: "agent", ActorRole: annotation.RoleAgent, FromStatus: annotation.StatusOpen, ToStatus: annotation.StatusAcknowledged},
+				{Kind: annotation.ThreadAcknowledgement, Role: "agent"},
+				{Kind: annotation.ThreadReply, Role: "reviewer", Message: `<b onclick="reply()">reply</b>`},
+				{Kind: annotation.ThreadStatusChange, Role: annotation.RoleAgent, FromStatus: annotation.StatusOpen, ToStatus: annotation.StatusAcknowledged},
 			},
 		},
 		Anchor: &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleNotFound},
@@ -125,7 +125,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 	}
 	for _, want := range []string{
 		`&lt;script&gt;alert(&#34;comment&#34;)&lt;/script&gt;`,
-		`&lt;img src=x onerror=&#34;author()&#34;&gt;`,
+		`&lt;img src=x onerror=&#34;role()&#34;&gt;`,
 		`&lt;svg onload=&#34;source()&#34;&gt;`,
 		`&lt;b onclick=&#34;reply()&#34;&gt;reply&lt;/b&gt;`,
 		`Lines 4–6`,
@@ -185,10 +185,10 @@ func transitionStatuses(transitions []annotationTransitionView) []annotation.Sta
 	return result
 }
 
-func transitionRoles(transitions []annotationTransitionView) []annotation.ActorRole {
-	result := make([]annotation.ActorRole, 0, len(transitions))
+func transitionRoles(transitions []annotationTransitionView) []annotation.Role {
+	result := make([]annotation.Role, 0, len(transitions))
 	for _, transition := range transitions {
-		result = append(result, transition.ActorRole)
+		result = append(result, transition.Role)
 	}
 	return result
 }

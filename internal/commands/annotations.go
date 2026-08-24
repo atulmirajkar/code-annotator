@@ -308,7 +308,7 @@ func runExport(configuration listConfig, output io.Writer) error {
 			fmt.Fprintf(&markdown, "### %s\n\n", item.ID)
 			fmt.Fprintf(&markdown, "- Intent: `%s`\n", item.Intent)
 			fmt.Fprintf(&markdown, "- Status: `%s`\n", item.Status)
-			fmt.Fprintf(&markdown, "- Author: %s\n", item.Author)
+			fmt.Fprintf(&markdown, "- Role: %s\n", item.Role)
 			fmt.Fprintf(&markdown, "- Created: %s\n", item.CreatedAt.Format("2006-01-02T15:04:05.999999999Z07:00"))
 			writeAnchorSummary(&markdown, item)
 			if item.Source != nil {
@@ -320,7 +320,7 @@ func runExport(configuration listConfig, output io.Writer) error {
 			if len(item.Thread) > 0 {
 				markdown.WriteString("\n#### Thread\n\n")
 				for _, entry := range item.Thread {
-					fmt.Fprintf(&markdown, "- `%s` by %s at %s", entry.Kind, entry.Author, entry.CreatedAt.Format("2006-01-02T15:04:05.999999999Z07:00"))
+					fmt.Fprintf(&markdown, "- `%s` by %s at %s", entry.Kind, entry.Role, entry.CreatedAt.Format("2006-01-02T15:04:05.999999999Z07:00"))
 					if entry.Message != "" {
 						fmt.Fprintf(&markdown, ": %s", singleLine(entry.Message))
 					} else if entry.Summary != "" {

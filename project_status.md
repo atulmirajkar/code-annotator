@@ -4,8 +4,9 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit gate 3 is implemented and awaiting
-maintainer review. Gate 4 must not begin without explicit approval.
+**Phase:** The role-only annotation migration following server-rendered review
+UI gate 3 is implemented and awaiting maintainer review. Gate 4 must not begin
+without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
@@ -21,6 +22,10 @@ the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
 Reviewer lifecycle permissions include dismissing an irrelevant or accidental
 open annotation directly to `closed`; agents cannot perform that transition.
+Annotations and thread entries now use one required `agent` or `reviewer` role
+for both attribution and lifecycle permissions. New writes use sidecar schema
+version 2. Schema version 1 remains readable and is migrated on the next
+successful optimistic save; free-text author controls and CLI flags are gone.
 
 The earlier TypeScript frontend migration is implemented and verified.
 The authored browser modules now compile under strict TypeScript into
@@ -295,10 +300,8 @@ Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling
 - [x] Add fake-CLI shell tests for discovery, retries, ETag carry-forward,
   unchanged polls, and `--once`.
 - [x] Document the helper in the skill and user-facing agent handoff docs.
-- [ ] Run the complete Go, vet, race, and browser checks and close the
-  milestone. `go test ./...` passed on 2026-08-24; browser verification is
-  currently environment-blocked because the configured Edge process aborts
-  before application startup and bundled Chromium is not installed.
+- [x] Run the complete Go, vet, race, and browser checks and close the
+  milestone. The full matrix passed on 2026-08-24.
 
 ### 17. Server-rendered review UI and testable TypeScript
 
@@ -317,6 +320,9 @@ for explicit approval before starting the next item.
   in the page.
 - [x] Commit 3: add inactive annotation fragment templates, presentation view
   models, and escaping/action-availability tests.
+- [x] Role-only compatibility commit: remove free-text authorship, use one role
+  across storage/API/CLI/browser contracts, and migrate schema v1 sidecars on
+  their next successful save. Awaiting maintainer review before commit 4.
 - [ ] Commit 4: share annotation read/create application operations and add
   compatible HTML handlers while preserving JSON behavior.
 - [ ] Commit 5: share reply/transition operations and add 422/409 HTML
@@ -358,6 +364,7 @@ for explicit approval before starting the next item.
 | HTMX 2.0.10 is pinned, vendored, licensed, embedded, and loaded only from the viewer origin | Approved |
 | Milestone 17 advances one reviewed commit at a time and stops after every commit | Approved |
 | Repository documentation is updated with each slice and is the cross-session handoff contract | Approved |
+| Annotation role is both attribution and permission; free-text authorship is not stored | Approved |
 
 ## Known risks
 
@@ -372,23 +379,20 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 3 adds the shared page/fragment template set and tested,
-presentation-only annotation view models without registering production UI
-routes. It is awaiting maintainer review. The next allowed implementation
-slice is commit 4, sharing annotation read/create operations and adding
-inactive HTML handlers; it must not begin until the maintainer explicitly
-approves proceeding.
+milestone. After commit 3, the approved role-only compatibility slice removes
+free-text authorship and introduces sidecar schema version 2 with schema-v1
+read/migrate support. It is awaiting maintainer review. The next allowed
+implementation slice is commit 4, sharing annotation read/create operations
+and adding inactive HTML handlers; it must not begin until the maintainer
+explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
-Milestone 16 (skill-managed agent queue polling) is implemented; final suite
-verification remains pending because browser startup is unavailable in this
-environment, as noted in milestone 16.
+Milestone 16 (skill-managed agent queue polling) is implemented and verified.
 Milestone 14
 (TypeScript frontend migration) is implemented and verified.
 Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
 previously available Playwright Edge tests passed when milestone 14 closed. The
-current suite discovers 39 browser cases, but this environment cannot launch
-Edge and does not have bundled Chromium installed. The only unchecked item in
-milestone 14 is a CI workflow check for generated-asset reproducibility; this
-repository has no existing CI workflow yet. Live reload and source syntax
+current suite's 39 browser cases passed on 2026-08-24. The only unchecked item
+in milestone 14 is a CI workflow check for generated-asset reproducibility;
+this repository has no existing CI workflow yet. Live reload and source syntax
 highlighting remain separately scoped milestones.

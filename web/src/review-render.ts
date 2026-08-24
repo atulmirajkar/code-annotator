@@ -27,8 +27,8 @@ export function createAnnotationRenderer({
 }: AnnotationRendererOptions) {
   let annotationPayload: AnnotationPayload | null = null;
 
-  // Render user-controlled content with textContent so comments and author
-  // names can never become executable markup.
+  // Render user-controlled content with textContent so comments can never
+  // become executable markup.
   function renderAnnotations(payload: AnnotationPayload): void {
     annotationPayload = payload;
     list.replaceChildren();
@@ -99,9 +99,9 @@ export function createAnnotationRenderer({
     comment.textContent = annotation.comment || "";
     body.append(comment);
 
-    const author = element("p", "annotation-author");
-    author.textContent = annotation.author ? `By ${annotation.author}` : "Unknown author";
-    body.append(author);
+    const role = element("p", "annotation-author");
+    role.textContent = `As ${annotation.role}`;
+    body.append(role);
 
     const visibleThread = Array.isArray(annotation.thread) ? annotation.thread.filter(showThreadEntry) : [];
     if (visibleThread.length > 0) {
@@ -111,14 +111,14 @@ export function createAnnotationRenderer({
         const kind = threadKind(entry);
         item.className = `annotation-thread-entry ${kind.className}`;
         item.dataset.kind = entry.kind || "";
-        if (entry.actorRole) item.dataset.role = entry.actorRole;
+        item.dataset.role = entry.role;
 
         const header = element("div", "annotation-thread-header");
         const kindBadge = element("span", "annotation-thread-kind");
         kindBadge.textContent = kind.label;
-        const author = element("span", "annotation-thread-author");
-        author.textContent = entry.author || "Unknown";
-        header.append(kindBadge, author);
+        const role = element("span", "annotation-thread-author");
+        role.textContent = entry.role;
+        header.append(kindBadge, role);
 
         const body = element("p", "annotation-thread-body");
         body.textContent = threadText(entry);

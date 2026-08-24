@@ -8,6 +8,9 @@ is authoritative for subsequent frontend work; it moved `web/page.html` to
 `web/templates/page.html` and added inactive fragment templates. See
 [`server-rendered-review-ui.md`](server-rendered-review-ui.md) and
 [`../architecture.md`](../architecture.md) for the current layout.
+The role-only schema migration also supersedes historical `author` fields in
+the examples below; current contracts use a required `role` of `agent` or
+`reviewer` as defined in [`annotations.md`](annotations.md).
 
 ## Goals
 

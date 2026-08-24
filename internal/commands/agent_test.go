@@ -79,33 +79,33 @@ func TestRunAgent(t *testing.T) {
 		{
 			name: "reply",
 			args: func(origin string) []string {
-				return []string{"reply", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--author", "codex", "--message", "More context"}
+				return []string{"reply", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--role", "agent", "--message", "More context"}
 			},
 			wantMethod:   http.MethodPost,
 			wantPath:     "/api/annotations/ann_test/replies",
-			wantBody:     map[string]string{"document": "README.md", "author": "codex", "message": "More context"},
+			wantBody:     map[string]string{"document": "README.md", "role": "agent", "message": "More context"},
 			wantRevision: "rev-1",
 			wantOutput:   `"revision":"rev-2"`,
 		},
 		{
 			name: "resolve",
 			args: func(origin string) []string {
-				return []string{"resolve", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--author", "codex", "--status", "applied", "--role", "agent", "--summary", "Done", "--commit", "abc1234"}
+				return []string{"resolve", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--status", "applied", "--role", "agent", "--summary", "Done", "--commit", "abc1234"}
 			},
 			wantMethod:   http.MethodPatch,
 			wantPath:     "/api/annotations/ann_test",
-			wantBody:     map[string]string{"document": "README.md", "author": "codex", "status": "applied", "actorRole": "agent", "summary": "Done", "commit": "abc1234"},
+			wantBody:     map[string]string{"document": "README.md", "role": "agent", "status": "applied", "summary": "Done", "commit": "abc1234"},
 			wantRevision: "rev-1",
 			wantOutput:   `"revision":"rev-2"`,
 		},
 		{
 			name: "conflict",
 			args: func(origin string) []string {
-				return []string{"resolve", "--url", origin, "--document", "README.md", "--revision", "stale", "--id", "ann_test", "--author", "codex", "--status", "acknowledged", "--role", "agent"}
+				return []string{"resolve", "--url", origin, "--document", "README.md", "--revision", "stale", "--id", "ann_test", "--status", "acknowledged", "--role", "agent"}
 			},
 			wantMethod:   http.MethodPatch,
 			wantPath:     "/api/annotations/ann_test",
-			wantBody:     map[string]string{"document": "README.md", "author": "codex", "status": "acknowledged", "actorRole": "agent"},
+			wantBody:     map[string]string{"document": "README.md", "role": "agent", "status": "acknowledged"},
 			wantRevision: "stale",
 			conflict:     true,
 			wantErr:      "reload the queue",
@@ -113,7 +113,7 @@ func TestRunAgent(t *testing.T) {
 		{
 			name: "not review mode",
 			args: func(origin string) []string {
-				return []string{"reply", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--author", "codex", "--message", "Question"}
+				return []string{"reply", "--url", origin, "--document", "README.md", "--revision", "rev-1", "--id", "ann_test", "--role", "agent", "--message", "Question"}
 			},
 			nonReview: true,
 			wantErr:   "not running in review mode",
@@ -258,8 +258,8 @@ func TestParseAgentConfig(t *testing.T) {
 		{name: "missing command", wantErr: "subcommand"},
 		{name: "unknown command", args: []string{"delete"}, wantErr: "unknown"},
 		{name: "missing URL", args: []string{"queue"}, wantErr: "--url"},
-		{name: "reply missing message", args: []string{"reply", "--url", "http://127.0.0.1:8080", "--document", "README.md", "--revision", "rev", "--id", "ann_test", "--author", "codex"}, wantErr: "--message"},
-		{name: "resolve missing role", args: []string{"resolve", "--url", "http://127.0.0.1:8080", "--document", "README.md", "--revision", "rev", "--id", "ann_test", "--author", "codex", "--status", "applied"}, wantErr: "--role"},
+		{name: "reply missing message", args: []string{"reply", "--url", "http://127.0.0.1:8080", "--document", "README.md", "--revision", "rev", "--id", "ann_test", "--role", "agent"}, wantErr: "--message"},
+		{name: "resolve missing role", args: []string{"resolve", "--url", "http://127.0.0.1:8080", "--document", "README.md", "--revision", "rev", "--id", "ann_test", "--status", "applied"}, wantErr: "--role"},
 	}
 
 	for _, test := range tests {

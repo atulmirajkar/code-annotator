@@ -3,7 +3,6 @@ package annotation
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -11,27 +10,23 @@ import (
 // transition event identifier.
 var ErrTransitionIdentifier = errors.New("generate transition identifier")
 
-// TransitionInput contains actor identity and target-specific lifecycle data.
+// TransitionInput contains the participant role and target-specific lifecycle data.
 type TransitionInput struct {
-	Status    Status
-	ActorRole ActorRole
-	Author    string
-	Message   string
-	Summary   string
-	Commit    string
+	Status  Status
+	Role    Role
+	Message string
+	Summary string
+	Commit  string
 }
 
 // TransitionEntries validates one lifecycle change and creates its immutable
 // activity followed by a status-change event.
 func TransitionEntries(current Annotation, input TransitionInput, now time.Time) ([]ThreadEntry, error) {
-	if err := ValidateTransition(current.Status, input.Status, input.ActorRole); err != nil {
+	if err := ValidateTransition(current.Status, input.Status, input.Role); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(input.Author) == "" {
-		return nil, errors.New("author is required")
-	}
 	entries := make([]ThreadEntry, 0, 2)
-	activity := ThreadEntry{Author: input.Author, CreatedAt: now}
+	activity := ThreadEntry{Role: input.Role, CreatedAt: now}
 	switch input.Status {
 	case StatusAcknowledged:
 		if input.Message != "" || input.Summary != "" || input.Commit != "" {
@@ -80,7 +75,7 @@ func TransitionEntries(current Annotation, input TransitionInput, now time.Time)
 	if err != nil {
 		return nil, fmt.Errorf("%w: status change: %v", ErrTransitionIdentifier, err)
 	}
-	statusChange := ThreadEntry{ID: statusIdentifier, Kind: ThreadStatusChange, Author: input.Author, ActorRole: input.ActorRole, FromStatus: current.Status, ToStatus: input.Status, CreatedAt: now}
+	statusChange := ThreadEntry{ID: statusIdentifier, Kind: ThreadStatusChange, Role: input.Role, FromStatus: current.Status, ToStatus: input.Status, CreatedAt: now}
 	if err := statusChange.Validate(); err != nil {
 		return nil, err
 	}

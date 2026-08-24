@@ -20,7 +20,7 @@ func TestSidecarValidate(t *testing.T) {
 		mutate  func(*Sidecar)
 		wantErr string
 	}{
-		{name: "schema", mutate: func(sidecar *Sidecar) { sidecar.SchemaVersion = 2 }, wantErr: "unsupported"},
+		{name: "schema", mutate: func(sidecar *Sidecar) { sidecar.SchemaVersion = 3 }, wantErr: "unsupported"},
 		{name: "document traversal", mutate: func(sidecar *Sidecar) { sidecar.Document = "../secret.md" }, wantErr: "escapes"},
 		{name: "duplicate annotation", mutate: func(sidecar *Sidecar) { sidecar.Annotations = append(sidecar.Annotations, sidecar.Annotations[0]) }, wantErr: "duplicate id"},
 		{name: "duplicate thread id", mutate: func(sidecar *Sidecar) {
@@ -79,7 +79,7 @@ func TestAnnotationValidate(t *testing.T) {
 		{name: "intent", mutate: func(item *Annotation) { item.Intent = "todo" }, wantErr: "intent"},
 		{name: "status", mutate: func(item *Annotation) { item.Status = "done" }, wantErr: "status"},
 		{name: "comment", mutate: func(item *Annotation) { item.Comment = " " }, wantErr: "comment"},
-		{name: "author", mutate: func(item *Annotation) { item.Author = "" }, wantErr: "author"},
+		{name: "role", mutate: func(item *Annotation) { item.Role = "" }, wantErr: "role"},
 		{name: "timestamps", mutate: func(item *Annotation) { item.UpdatedAt = item.CreatedAt.Add(-time.Second) }, wantErr: "precede"},
 		{name: "digest", mutate: func(item *Annotation) { item.Source.SHA256 = "short" }, wantErr: "sha256"},
 		{name: "byte range", mutate: func(item *Annotation) { item.Source.Selector.EndByte = item.Source.Selector.StartByte }, wantErr: "byte range"},
@@ -119,15 +119,15 @@ func TestThreadEntryValidate(t *testing.T) {
 		entry   ThreadEntry
 		wantErr string
 	}{
-		{name: "reply", entry: ThreadEntry{ID: "msg_reply", Kind: ThreadReply, Message: "More context", Author: "atul", CreatedAt: now}},
-		{name: "review", entry: ThreadEntry{ID: "msg_review", Kind: ThreadReview, Message: "Needs changes", Author: "atul", CreatedAt: now}},
-		{name: "resolution", entry: ThreadEntry{ID: "msg_resolution", Kind: ThreadResolution, Summary: "Implemented", Commit: "abc1234", Author: "codex", CreatedAt: now}},
-		{name: "acknowledgement", entry: ThreadEntry{ID: "msg_ack", Kind: ThreadAcknowledgement, Author: "codex", CreatedAt: now}},
-		{name: "status change", entry: ThreadEntry{ID: "msg_status", Kind: ThreadStatusChange, Author: "atul", ActorRole: RoleReviewer, FromStatus: StatusApplied, ToStatus: StatusNeedsChanges, CreatedAt: now}},
-		{name: "missing reply", entry: ThreadEntry{ID: "msg_reply", Kind: ThreadReply, Author: "atul", CreatedAt: now}, wantErr: "message"},
-		{name: "missing resolution", entry: ThreadEntry{ID: "msg_resolution", Kind: ThreadResolution, Author: "codex", CreatedAt: now}, wantErr: "summary"},
-		{name: "invalid id", entry: ThreadEntry{ID: "message", Kind: ThreadReply, Message: "text", Author: "atul", CreatedAt: now}, wantErr: "must start"},
-		{name: "invalid status change", entry: ThreadEntry{ID: "msg_status", Kind: ThreadStatusChange, Author: "codex", ActorRole: RoleAgent, FromStatus: StatusApplied, ToStatus: StatusClosed, CreatedAt: now}, wantErr: "cannot transition"},
+		{name: "reply", entry: ThreadEntry{ID: "msg_reply", Kind: ThreadReply, Message: "More context", Role: "reviewer", CreatedAt: now}},
+		{name: "review", entry: ThreadEntry{ID: "msg_review", Kind: ThreadReview, Message: "Needs changes", Role: "reviewer", CreatedAt: now}},
+		{name: "resolution", entry: ThreadEntry{ID: "msg_resolution", Kind: ThreadResolution, Summary: "Implemented", Commit: "abc1234", Role: "agent", CreatedAt: now}},
+		{name: "acknowledgement", entry: ThreadEntry{ID: "msg_ack", Kind: ThreadAcknowledgement, Role: "agent", CreatedAt: now}},
+		{name: "status change", entry: ThreadEntry{ID: "msg_status", Kind: ThreadStatusChange, Role: RoleReviewer, FromStatus: StatusApplied, ToStatus: StatusNeedsChanges, CreatedAt: now}},
+		{name: "missing reply", entry: ThreadEntry{ID: "msg_reply", Kind: ThreadReply, Role: "reviewer", CreatedAt: now}, wantErr: "message"},
+		{name: "missing resolution", entry: ThreadEntry{ID: "msg_resolution", Kind: ThreadResolution, Role: "agent", CreatedAt: now}, wantErr: "summary"},
+		{name: "invalid id", entry: ThreadEntry{ID: "message", Kind: ThreadReply, Message: "text", Role: "reviewer", CreatedAt: now}, wantErr: "must start"},
+		{name: "invalid status change", entry: ThreadEntry{ID: "msg_status", Kind: ThreadStatusChange, Role: RoleAgent, FromStatus: StatusApplied, ToStatus: StatusClosed, CreatedAt: now}, wantErr: "cannot transition"},
 	}
 
 	for _, tt := range tests {
@@ -150,7 +150,7 @@ func TestValidateTransition(t *testing.T) {
 		name    string
 		from    Status
 		to      Status
-		actor   ActorRole
+		actor   Role
 		allowed bool
 	}{
 		{name: "agent acknowledges", from: StatusOpen, to: StatusAcknowledged, actor: RoleAgent, allowed: true},
@@ -212,7 +212,7 @@ func validSidecar() Sidecar {
 				Intent:    IntentChangeRequest,
 				Status:    StatusNeedsChanges,
 				Comment:   "Make the listen address configurable.",
-				Author:    "atul",
+				Role:      "reviewer",
 				CreatedAt: created,
 				UpdatedAt: created.Add(time.Hour),
 				Source: &Source{
@@ -232,7 +232,7 @@ func validSidecar() Sidecar {
 						ID:        "msg_01J7Z0N4S8B6H3Q2C9D5F7K1M0",
 						Kind:      ThreadReview,
 						Message:   "Keep the default",
-						Author:    "atul",
+						Role:      "reviewer",
 						CreatedAt: created.Add(time.Hour),
 					},
 				},

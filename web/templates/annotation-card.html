@@ -17,14 +17,14 @@
     <div class="annotation-source"><q>{{.SourceQuote}}</q><span class="annotation-source-lines">{{.SourceLines}}</span></div>
     {{end}}
     <p class="annotation-comment">{{.Comment}}</p>
-    <p class="annotation-author">By {{.Author}}</p>
+    <p class="annotation-author">As {{.Role}}</p>
     {{if .Thread}}
     <ol class="annotation-thread">
       {{range .Thread}}
-      <li class="annotation-thread-entry {{.Class}}" data-kind="{{.Kind}}"{{if .ActorRole}} data-role="{{.ActorRole}}"{{end}}>
+      <li class="annotation-thread-entry {{.Class}}" data-kind="{{.Kind}}" data-role="{{.Role}}">
         <div class="annotation-thread-header">
           <span class="annotation-thread-kind">{{.KindLabel}}</span>
-          <span class="annotation-thread-author">{{.Author}}</span>
+          <span class="annotation-thread-author">{{.Role}}</span>
         </div>
         <p class="annotation-thread-body">{{.Text}}</p>
       </li>

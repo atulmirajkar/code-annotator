@@ -131,7 +131,7 @@ test.describe("annotation review interactions", () => {
     await openAnnotations(page);
     await expect(page.locator(".annotation-form")).toBeHidden();
     await openNewAnnotationForm(page);
-    await expect(page.locator('.annotation-form select[name="author"] option')).toHaveText(["Reviewer", "Author", "Agent"]);
+    await expect(page.locator('.annotation-form select[name="role"] option')).toHaveText(["Reviewer", "Agent"]);
     await createSelectionAnnotation(page, "Clarify this wording.");
 
     const card = page.locator(".annotation-card");
@@ -142,7 +142,7 @@ test.describe("annotation review interactions", () => {
     await card.locator(".annotation-summary").click();
     await card.locator(".annotation-actions > summary").click();
 
-    await card.locator('.annotation-reply select[name="author"]').selectOption("agent");
+    await card.locator('.annotation-reply select[name="role"]').selectOption("agent");
     await card.locator('.annotation-reply textarea[name="message"]').fill("I will update it.");
     await card.locator('.annotation-reply button[type="submit"]').click();
     await expect(card.locator(".annotation-thread")).toContainText("I will update it.");
@@ -153,8 +153,8 @@ test.describe("annotation review interactions", () => {
 
     await card.locator(".annotation-summary").click();
     await card.locator(".annotation-actions > summary").click();
-    await expect(card.locator('.annotation-reply select[name="author"] option')).toHaveText(["Reviewer", "Author", "Agent"]);
-    await card.locator('.annotation-reply select[name="author"]').selectOption("author");
+    await expect(card.locator('.annotation-reply select[name="role"] option')).toHaveText(["Reviewer", "Agent"]);
+    await card.locator('.annotation-reply select[name="role"]').selectOption("reviewer");
     await card.locator('.annotation-reply textarea[name="message"]').fill("I have a follow-up question.");
     await card.locator('.annotation-reply button[type="submit"]').click();
     await expect(card.locator(".annotation-thread")).toContainText("I have a follow-up question.");
@@ -163,7 +163,7 @@ test.describe("annotation review interactions", () => {
     await card.locator(".annotation-summary").click();
     await card.locator('.annotation-actions > summary').click();
     await card.locator('.annotation-lifecycle select[name="status"]').selectOption("acknowledged");
-    await expect(card.locator('.annotation-lifecycle select[name="author"] option')).toHaveText(["Agent"]);
+    await expect(card.locator('.annotation-lifecycle select[name="role"] option')).toHaveText(["Agent"]);
     await card.locator('.annotation-lifecycle button[type="submit"]').click();
     await expect(card.locator(".annotation-badge")).toContainText(["change request", "acknowledged"]);
     await expect(card.locator('.annotation-thread-entry[data-kind="acknowledgement"]')).toHaveCount(0);
@@ -179,7 +179,7 @@ test.describe("annotation review interactions", () => {
     await card.locator(".annotation-actions > summary").click();
     await expect(card.locator('.annotation-lifecycle option[value="closed"]')).toHaveCount(0);
     await expect(card.locator('.annotation-lifecycle option[value="needs_changes"]')).toHaveCount(1);
-    await expect(card.locator('.annotation-lifecycle select[name="author"] option')).toHaveText(["Reviewer", "Author"]);
+    await expect(card.locator('.annotation-lifecycle select[name="role"] option')).toHaveText(["Reviewer"]);
     await expect(card.locator(".annotation-quick-close")).toBeVisible();
     await card.locator(".annotation-quick-close").click();
     await expect(page.locator(".annotation-card")).toHaveCount(0);
@@ -227,7 +227,7 @@ test.describe("annotation review interactions", () => {
         document: "conflict.md",
         intent: "question",
         comment: "Concurrent annotation",
-        author: "agent",
+        role: "agent",
       },
     });
     expect(external.ok()).toBeTruthy();
@@ -278,7 +278,7 @@ test.describe("annotation review interactions", () => {
         document: "quick-close.md",
         intent: "question",
         comment: "Concurrent quick-close annotation",
-        author: "agent",
+        role: "agent",
       },
     });
     expect(external.ok()).toBeTruthy();

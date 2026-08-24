@@ -201,10 +201,10 @@ List annotations without running the server:
   --status open,needs_changes --format markdown
 
 ./bin/code-annotator annotations reply --root ./docs --id ann_... \
-  --author reviewer --message "Please retain the default."
+  --role reviewer --message "Please retain the default."
 
 ./bin/code-annotator annotations resolve --root ./docs --id ann_... \
-  --status applied --role agent --author codex \
+  --status applied --role agent \
   --summary "Implemented request" --commit abc1234
 ```
 
@@ -216,7 +216,7 @@ source selections, current anchor state, reviewer comments, and thread history.
 The `reply` command is a mutation: it requires an existing annotation directory,
 appends one ordinary thread entry, and uses the loaded revision for optimistic
 concurrency. It never changes lifecycle status.
-The `resolve` command applies actor-controlled transitions and their required
+The `resolve` command applies role-controlled transitions and their required
 activity. For example, `applied` requires `--summary`, while `needs_changes` and
 `rejected` require `--message`.
 
@@ -228,7 +228,7 @@ coordinator:
 ./bin/code-annotator agent queue --url http://127.0.0.1:54321
 ./bin/code-annotator agent resolve --url http://127.0.0.1:54321 \
   --document README.md --revision <revision> --id ann_... \
-  --status acknowledged --role agent --author codex
+  --status acknowledged --role agent
 ```
 
 The agent client obtains the ephemeral review token from the supplied loopback

@@ -155,7 +155,7 @@ func TestOpenGitComparison(t *testing.T) {
 }
 
 // initializeAppTestRepository creates one local commit without reading global
-// author configuration, providing a deterministic startup-resolution fixture.
+// role configuration, providing a deterministic startup-resolution fixture.
 func initializeAppTestRepository(t *testing.T, repository string) {
 	t.Helper()
 	if _, err := exec.LookPath("git"); err != nil {
@@ -509,7 +509,7 @@ func TestLiveAgentClientAgainstReviewServer(t *testing.T) {
 		{
 			name: "acknowledge through authenticated API",
 			args: func() []string {
-				return []string{"resolve", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--status", "acknowledged", "--role", "agent", "--author", "codex"}
+				return []string{"resolve", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--status", "acknowledged", "--role", "agent"}
 			},
 			check: func(t *testing.T, output []byte) {
 				var mutation mutationResponse
@@ -524,7 +524,7 @@ func TestLiveAgentClientAgainstReviewServer(t *testing.T) {
 		{
 			name: "reject stale revision",
 			args: func() []string {
-				return []string{"reply", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--author", "codex", "--message", "Stale reply"}
+				return []string{"reply", "--url", viewerURL, "--document", "README.md", "--revision", initialRevision, "--id", "ann_live_agent", "--role", "agent", "--message", "Stale reply"}
 			},
 			wantErr: "reload the queue",
 		},
@@ -575,7 +575,7 @@ func seedLiveAgentAnnotation(t *testing.T, directory string) {
 			Intent:    annotation.IntentChangeRequest,
 			Status:    annotation.StatusOpen,
 			Comment:   "Update this document.",
-			Author:    "reviewer",
+			Role:      "reviewer",
 			CreatedAt: now,
 			UpdatedAt: now,
 			Thread:    []annotation.ThreadEntry{},

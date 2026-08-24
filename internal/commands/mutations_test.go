@@ -15,7 +15,7 @@ import (
 func TestParseReplyConfig(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"--root", "./docs", "--id", "ann_test", "--author", "reviewer", "--message", "More detail"}
+	valid := []string{"--root", "./docs", "--id", "ann_test", "--role", "reviewer", "--message", "More detail"}
 	tests := []struct {
 		name    string
 		args    []string
@@ -23,9 +23,9 @@ func TestParseReplyConfig(t *testing.T) {
 	}{
 		{name: "valid", args: valid},
 		{name: "missing root", args: valid[2:], wantErr: "--root is required"},
-		{name: "missing id", args: []string{"--root", "./docs", "--author", "reviewer", "--message", "More detail"}, wantErr: "--id is required"},
-		{name: "blank author", args: []string{"--root", "./docs", "--id", "ann_test", "--author", " ", "--message", "More detail"}, wantErr: "--author is required"},
-		{name: "missing message", args: []string{"--root", "./docs", "--id", "ann_test", "--author", "reviewer"}, wantErr: "--message is required"},
+		{name: "missing id", args: []string{"--root", "./docs", "--role", "reviewer", "--message", "More detail"}, wantErr: "--id is required"},
+		{name: "blank role", args: []string{"--root", "./docs", "--id", "ann_test", "--role", " ", "--message", "More detail"}, wantErr: "--role is required"},
+		{name: "missing message", args: []string{"--root", "./docs", "--id", "ann_test", "--role", "reviewer"}, wantErr: "--message is required"},
 		{name: "positional", args: append(append([]string{}, valid...), "extra"), wantErr: "does not accept positional"},
 	}
 
@@ -71,7 +71,7 @@ func TestRunAnnotationReply(t *testing.T) {
 				seedCommandAnnotations(t, annotationsDir)
 			}
 
-			args := []string{"reply", "--root", rootPath, "--annotations-dir", annotationsDir, "--id", test.identifier, "--author", "agent", "--message", "Additional context"}
+			args := []string{"reply", "--root", rootPath, "--annotations-dir", annotationsDir, "--id", test.identifier, "--role", "agent", "--message", "Additional context"}
 			var output bytes.Buffer
 			err := RunAnnotations(args, &output, io.Discard)
 			if test.wantErr != "" {
@@ -92,7 +92,7 @@ func TestRunAnnotationReply(t *testing.T) {
 				t.Fatalf("mutation output = %#v", result)
 			}
 			thread := result.Annotation.Thread
-			if len(thread) != 2 || thread[1].Message != "Additional context" || thread[1].Author != "agent" || !strings.HasPrefix(thread[1].ID, "msg_") {
+			if len(thread) != 2 || thread[1].Message != "Additional context" || thread[1].Role != "agent" || !strings.HasPrefix(thread[1].ID, "msg_") {
 				t.Fatalf("thread = %#v", thread)
 			}
 
@@ -114,16 +114,16 @@ func TestRunAnnotationReply(t *testing.T) {
 func TestParseResolveConfig(t *testing.T) {
 	t.Parallel()
 
-	valid := []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "agent", "--author", "codex"}
+	valid := []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "agent"}
 	tests := []struct {
 		name    string
 		args    []string
 		wantErr string
 	}{
 		{name: "valid", args: valid},
-		{name: "missing status", args: []string{"--root", "./docs", "--id", "ann_test", "--role", "agent", "--author", "codex"}, wantErr: "--status is required"},
-		{name: "invalid status", args: append(append([]string{}, valid[:4]...), "--status", "pending", "--role", "agent", "--author", "codex"), wantErr: "invalid annotation status"},
-		{name: "invalid role", args: []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "owner", "--author", "codex"}, wantErr: "invalid annotation actor role"},
+		{name: "missing status", args: []string{"--root", "./docs", "--id", "ann_test", "--role", "agent"}, wantErr: "--status is required"},
+		{name: "invalid status", args: append(append([]string{}, valid[:4]...), "--status", "pending", "--role", "agent"), wantErr: "invalid annotation status"},
+		{name: "invalid role", args: []string{"--root", "./docs", "--id", "ann_test", "--status", "acknowledged", "--role", "owner"}, wantErr: "invalid annotation role"},
 		{name: "positional", args: append(append([]string{}, valid...), "extra"), wantErr: "does not accept positional"},
 	}
 
@@ -168,7 +168,7 @@ func TestRunAnnotationResolve(t *testing.T) {
 			annotationsDir := filepath.Join(t.TempDir(), "annotations")
 			seedCommandAnnotations(t, annotationsDir)
 
-			args := []string{"resolve", "--root", rootPath, "--annotations-dir", annotationsDir, "--id", "ann_readme", "--status", test.status, "--role", test.role, "--author", "codex"}
+			args := []string{"resolve", "--root", rootPath, "--annotations-dir", annotationsDir, "--id", "ann_readme", "--status", test.status, "--role", test.role}
 			var output bytes.Buffer
 			err := RunAnnotations(args, &output, io.Discard)
 			if test.wantErr != "" {
@@ -199,8 +199,8 @@ func TestCodeAnnotationMutations(t *testing.T) {
 		name string
 		args []string
 	}{
-		{name: "reply", args: []string{"reply", "--id", "ann_code", "--author", "agent", "--message", "Checked the comparison."}},
-		{name: "resolve", args: []string{"resolve", "--id", "ann_code", "--status", "acknowledged", "--role", "agent", "--author", "codex"}},
+		{name: "reply", args: []string{"reply", "--id", "ann_code", "--role", "agent", "--message", "Checked the comparison."}},
+		{name: "resolve", args: []string{"resolve", "--id", "ann_code", "--status", "acknowledged", "--role", "agent"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

@@ -1,6 +1,6 @@
 import { reattachAnnotation, replyToAnnotation, updateAnnotation } from "./review-api.js";
 import { element } from "./review-dom.js";
-import { replyActors, replyActorValue, transitionOptions } from "./review-thread.js";
+import { replyRoles, transitionOptions } from "./review-thread.js";
 function errorMessage(error, fallback) {
     return error instanceof Error && error.message ? error.message : fallback;
 }
@@ -9,7 +9,7 @@ function requiredElement(value, label) {
         throw new Error(`Missing ${label} in review template`);
     return value;
 }
-export function createAnnotationActions({ documentPath, reviewToken, getCurrentRevision, currentSelection, forceClearSelectionPreview, loadAnnotations, setFormStatus, reviewerAuthor, list, }) {
+export function createAnnotationActions({ documentPath, reviewToken, getCurrentRevision, currentSelection, forceClearSelectionPreview, loadAnnotations, setFormStatus, list, }) {
     // Closing is the common reviewer response to an applied annotation, so keep
     // it available without requiring the less-frequent Actions panel to open.
     function createQuickClose(annotation) {
@@ -18,12 +18,10 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         button.textContent = "Close";
         button.setAttribute("aria-label", `Close annotation: ${annotation.comment || annotation.id}`);
         button.addEventListener("click", async () => {
-            const author = reviewerAuthor() || "reviewer";
             await updateLifecycle(annotation.id, {
                 document: documentPath,
                 status: "closed",
-                actorRole: "reviewer",
-                author,
+                role: "reviewer",
             }, button, null);
         });
         return button;
@@ -101,19 +99,18 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
     // annotation has advanced through its lifecycle.
     function createReplyForm(annotation) {
         const reply = element("form", "annotation-reply");
-        const authorLabel = document.createElement("label");
-        authorLabel.append(document.createTextNode("Reply as"));
-        const author = document.createElement("select");
-        author.name = "author";
-        author.required = true;
-        replyActors().forEach((actor) => {
+        const roleLabel = document.createElement("label");
+        roleLabel.append(document.createTextNode("Reply as"));
+        const role = document.createElement("select");
+        role.name = "role";
+        role.required = true;
+        replyRoles().forEach((replyRole) => {
             const option = document.createElement("option");
-            option.value = actor.value;
-            option.textContent = actor.label;
-            author.append(option);
+            option.value = replyRole.value;
+            option.textContent = replyRole.label;
+            role.append(option);
         });
-        author.value = replyActorValue(reviewerAuthor());
-        authorLabel.append(author);
+        roleLabel.append(role);
         const messageLabel = document.createElement("label");
         messageLabel.append(document.createTextNode("Reply"));
         const message = document.createElement("textarea");
@@ -126,7 +123,7 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         const button = document.createElement("button");
         button.type = "submit";
         button.textContent = "Add reply";
-        reply.append(authorLabel, messageLabel, status, button);
+        reply.append(roleLabel, messageLabel, status, button);
         reply.addEventListener("submit", (event) => submitReply(event, annotation.id));
         return reply;
     }
@@ -142,7 +139,7 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         try {
             const response = await replyToAnnotation(reviewToken, getCurrentRevision(), annotationID, {
                 document: documentPath,
-                author: String(fields.get("author") || ""),
+                role: String(fields.get("role") || ""),
                 message: String(fields.get("message") || ""),
             });
             if (!response.ok) {
@@ -162,7 +159,7 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         }
     }
     // Build only the lifecycle actions valid from the annotation's current
-    // state. Actor roles and required activity are derived from that action so
+    // state. Roles and required activity are derived from that action so
     // the browser cannot accidentally submit an invalid transition shape.
     function createLifecycleForm(annotation) {
         // Applied annotations expose Close as a quick action beside this panel.
@@ -185,12 +182,12 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
             action.append(item);
         });
         actionLabel.append(action);
-        const authorLabel = document.createElement("label");
-        authorLabel.append(document.createTextNode("Author"));
-        const author = document.createElement("select");
-        author.name = "author";
-        author.required = true;
-        authorLabel.append(author);
+        const roleLabel = document.createElement("label");
+        roleLabel.append(document.createTextNode("Role"));
+        const role = document.createElement("select");
+        role.name = "role";
+        role.required = true;
+        roleLabel.append(role);
         const activityLabel = document.createElement("label");
         activityLabel.className = "lifecycle-activity";
         const activityTitle = document.createElement("span");
@@ -209,11 +206,12 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         const button = document.createElement("button");
         button.type = "submit";
         button.textContent = "Update status";
-        lifecycle.append(actionLabel, authorLabel, activityLabel, commitLabel, status, button);
+        lifecycle.append(actionLabel, roleLabel, activityLabel, commitLabel, status, button);
         const updateFields = () => {
             const selected = requiredElement(action.selectedOptions[0] || null, "lifecycle action");
             const activityKind = selected.dataset.activity;
-            updateLifecycleAuthorOptions(author, selected.dataset.role || "reviewer");
+            const selectedRole = selected.dataset.role || "reviewer";
+            role.replaceChildren(new Option(selectedRole === "agent" ? "Agent" : "Reviewer", selectedRole));
             activityLabel.hidden = !activityKind;
             activity.required = Boolean(activityKind);
             activityTitle.textContent = activityKind === "summary" ? "Summary" : "Message";
@@ -228,20 +226,6 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         updateFields();
         return lifecycle;
     }
-    function updateLifecycleAuthorOptions(author, role) {
-        const preferred = replyActorValue(reviewerAuthor());
-        const actors = role === "agent"
-            ? replyActors().filter((actor) => actor.value === "agent")
-            : replyActors().filter((actor) => actor.value !== "agent");
-        author.replaceChildren();
-        actors.forEach((actor) => {
-            const option = document.createElement("option");
-            option.value = actor.value;
-            option.textContent = actor.label;
-            author.append(option);
-        });
-        author.value = actors.some((actor) => actor.value === preferred) ? preferred : actors[0]?.value || "reviewer";
-    }
     async function submitLifecycle(event, annotationID) {
         event.preventDefault();
         const lifecycle = requiredElement(event.currentTarget, "lifecycle form");
@@ -253,8 +237,7 @@ export function createAnnotationActions({ documentPath, reviewToken, getCurrentR
         const payload = {
             document: documentPath,
             status: selected.value,
-            actorRole: selected.dataset.role,
-            author: String(fields.get("author") || ""),
+            role: String(fields.get("role") || ""),
         };
         if (activityKind === "message")
             payload.message = String(fields.get("activity") || "");

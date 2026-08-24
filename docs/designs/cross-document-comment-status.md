@@ -129,7 +129,7 @@ terminal:
 | Status | Included | Reason |
 | --- | --- | --- |
 | `open` | Yes | New reviewer work has not been acknowledged. |
-| `acknowledged` | Yes | An agent or author has started work, but review is not complete. |
+| `acknowledged` | Yes | An agent has started work, but review is not complete. |
 | `needs_changes` | Yes | The reviewer has returned the request for another attempt. |
 | `applied` | Yes | A change was reported, but the reviewer has not closed it. |
 | `closed` | No | The review thread is complete. |
@@ -250,5 +250,5 @@ comparison base.
 - Multiple browser tabs may display different in-memory filters and counts;
   cross-tab synchronization is intentionally deferred.
 - A future review dashboard could reuse the aggregate summary for filters by
-  status, author, or stale-anchor state, but those controls are outside this
+  status, role, or stale-anchor state, but those controls are outside this
   milestone.

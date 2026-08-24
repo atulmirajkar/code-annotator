@@ -81,7 +81,6 @@ function errorMessage(error, fallback) {
         forceClearSelectionPreview,
         loadAnnotations,
         setFormStatus,
-        reviewerAuthor: () => String(form.elements.namedItem("author")?.value || ""),
         list,
     });
     const { createQuickClose, createReattachForm, createReplyForm, createLifecycleForm, } = actionController;
@@ -132,7 +131,7 @@ function errorMessage(error, fallback) {
             document: reviewDocumentPath,
             intent: String(fields.get("intent") || ""),
             comment: String(fields.get("comment") || ""),
-            author: String(fields.get("author") || ""),
+            role: String(fields.get("role") || ""),
         };
         const selectedRange = currentSelection();
         if (fields.get("scope") === "selection" && selectedRange) {

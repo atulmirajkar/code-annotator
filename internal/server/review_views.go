@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/url"
-	"strings"
 
 	"atulm/code-annotator/internal/annotation"
 )
@@ -32,9 +31,10 @@ type annotationCardView struct {
 	// Intent and Status are validated domain values rendered as badges.
 	Intent annotation.Intent
 	Status annotation.Status
-	// Comment and Author are untrusted text escaped by html/template.
+	// Comment is untrusted text escaped by html/template. Role is a validated
+	// domain value used for both attribution and permissions.
 	Comment string
-	Author  string
+	Role    annotation.Role
 	// Inactive marks closed and rejected annotations when they are visible.
 	Inactive bool
 	// SourceQuote and SourceLines describe a source-level annotation.
@@ -66,13 +66,10 @@ type annotationThreadView struct {
 	// KindLabel and Class are the readable label and CSS presentation hook.
 	KindLabel string
 	Class     string
-	// ActorRole is authorization identity (agent or reviewer), when recorded.
-	// It differs from Author, which is the human-facing name attached to the
-	// entry; for example, both "reviewer" and "author" use the reviewer role.
-	ActorRole annotation.ActorRole
-	// Author and Text are untrusted display strings escaped by html/template.
-	Author string
-	Text   string
+	// Role is the attribution and authorization identity (agent or reviewer).
+	Role annotation.Role
+	// Text is untrusted display content escaped by html/template.
+	Text string
 }
 
 // annotationActionsView supplies URLs and state for forms on one card.
@@ -94,15 +91,14 @@ type annotationActionsView struct {
 }
 
 // annotationTransitionView describes one option rendered in the lifecycle
-// form. ActorRole authorizes the state change; the separately submitted author
-// is the display identity recorded in the thread.
+// form. Role authorizes and attributes the state change.
 type annotationTransitionView struct {
 	// Status is the requested target lifecycle state.
 	Status annotation.Status
 	// Label is the option text shown to the reviewer or agent.
 	Label string
-	// ActorRole identifies which domain role may perform this transition.
-	ActorRole annotation.ActorRole
+	// Role identifies which domain role may perform this transition.
+	Role annotation.Role
 	// Activity and ActivityLabel describe optional message/summary input.
 	Activity      string
 	ActivityLabel string
@@ -114,18 +110,18 @@ type annotationTransitionView struct {
 type lifecycleActionDefinition struct {
 	status        annotation.Status
 	label         string
-	actorRole     annotation.ActorRole
+	role          annotation.Role
 	activity      string
 	activityLabel string
 }
 
 var lifecycleActionDefinitions = [...]lifecycleActionDefinition{
-	{status: annotation.StatusAcknowledged, label: "Acknowledge", actorRole: annotation.RoleAgent},
-	{status: annotation.StatusApplied, label: "Mark applied", actorRole: annotation.RoleAgent, activity: "summary", activityLabel: "Summary"},
-	{status: annotation.StatusRejected, label: "Reject", actorRole: annotation.RoleAgent, activity: "message", activityLabel: "Message"},
-	{status: annotation.StatusClosed, label: "Close", actorRole: annotation.RoleReviewer},
-	{status: annotation.StatusNeedsChanges, label: "Needs changes", actorRole: annotation.RoleReviewer, activity: "message", activityLabel: "Message"},
-	{status: annotation.StatusOpen, label: "Reopen", actorRole: annotation.RoleReviewer},
+	{status: annotation.StatusAcknowledged, label: "Acknowledge", role: annotation.RoleAgent},
+	{status: annotation.StatusApplied, label: "Mark applied", role: annotation.RoleAgent, activity: "summary", activityLabel: "Summary"},
+	{status: annotation.StatusRejected, label: "Reject", role: annotation.RoleAgent, activity: "message", activityLabel: "Message"},
+	{status: annotation.StatusClosed, label: "Close", role: annotation.RoleReviewer},
+	{status: annotation.StatusNeedsChanges, label: "Needs changes", role: annotation.RoleReviewer, activity: "message", activityLabel: "Message"},
+	{status: annotation.StatusOpen, label: "Reopen", role: annotation.RoleReviewer},
 }
 
 // newAnnotationPanelView applies active/inactive filtering once on the server
@@ -170,7 +166,7 @@ func newAnnotationCardView(document string, item resolvedAnnotation) annotationC
 		Intent:   item.Intent,
 		Status:   item.Status,
 		Comment:  item.Comment,
-		Author:   item.Author,
+		Role:     item.Role,
 		Inactive: inactive,
 		Turn:     pendingTurnBadge(item.Annotation),
 		Thread:   annotationThread(item.Thread),
@@ -202,7 +198,7 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 		CanQuickClose: item.Status == annotation.StatusApplied,
 	}
 	for _, definition := range lifecycleActionDefinitions {
-		if err := annotation.ValidateTransition(item.Status, definition.status, definition.actorRole); err != nil {
+		if err := annotation.ValidateTransition(item.Status, definition.status, definition.role); err != nil {
 			continue
 		}
 		if view.CanQuickClose && definition.status == annotation.StatusClosed {
@@ -215,7 +211,7 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 		view.Transitions = append(view.Transitions, annotationTransitionView{
 			Status:        definition.status,
 			Label:         label,
-			ActorRole:     definition.actorRole,
+			Role:          definition.role,
 			Activity:      definition.activity,
 			ActivityLabel: definition.activityLabel,
 		})
@@ -236,8 +232,7 @@ func annotationThread(entries []annotation.ThreadEntry) []annotationThreadView {
 			Kind:      entry.Kind,
 			KindLabel: kindLabel,
 			Class:     class,
-			ActorRole: entry.ActorRole,
-			Author:    entry.Author,
+			Role:      entry.Role,
 			Text:      threadEntryText(entry),
 		})
 	}
@@ -279,7 +274,7 @@ func pendingTurnBadge(item annotation.Annotation) *annotationTurnView {
 		return nil
 	}
 	for index := len(item.Thread) - 1; index >= 0; index-- {
-		role := inferThreadActorRole(item.Thread[index], item.Author)
+		role := item.Thread[index].Role
 		switch role {
 		case annotation.RoleAgent:
 			return &annotationTurnView{Label: "waiting for reviewer", Class: "pending-review"}
@@ -288,26 +283,6 @@ func pendingTurnBadge(item annotation.Annotation) *annotationTurnView {
 		}
 	}
 	return nil
-}
-
-// inferThreadActorRole prefers the structured role stored on lifecycle events.
-// Ordinary replies predate that field, so their conventional author names are
-// mapped as a display fallback. Unknown names intentionally produce no badge.
-func inferThreadActorRole(entry annotation.ThreadEntry, reviewer string) annotation.ActorRole {
-	if entry.ActorRole == annotation.RoleAgent || entry.ActorRole == annotation.RoleReviewer {
-		return entry.ActorRole
-	}
-	author := strings.ToLower(strings.TrimSpace(entry.Author))
-	switch {
-	case author == "":
-		return ""
-	case author == strings.ToLower(strings.TrimSpace(reviewer)), author == "reviewer", author == "author":
-		return annotation.RoleReviewer
-	case author == "agent", author == "codex", author == "claude":
-		return annotation.RoleAgent
-	default:
-		return ""
-	}
 }
 
 func annotationCountLabel(active, total int) string {

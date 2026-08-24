@@ -1,15 +1,8 @@
-export function replyActors() {
+export function replyRoles() {
     return [
         { value: "reviewer", label: "Reviewer" },
-        { value: "author", label: "Author" },
         { value: "agent", label: "Agent" },
     ];
-}
-export function replyActorValue(author) {
-    const preferred = String(author || "").trim().toLowerCase();
-    return replyActors().some((actor) => actor.value === preferred)
-        ? preferred
-        : "reviewer";
 }
 export function transitionOptions(status) {
     const transitions = {
@@ -70,27 +63,8 @@ function latestThreadActorRole(annotation) {
         const entry = annotation.thread[index];
         if (!entry)
             continue;
-        const role = threadActorRole(entry, annotation);
-        if (role)
-            return role;
+        if (entry.role === "agent" || entry.role === "reviewer")
+            return entry.role;
     }
     return null;
-}
-function threadActorRole(entry, annotation) {
-    if (entry.actorRole === "agent" || entry.actorRole === "reviewer")
-        return entry.actorRole;
-    const author = normalizeThreadAuthor(entry.author);
-    if (!author)
-        return null;
-    const reviewerAuthor = normalizeThreadAuthor(annotation.author);
-    if (author === reviewerAuthor || author === "reviewer")
-        return "reviewer";
-    if (author === "author")
-        return "reviewer";
-    if (author === "agent" || author === "codex" || author === "claude")
-        return "agent";
-    return null;
-}
-function normalizeThreadAuthor(author) {
-    return String(author || "").trim().toLowerCase();
 }

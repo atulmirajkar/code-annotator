@@ -12,7 +12,7 @@ export type AnnotationStatus =
   | "closed"
   | "rejected";
 
-export type ActorRole = "agent" | "reviewer";
+export type Role = "agent" | "reviewer";
 
 export type ThreadKind =
   | "reply"
@@ -46,8 +46,7 @@ export interface ThreadEntry {
   message?: string;
   summary?: string;
   commit?: string;
-  author: string;
-  actorRole?: ActorRole;
+  role: Role;
   fromStatus?: AnnotationStatus;
   toStatus?: AnnotationStatus;
   createdAt: string;
@@ -58,7 +57,7 @@ export interface Annotation {
   intent: AnnotationIntent;
   status: AnnotationStatus;
   comment: string;
-  author: string;
+  role: Role;
   source?: Source;
   anchor?: AnchorResult;
   thread: ThreadEntry[];
@@ -80,21 +79,20 @@ export interface CreateAnnotationRequest {
   document: string;
   intent: AnnotationIntent;
   comment: string;
-  author: string;
+  role: Role;
   selection?: SelectionPayload;
 }
 
 export interface ReplyRequest {
   document: string;
-  author: string;
+  role: Role;
   message: string;
 }
 
 export interface TransitionRequest {
   document: string;
   status: AnnotationStatus;
-  actorRole: ActorRole;
-  author: string;
+  role: Role;
   activity?: string;
   commit?: string;
   message?: string;
@@ -106,15 +104,15 @@ export interface ReattachRequest {
   selection: SelectionPayload;
 }
 
-export interface ReplyActor {
-  value: "reviewer" | "author" | "agent";
+export interface ReplyRole {
+  value: Role;
   label: string;
 }
 
 export interface TransitionOption {
   status: AnnotationStatus;
   label: string;
-  role: ActorRole;
+  role: Role;
   activity?: "message" | "summary";
 }
 

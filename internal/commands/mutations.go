@@ -20,7 +20,7 @@ type replyConfig struct {
 	rootPath       string
 	annotationsDir string
 	annotationID   string
-	author         string
+	role           annotation.Role
 	message        string
 	indexOptions   content.IndexOptions
 }
@@ -52,13 +52,13 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 	root := flags.String("root", "", "reviewable content root")
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	identifier := flags.String("id", "", "annotation identifier")
-	author := flags.String("author", "", "reply author")
+	role := flags.String("role", "", "reply role (agent or reviewer)")
 	message := flags.String("message", "", "reply message")
 	includeCode := flags.Bool("include-code", false, "include supported source files")
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: code-annotator annotations reply --root <directory> --id <annotation> --author <name> --message <text>")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations reply --root <directory> --id <annotation> --role <role> --message <text>")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -72,7 +72,7 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 	required := []struct{ name, value string }{
 		{name: "--root", value: *root},
 		{name: "--id", value: *identifier},
-		{name: "--author", value: *author},
+		{name: "--role", value: *role},
 		{name: "--message", value: *message},
 	}
 	for _, field := range required {
@@ -89,7 +89,11 @@ func parseReplyConfig(args []string, stderr io.Writer) (replyConfig, error) {
 	if err != nil {
 		return replyConfig{}, err
 	}
-	return replyConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, author: *author, message: *message, indexOptions: indexOptions}, nil
+	replyRole := annotation.Role(*role)
+	if !replyRole.Valid() {
+		return replyConfig{}, fmt.Errorf("invalid annotation role %q", replyRole)
+	}
+	return replyConfig{rootPath: *root, annotationsDir: *annotationsDir, annotationID: *identifier, role: replyRole, message: *message, indexOptions: indexOptions}, nil
 }
 
 func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) {
@@ -99,8 +103,7 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 	annotationsDir := flags.String("annotations-dir", "", "annotation storage directory")
 	identifier := flags.String("id", "", "annotation identifier")
 	status := flags.String("status", "", "target lifecycle status")
-	role := flags.String("role", "", "actor role (agent or reviewer)")
-	author := flags.String("author", "", "actor name")
+	role := flags.String("role", "", "role (agent or reviewer)")
 	message := flags.String("message", "", "review or rejection message")
 	summary := flags.String("summary", "", "applied-work summary")
 	commit := flags.String("commit", "", "optional applied-work commit")
@@ -108,7 +111,7 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 	codeExtensions := flags.String("code-extensions", "", "comma-separated source extensions (implies --include-code)")
 	excludeDirs := flags.String("exclude-dirs", "", "comma-separated directory base names to exclude")
 	flags.Usage = func() {
-		fmt.Fprintln(stderr, "Usage: code-annotator annotations resolve --root <directory> --id <annotation> --status <status> --role <role> --author <name> [options]")
+		fmt.Fprintln(stderr, "Usage: code-annotator annotations resolve --root <directory> --id <annotation> --status <status> --role <role> [options]")
 		flags.PrintDefaults()
 	}
 	if err := flags.Parse(args); err != nil {
@@ -123,7 +126,6 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 		{name: "--id", value: *identifier},
 		{name: "--status", value: *status},
 		{name: "--role", value: *role},
-		{name: "--author", value: *author},
 	}
 	for _, field := range required {
 		if strings.TrimSpace(field.value) == "" {
@@ -131,12 +133,12 @@ func parseResolveConfig(args []string, stderr io.Writer) (resolveConfig, error) 
 			return resolveConfig{}, fmt.Errorf("%s is required", field.name)
 		}
 	}
-	input := annotation.TransitionInput{Status: annotation.Status(*status), ActorRole: annotation.ActorRole(*role), Author: *author, Message: *message, Summary: *summary, Commit: *commit}
+	input := annotation.TransitionInput{Status: annotation.Status(*status), Role: annotation.Role(*role), Message: *message, Summary: *summary, Commit: *commit}
 	if !input.Status.Valid() {
 		return resolveConfig{}, fmt.Errorf("invalid annotation status %q", input.Status)
 	}
-	if input.ActorRole != annotation.RoleAgent && input.ActorRole != annotation.RoleReviewer {
-		return resolveConfig{}, fmt.Errorf("invalid annotation actor role %q", input.ActorRole)
+	if !input.Role.Valid() {
+		return resolveConfig{}, fmt.Errorf("invalid annotation role %q", input.Role)
 	}
 	indexOptions, err := annotationCatalogOptions(*includeCode, *codeExtensions, *excludeDirs)
 	if err != nil {
@@ -166,7 +168,7 @@ func runReply(configuration replyConfig, output io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("generate reply identifier: %w", err)
 	}
-	reply := annotation.ThreadEntry{ID: identifier, Kind: annotation.ThreadReply, Message: configuration.message, Author: configuration.author, CreatedAt: now}
+	reply := annotation.ThreadEntry{ID: identifier, Kind: annotation.ThreadReply, Message: configuration.message, Role: configuration.role, CreatedAt: now}
 	if err := reply.Validate(); err != nil {
 		return fmt.Errorf("validate reply: %w", err)
 	}

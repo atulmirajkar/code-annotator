@@ -64,7 +64,7 @@ Use an installed `code-annotator agent` command.
    go run ./cmd/code-annotator agent resolve \
      --url <viewer-url> --document <document> \
      --revision <revision> --id <annotation-id> --status acknowledged \
-     --role agent --author <agent-name>
+     --role agent
    ```
 
    The mutation response contains the new `revision`. Use it for the next
@@ -77,11 +77,11 @@ Use an installed `code-annotator agent` command.
    go run ./cmd/code-annotator agent resolve \
      --url <viewer-url> --document <document> \
      --revision <revision> --id <annotation-id> --status applied \
-     --role agent --author <agent-name> --summary <completed-work> \
+     --role agent --summary <completed-work> \
      [--commit <commit>]
    ```
 
-Use `reply` with the same document, revision, ID, and author arguments plus
+Use `reply` with the same document, revision, ID, and role arguments plus
 `--message` for clarification or discussion that must not change lifecycle
 state. Use `resolve --status rejected --message <reason>` when an agent rejects
 an `open` or `needs_changes` request because it cannot or should not be
@@ -90,7 +90,7 @@ performed, not merely because clarification is needed.
 ```sh
 go run ./cmd/code-annotator agent reply \
   --url <viewer-url> --document <document> --revision <revision> \
-  --id <annotation-id> --author <agent-name> --message <question-or-context>
+  --id <annotation-id> --role agent --message <question-or-context>
 ```
 
 ## Watching for new work
@@ -182,11 +182,11 @@ For example, acknowledge before editing and then report completed work:
 ```sh
 go run ./cmd/code-annotator annotations resolve \
   --root <content-root> --id <annotation-id> \
-  --status acknowledged --role agent --author <agent-name>
+  --status acknowledged --role agent
 
 go run ./cmd/code-annotator annotations resolve \
   --root <content-root> --id <annotation-id> \
-  --status applied --role agent --author <agent-name> \
+  --status applied --role agent \
   --summary <completed-work> [--commit <commit>]
 ```
 

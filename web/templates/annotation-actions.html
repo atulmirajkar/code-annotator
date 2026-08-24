@@ -16,9 +16,8 @@
     <form class="annotation-reply" method="post" action="{{.ReplyURL}}" hx-post="{{.ReplyURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Reply as
-        <select name="author" required>
+        <select name="role" required>
           <option value="reviewer">Reviewer</option>
-          <option value="author">Author</option>
           <option value="agent">Agent</option>
         </select>
       </label>
@@ -31,13 +30,12 @@
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Action
         <select name="status" required>
-          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.ActorRole}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}>{{.Label}}</option>{{end}}
+          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.Role}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}>{{.Label}}</option>{{end}}
         </select>
       </label>
-      <label>Author
-        <select name="author" required>
+      <label>Role
+        <select name="role" required>
           <option value="reviewer">Reviewer</option>
-          <option value="author">Author</option>
           <option value="agent">Agent</option>
         </select>
       </label>
@@ -52,8 +50,7 @@
   <form class="annotation-quick-close-form" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
     <input type="hidden" name="document" value="{{.Document}}">
     <input type="hidden" name="status" value="closed">
-    <input type="hidden" name="actor_role" value="reviewer">
-    <input type="hidden" name="author" value="reviewer">
+    <input type="hidden" name="role" value="reviewer">
     <button type="submit" class="annotation-quick-close" aria-label="Close annotation {{.AnnotationID}}">Close</button>
   </form>
   {{end}}

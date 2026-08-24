@@ -54,7 +54,7 @@ type createAnnotationRequest struct {
 	Document  string               `json:"document"`
 	Intent    annotation.Intent    `json:"intent"`
 	Comment   string               `json:"comment"`
-	Author    string               `json:"author"`
+	Role      annotation.Role      `json:"role"`
 	Selection *annotationSelection `json:"selection,omitempty"`
 }
 
@@ -73,12 +73,12 @@ type createAnnotationResponse struct {
 	Revision   string             `json:"revision"`
 }
 
-// replyAnnotationRequest contains the reviewer or agent-authored content for an
+// replyAnnotationRequest contains reviewer- or agent-attributed content for an
 // ordinary discussion reply. Structured lifecycle events use transition APIs.
 type replyAnnotationRequest struct {
-	Document string `json:"document"`
-	Message  string `json:"message"`
-	Author   string `json:"author"`
+	Document string          `json:"document"`
+	Message  string          `json:"message"`
+	Role     annotation.Role `json:"role"`
 }
 
 // replyAnnotationResponse returns the updated annotation and sidecar revision.
@@ -90,13 +90,12 @@ type replyAnnotationResponse struct {
 // transitionAnnotationRequest describes one lifecycle transition and any
 // activity content required for that transition.
 type transitionAnnotationRequest struct {
-	Document  string               `json:"document"`
-	Status    annotation.Status    `json:"status"`
-	ActorRole annotation.ActorRole `json:"actorRole"`
-	Author    string               `json:"author"`
-	Message   string               `json:"message,omitempty"`
-	Summary   string               `json:"summary,omitempty"`
-	Commit    string               `json:"commit,omitempty"`
+	Document string            `json:"document"`
+	Status   annotation.Status `json:"status"`
+	Role     annotation.Role   `json:"role"`
+	Message  string            `json:"message,omitempty"`
+	Summary  string            `json:"summary,omitempty"`
+	Commit   string            `json:"commit,omitempty"`
 }
 
 // transitionAnnotationResponse returns the transitioned annotation and the new
@@ -368,7 +367,7 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		Intent:    input.Intent,
 		Status:    annotation.StatusOpen,
 		Comment:   input.Comment,
-		Author:    input.Author,
+		Role:      input.Role,
 		CreatedAt: now,
 		UpdatedAt: now,
 		Source:    source,
@@ -446,7 +445,7 @@ func (s *Server) handleReplyAnnotation(response http.ResponseWriter, request *ht
 		ID:        identifier,
 		Kind:      annotation.ThreadReply,
 		Message:   input.Message,
-		Author:    input.Author,
+		Role:      input.Role,
 		CreatedAt: now,
 	}
 	if err := reply.Validate(); err != nil {
@@ -517,7 +516,7 @@ func (s *Server) handleTransitionAnnotation(response http.ResponseWriter, reques
 		return
 	}
 	updated := &sidecar.Annotations[annotationIndex]
-	if err := annotation.ValidateTransition(updated.Status, input.Status, input.ActorRole); err != nil {
+	if err := annotation.ValidateTransition(updated.Status, input.Status, input.Role); err != nil {
 		http.Error(response, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -659,7 +658,7 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 // transitionEntries builds the immutable activity history required by one
 // already-validated status transition, followed by its status-change event.
 func transitionEntries(current annotation.Annotation, input transitionAnnotationRequest, now time.Time) ([]annotation.ThreadEntry, error) {
-	return annotation.TransitionEntries(current, annotation.TransitionInput{Status: input.Status, ActorRole: input.ActorRole, Author: input.Author, Message: input.Message, Summary: input.Summary, Commit: input.Commit}, now)
+	return annotation.TransitionEntries(current, annotation.TransitionInput{Status: input.Status, Role: input.Role, Message: input.Message, Summary: input.Summary, Commit: input.Commit}, now)
 }
 
 // findAnnotation returns the index of identifier or -1 when the sidecar does

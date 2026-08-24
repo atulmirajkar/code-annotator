@@ -17,13 +17,13 @@ func TestTransitionEntries(t *testing.T) {
 		wantKinds []ThreadKind
 		wantErr   string
 	}{
-		{name: "acknowledge", from: StatusOpen, input: TransitionInput{Status: StatusAcknowledged, ActorRole: RoleAgent, Author: "codex"}, wantKinds: []ThreadKind{ThreadAcknowledgement, ThreadStatusChange}},
-		{name: "apply", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, ActorRole: RoleAgent, Author: "codex", Summary: "Implemented", Commit: "abc1234"}, wantKinds: []ThreadKind{ThreadResolution, ThreadStatusChange}},
-		{name: "review changes", from: StatusApplied, input: TransitionInput{Status: StatusNeedsChanges, ActorRole: RoleReviewer, Author: "reviewer", Message: "Keep the default"}, wantKinds: []ThreadKind{ThreadReview, ThreadStatusChange}},
-		{name: "reject changes", from: StatusNeedsChanges, input: TransitionInput{Status: StatusRejected, ActorRole: RoleAgent, Author: "codex", Message: "This change is not applicable"}, wantKinds: []ThreadKind{ThreadReply, ThreadStatusChange}},
-		{name: "reviewer dismisses open", from: StatusOpen, input: TransitionInput{Status: StatusClosed, ActorRole: RoleReviewer, Author: "reviewer"}, wantKinds: []ThreadKind{ThreadStatusChange}},
-		{name: "agent cannot close", from: StatusApplied, input: TransitionInput{Status: StatusClosed, ActorRole: RoleAgent, Author: "codex"}, wantErr: "cannot transition"},
-		{name: "summary required", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, ActorRole: RoleAgent, Author: "codex"}, wantErr: "summary"},
+		{name: "acknowledge", from: StatusOpen, input: TransitionInput{Status: StatusAcknowledged, Role: RoleAgent}, wantKinds: []ThreadKind{ThreadAcknowledgement, ThreadStatusChange}},
+		{name: "apply", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, Role: RoleAgent, Summary: "Implemented", Commit: "abc1234"}, wantKinds: []ThreadKind{ThreadResolution, ThreadStatusChange}},
+		{name: "review changes", from: StatusApplied, input: TransitionInput{Status: StatusNeedsChanges, Role: RoleReviewer, Message: "Keep the default"}, wantKinds: []ThreadKind{ThreadReview, ThreadStatusChange}},
+		{name: "reject changes", from: StatusNeedsChanges, input: TransitionInput{Status: StatusRejected, Role: RoleAgent, Message: "This change is not applicable"}, wantKinds: []ThreadKind{ThreadReply, ThreadStatusChange}},
+		{name: "reviewer dismisses open", from: StatusOpen, input: TransitionInput{Status: StatusClosed, Role: RoleReviewer}, wantKinds: []ThreadKind{ThreadStatusChange}},
+		{name: "agent cannot close", from: StatusApplied, input: TransitionInput{Status: StatusClosed, Role: RoleAgent}, wantErr: "cannot transition"},
+		{name: "summary required", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, Role: RoleAgent}, wantErr: "summary"},
 	}
 
 	for _, test := range tests {

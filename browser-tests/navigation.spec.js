@@ -109,7 +109,7 @@ test.describe("viewer navigation", () => {
         document: "nested/reviewed.md",
         intent: "question",
         comment: "Review this nested document.",
-        author: "reviewer",
+        role: "reviewer",
       },
     });
     expect(created.ok()).toBe(true);

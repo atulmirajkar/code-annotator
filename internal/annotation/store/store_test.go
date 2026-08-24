@@ -24,6 +24,7 @@ func TestStore(t *testing.T) {
 		{name: "support reviewable extensions", run: testReviewableExtensions},
 		{name: "reject stale revision", run: testSaveRejectsStaleRevision},
 		{name: "preserve unknown fields", run: testSavePreservesUnknownFields},
+		{name: "migrate schema v1 roles", run: testMigrateSchemaV1Roles},
 		{name: "reject unsafe paths", run: testStoreRejectsUnsafePaths},
 		{name: "reject escaping symlink", run: testStoreRejectsEscapingSymlink},
 		{name: "serialize concurrent saves", run: testConcurrentSaveAllowsOneRevisionWinner},
@@ -32,6 +33,66 @@ func TestStore(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, test.run)
+	}
+}
+
+func testMigrateSchemaV1Roles(t *testing.T) {
+	t.Parallel()
+
+	storage := openTestStore(t)
+	path := filepath.Join(storage.Root(), "README.md.json")
+	legacy := `{
+  "schemaVersion": 1,
+  "document": "README.md",
+  "futureRoot": "preserved",
+  "annotations": [{
+    "id": "ann_legacy",
+    "intent": "change_request",
+    "status": "applied",
+    "comment": "Keep compatibility.",
+    "author": "atul",
+    "createdAt": "2026-08-20T19:30:00Z",
+    "updatedAt": "2026-08-20T19:31:00Z",
+    "thread": [{
+      "id": "msg_legacy",
+      "kind": "resolution",
+      "summary": "Implemented",
+      "author": "codex",
+      "actorRole": "agent",
+      "createdAt": "2026-08-20T19:31:00Z"
+    }]
+  }]
+}
+`
+	if err := os.WriteFile(path, []byte(legacy), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	loaded, revision, err := storage.Load("README.md")
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if loaded.SchemaVersion != annotation.SchemaVersion || loaded.Annotations[0].Role != annotation.RoleReviewer || loaded.Annotations[0].Thread[0].Role != annotation.RoleAgent {
+		t.Fatalf("migrated sidecar = %#v", loaded)
+	}
+	if _, err := storage.Save(loaded, revision); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	updated, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	text := string(updated)
+	for _, removed := range []string{`"author"`, `"actorRole"`} {
+		if strings.Contains(text, removed) {
+			t.Errorf("migrated sidecar retains %s:\n%s", removed, text)
+		}
+	}
+	for _, want := range []string{`"schemaVersion": 2`, `"role": "reviewer"`, `"role": "agent"`, `"futureRoot": "preserved"`} {
+		if !strings.Contains(text, want) {
+			t.Errorf("migrated sidecar missing %s:\n%s", want, text)
+		}
 	}
 }
 
@@ -319,7 +380,7 @@ func testSidecar(document string) annotation.Sidecar {
 				Intent:    annotation.IntentChangeRequest,
 				Status:    annotation.StatusApplied,
 				Comment:   "Make the default explicit.",
-				Author:    "atul",
+				Role:      "reviewer",
 				CreatedAt: created,
 				UpdatedAt: created.Add(time.Minute),
 				Source: &annotation.Source{
@@ -337,7 +398,7 @@ func testSidecar(document string) annotation.Sidecar {
 						ID:        "msg_resolution",
 						Kind:      annotation.ThreadResolution,
 						Summary:   "Implemented",
-						Author:    "codex",
+						Role:      "agent",
 						CreatedAt: created.Add(time.Minute),
 					},
 				},

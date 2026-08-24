@@ -91,7 +91,6 @@ function errorMessage(error: unknown, fallback: string): string {
     forceClearSelectionPreview,
     loadAnnotations,
     setFormStatus,
-    reviewerAuthor: () => String((form.elements.namedItem("author") as HTMLSelectElement | null)?.value || ""),
     list,
   });
   const {
@@ -148,7 +147,7 @@ function errorMessage(error: unknown, fallback: string): string {
       document: reviewDocumentPath,
       intent: String(fields.get("intent") || "") as AnnotationIntent,
       comment: String(fields.get("comment") || ""),
-      author: String(fields.get("author") || ""),
+      role: String(fields.get("role") || "") as CreateAnnotationRequest["role"],
     };
     const selectedRange = currentSelection();
     if (fields.get("scope") === "selection" && selectedRange) {

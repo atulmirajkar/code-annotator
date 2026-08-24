@@ -1,27 +1,19 @@
 import type {
-  ActorRole,
   Annotation,
   AnnotationStatus,
   AnnotationTurnBadge,
-  ReplyActor,
+  ReplyRole,
+  Role,
   ThreadEntry,
   ThreadKindDisplay,
   TransitionOption,
 } from "./types.js";
 
-export function replyActors(): ReplyActor[] {
+export function replyRoles(): ReplyRole[] {
   return [
     { value: "reviewer", label: "Reviewer" },
-    { value: "author", label: "Author" },
     { value: "agent", label: "Agent" },
   ];
-}
-
-export function replyActorValue(author: string): ReplyActor["value"] {
-  const preferred = String(author || "").trim().toLowerCase();
-  return replyActors().some((actor) => actor.value === preferred)
-    ? preferred as ReplyActor["value"]
-    : "reviewer";
 }
 
 export function transitionOptions(status: AnnotationStatus): TransitionOption[] {
@@ -80,28 +72,12 @@ export function annotationTurnBadge(annotation: Annotation): AnnotationTurnBadge
   return null;
 }
 
-function latestThreadActorRole(annotation: Annotation): ActorRole | null {
+function latestThreadActorRole(annotation: Annotation): Role | null {
   if (!Array.isArray(annotation.thread)) return null;
   for (let index = annotation.thread.length - 1; index >= 0; index -= 1) {
     const entry = annotation.thread[index];
     if (!entry) continue;
-    const role = threadActorRole(entry, annotation);
-    if (role) return role;
+    if (entry.role === "agent" || entry.role === "reviewer") return entry.role;
   }
   return null;
-}
-
-function threadActorRole(entry: ThreadEntry, annotation: Annotation): ActorRole | null {
-  if (entry.actorRole === "agent" || entry.actorRole === "reviewer") return entry.actorRole;
-  const author = normalizeThreadAuthor(entry.author);
-  if (!author) return null;
-  const reviewerAuthor = normalizeThreadAuthor(annotation.author);
-  if (author === reviewerAuthor || author === "reviewer") return "reviewer";
-  if (author === "author") return "reviewer";
-  if (author === "agent" || author === "codex" || author === "claude") return "agent";
-  return null;
-}
-
-function normalizeThreadAuthor(author: string | undefined): string {
-  return String(author || "").trim().toLowerCase();
 }
