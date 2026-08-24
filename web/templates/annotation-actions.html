@@ -5,9 +5,9 @@
     {{if .CanReattach}}
     <form class="annotation-reattach" method="post" action="{{.ReattachURL}}" hx-post="{{.ReattachURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
-      <input type="hidden" name="selection_start_byte">
-      <input type="hidden" name="selection_end_byte">
-      <input type="hidden" name="document_sha256">
+      <input type="hidden" name="selection_start_byte" value="{{.ReattachStartByte}}">
+      <input type="hidden" name="selection_end_byte" value="{{.ReattachEndByte}}">
+      <input type="hidden" name="document_sha256" value="{{.ReattachDigest}}">
       <p class="reattach-help">Select replacement text in the document to enable reattachment.</p>
       <p class="reattach-status" role="status"></p>
       <button type="submit" disabled>Reattach selection</button>

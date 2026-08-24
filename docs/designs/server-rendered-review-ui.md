@@ -2,9 +2,9 @@
 
 ## Status
 
-Implementation in progress. Commit gates 0 through 5, the commit 4 review
+Implementation in progress. Commit gates 0 through 6, the commit 4 review
 follow-up, and the intervening role-only compatibility slice are implemented.
-Commit 5 is awaiting maintainer review before gate 6 may begin.
+Commit 6 is awaiting maintainer review before gate 7 may begin.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -320,6 +320,16 @@ escaped draft in the authoritative panel; optimistic conflicts return `409`,
 the latest ETag and panel state, and the escaped draft. JSON status codes,
 headers, and payloads remain unchanged.
 
+Commit 6 implements the reattachment form route and completes the inactive
+HTML mutation surface. Reattachment hidden fields are parsed into typed byte
+offsets before reaching the shared operation. Invalid ranges return `422` with
+escaped retained fields; document or anchor-state conflicts return an accurate
+`409` panel and discard an obsolete selection; sidecar revision conflicts
+return the latest ETag while retaining the still-verified selection for an
+explicit retry. Creation validation and revision conflicts now use the same
+authoritative fragment contract. The production browser remains on JSON until
+commit 7.
+
 ### Related updates
 
 Annotation mutations also change cross-document counts. Once the document
@@ -556,7 +566,7 @@ Checks: focused server/template tests, `go test ./...`.
 
 ### Commit 4: share annotation read/create operations and add UI handlers
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -570,6 +580,8 @@ test for the affected packages.
 
 ### Commit 5: share reply/transition operations and add UI handlers
 
+Status: implemented and approved.
+
 Scope:
 
 - extract typed reply and lifecycle application operations;
@@ -580,6 +592,8 @@ Scope:
 Checks: annotation domain, API, UI handler, full Go, and affected race tests.
 
 ### Commit 6: share reattach operations and complete UI mutation coverage
+
+Status: implemented in the current review commit; awaiting maintainer approval.
 
 Scope:
 

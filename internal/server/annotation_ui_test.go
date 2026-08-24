@@ -150,6 +150,9 @@ func TestCreateAnnotationUI(t *testing.T) {
 		if response.Code != http.StatusConflict || response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
 			t.Fatalf("status = %d, ETag = %q; want 409 and %q", response.Code, response.Header().Get("ETag"), strconv.Quote(string(currentRevision)))
 		}
+		if response.Header().Get("Content-Type") != "text/html; charset=utf-8" || !strings.Contains(response.Body.String(), "Annotations changed; review the latest state before retrying.") {
+			t.Fatalf("conflict did not return authoritative HTML panel: %s", response.Body.String())
+		}
 	})
 
 	t.Run("preserves comment when selection revision changed", func(t *testing.T) {
@@ -218,6 +221,9 @@ func TestCreateAnnotationUI(t *testing.T) {
 			viewer.Handler().ServeHTTP(response, request)
 			if response.Code != test.wantStatus {
 				t.Fatalf("status = %d, want %d; body: %s", response.Code, test.wantStatus, response.Body.String())
+			}
+			if test.wantStatus == http.StatusUnprocessableEntity && (response.Header().Get("Content-Type") != "text/html; charset=utf-8" || !strings.Contains(response.Body.String(), `id="annotation-panel-content"`)) {
+				t.Errorf("validation did not return authoritative HTML panel: %s", response.Body.String())
 			}
 		})
 	}
@@ -403,6 +409,107 @@ func TestTransitionAnnotationUI(t *testing.T) {
 	})
 }
 
+func TestReattachAnnotationUI(t *testing.T) {
+	t.Parallel()
+
+	const (
+		origin          = "http://127.0.0.1:8080"
+		token           = "0123456789abcdef0123456789abcdef"
+		currentDocument = "Before new selection after"
+	)
+	digest := annotation.DocumentSHA256([]byte(currentDocument))
+	tests := []struct {
+		name          string
+		sourceMode    string
+		endByte       string
+		digest        string
+		staleRevision bool
+		wantStatus    int
+		wantText      string
+		preserveDraft bool
+		wantSuccess   bool
+	}{
+		{name: "reattaches stale selection", sourceMode: "stale", endByte: "20", digest: digest, wantStatus: http.StatusOK, wantText: "new selection", wantSuccess: true},
+		{name: "reattaches selection lost during creation", sourceMode: "pending", endByte: "20", digest: digest, wantStatus: http.StatusOK, wantText: "new selection", wantSuccess: true},
+		{name: "invalid range returns draft", sourceMode: "stale", endByte: "200", digest: digest, wantStatus: http.StatusUnprocessableEntity, wantText: "annotation source byte range is invalid", preserveDraft: true},
+		{name: "invalid hidden integer is escaped", sourceMode: "stale", endByte: `<bad>`, digest: digest, wantStatus: http.StatusUnprocessableEntity, wantText: "selection end byte must be an integer", preserveDraft: true},
+		{name: "document change clears stale selection", sourceMode: "stale", endByte: "20", digest: strings.Repeat("0", 64), wantStatus: http.StatusConflict, wantText: "document changed; refresh and select again"},
+		{name: "resolved anchor reports semantic conflict", sourceMode: "exact", endByte: "20", digest: digest, wantStatus: http.StatusConflict, wantText: "annotation anchor is not stale"},
+		{name: "revision conflict retains verified selection", sourceMode: "stale", endByte: "20", digest: digest, staleRevision: true, wantStatus: http.StatusConflict, wantText: "Annotations changed; review the latest state before retrying.", preserveDraft: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			rootPath := t.TempDir()
+			writeTestFile(t, filepath.Join(rootPath, "README.md"), currentDocument)
+			root, err := content.Open(rootPath)
+			if err != nil {
+				t.Fatalf("content.Open() error = %v", err)
+			}
+			store, err := annotationstore.Open(filepath.Join(t.TempDir(), "annotations"))
+			if err != nil {
+				t.Fatalf("annotationstore.Open() error = %v", err)
+			}
+			currentRevision := saveReattachAnnotation(t, store, test.sourceMode)
+			viewer, err := New(root, mdrender.New(), WithReviewSession(store, origin, token))
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			form := url.Values{
+				"document": {"README.md"}, "selection_start_byte": {"7"},
+				"selection_end_byte": {test.endByte}, "document_sha256": {test.digest},
+			}
+			request := httptest.NewRequest(http.MethodPost, "/ui/review/annotations/ann_reattach_test/reattach", strings.NewReader(form.Encode()))
+			request.Header.Set("Origin", origin)
+			request.Header.Set(reviewTokenHeader, token)
+			request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			revision := currentRevision
+			if test.staleRevision {
+				revision = ""
+			}
+			request.Header.Set("If-Match", strconv.Quote(string(revision)))
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
+			body := response.Body.String()
+			if response.Code != test.wantStatus || !strings.Contains(body, test.wantText) {
+				t.Fatalf("status = %d, want %d and %q; body: %s", response.Code, test.wantStatus, test.wantText, body)
+			}
+			if response.Header().Get("Content-Type") != "text/html; charset=utf-8" {
+				t.Errorf("Content-Type = %q", response.Header().Get("Content-Type"))
+			}
+			if test.wantSuccess {
+				stored, savedRevision, err := store.Load("README.md")
+				if err != nil {
+					t.Fatalf("Store.Load() error = %v", err)
+				}
+				if stored.Annotations[0].Source == nil || stored.Annotations[0].Source.Selector.Exact != "new selection" || stored.Annotations[0].NeedsReattachment || response.Header().Get("ETag") != strconv.Quote(string(savedRevision)) {
+					t.Fatalf("stored = %#v, ETag = %q", stored, response.Header().Get("ETag"))
+				}
+				return
+			}
+			if response.Header().Get("ETag") != strconv.Quote(string(currentRevision)) {
+				t.Errorf("ETag = %q, want %q", response.Header().Get("ETag"), strconv.Quote(string(currentRevision)))
+			}
+			if test.sourceMode == "exact" {
+				return
+			}
+			wantEndValue := `name="selection_end_byte" value=""`
+			if test.preserveDraft {
+				wantEndValue = `name="selection_end_byte" value="` + test.endByte + `"`
+				wantEndValue = strings.ReplaceAll(wantEndValue, "<", "&lt;")
+				wantEndValue = strings.ReplaceAll(wantEndValue, ">", "&gt;")
+			}
+			if !strings.Contains(body, wantEndValue) {
+				t.Errorf("body missing draft field %q:\n%s", wantEndValue, body)
+			}
+			if strings.Contains(body, `<bad>`) {
+				t.Errorf("body contains unescaped hidden value:\n%s", body)
+			}
+		})
+	}
+}
+
 func TestAnnotationUIRoutesRequireReviewSession(t *testing.T) {
 	t.Parallel()
 	rootPath := t.TempDir()
@@ -424,6 +531,7 @@ func TestAnnotationUIRoutesRequireReviewSession(t *testing.T) {
 		{http.MethodPost, "/ui/review/annotations"},
 		{http.MethodPost, "/ui/review/annotations/ann_test/replies"},
 		{http.MethodPost, "/ui/review/annotations/ann_test/transition"},
+		{http.MethodPost, "/ui/review/annotations/ann_test/reattach"},
 	} {
 		request := httptest.NewRequest(route.method, route.path, nil)
 		response := httptest.NewRecorder()

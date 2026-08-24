@@ -415,81 +415,20 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, _, ok := s.readAnnotationDocument(response, input.Document)
-	if !ok {
-		return
-	}
-	if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
-		http.Error(response, "document changed; refresh and select again", http.StatusConflict)
-		return
-	}
-	sidecar, _, err := s.annotations.Load(input.Document)
+	result, err := s.reattachAnnotationOperation(reattachAnnotationInput{
+		Document: input.Document, AnnotationID: request.PathValue("id"), Selection: input.Selection,
+		ExpectedRevision: expected,
+	})
 	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
-		return
-	}
-
-	annotationIndex := findAnnotation(sidecar, request.PathValue("id"))
-	if annotationIndex < 0 {
-		http.Error(response, "annotation not found", http.StatusNotFound)
-		return
-	}
-	updated := &sidecar.Annotations[annotationIndex]
-	if updated.Source == nil && !updated.NeedsReattachment {
-		http.Error(response, "document-level annotation cannot be reattached", http.StatusConflict)
-		return
-	}
-	oldAnchor := annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}
-	if updated.Source != nil {
-		oldAnchor, err = annotation.ResolveAnchor(document, *updated.Source)
-		if err != nil {
-			http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-			return
-		}
-	}
-	if oldAnchor.State != annotation.AnchorStale {
-		http.Error(response, "annotation anchor is not stale", http.StatusConflict)
-		return
-	}
-
-	replacement, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
-	if err != nil {
-		http.Error(response, err.Error(), http.StatusBadRequest)
-		return
-	}
-	newAnchor, err := annotation.ResolveAnchor(document, replacement)
-	if err != nil {
-		http.Error(response, "could not resolve replacement anchor", http.StatusInternalServerError)
-		return
-	}
-
-	now := time.Now().UTC()
-	if now.Before(updated.UpdatedAt) {
-		now = updated.UpdatedAt
-	}
-	updated.Source = &replacement
-	updated.NeedsReattachment = false
-	updated.UpdatedAt = now
-	if err := sidecar.Validate(); err != nil {
-		http.Error(response, "could not validate reattached annotation", http.StatusInternalServerError)
-		return
-	}
-	revision, err := s.annotations.Save(sidecar, expected)
-	if err != nil {
-		if errors.Is(err, annotationstore.ErrConflict) {
-			response.Header().Set("ETag", strconv.Quote(string(revision)))
-			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
-			return
-		}
-		http.Error(response, "could not save annotation reattachment", http.StatusInternalServerError)
+		writeAnnotationOperationError(response, err, false)
 		return
 	}
 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
 	_ = json.NewEncoder(response).Encode(reattachAnnotationResponse{
-		Annotation: resolvedAnnotation{Annotation: *updated, Anchor: &newAnchor},
-		Revision:   string(revision),
+		Annotation: result.Updated,
+		Revision:   string(result.Document.Revision),
 	})
 }
 
@@ -608,17 +547,6 @@ func writeAnnotationOperationError(response http.ResponseWriter, err error, form
 		response.Header().Set("ETag", strconv.Quote(string(operationErr.revision)))
 	}
 	http.Error(response, operationErr.message, status)
-}
-
-// readAnnotationDocument requires both a safe annotation path and membership
-// in the configured reviewable catalog before reading current bytes.
-func (s *Server) readAnnotationDocument(response http.ResponseWriter, documentPath string) ([]byte, content.Document, bool) {
-	document, catalogDocument, err := s.loadAnnotationSource(documentPath)
-	if err != nil {
-		writeAnnotationOperationError(response, err, false)
-		return nil, content.Document{}, false
-	}
-	return document, catalogDocument, true
 }
 
 // writeAnnotationReadError hides filesystem details and treats invalid or

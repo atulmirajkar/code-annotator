@@ -396,6 +396,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		mux.Handle("POST /ui/review/annotations", server.protectReviewFormMutation(http.HandlerFunc(server.handleCreateAnnotationForm)))
 		mux.Handle("POST /ui/review/annotations/{id}/replies", server.protectReviewFormMutation(http.HandlerFunc(server.handleReplyAnnotationForm)))
 		mux.Handle("POST /ui/review/annotations/{id}/transition", server.protectReviewFormMutation(http.HandlerFunc(server.handleTransitionAnnotationForm)))
+		mux.Handle("POST /ui/review/annotations/{id}/reattach", server.protectReviewFormMutation(http.HandlerFunc(server.handleReattachAnnotationForm)))
 		mux.Handle("POST /api/annotations", server.protectReviewMutation(http.HandlerFunc(server.handleCreateAnnotation)))
 		mux.Handle("PATCH /api/annotations/{id}", server.protectReviewMutation(http.HandlerFunc(server.handleTransitionAnnotation)))
 		mux.Handle("POST /api/annotations/{id}/replies", server.protectReviewMutation(http.HandlerFunc(server.handleReplyAnnotation)))

@@ -88,6 +88,18 @@ type transitionAnnotationResult struct {
 	Document annotationDocumentResult
 }
 
+type reattachAnnotationInput struct {
+	Document         string
+	AnnotationID     string
+	Selection        annotationSelection
+	ExpectedRevision annotationstore.Revision
+}
+
+type reattachAnnotationResult struct {
+	Updated  resolvedAnnotation
+	Document annotationDocumentResult
+}
+
 // readAnnotationDocumentOperation returns the current resolved annotations for
 // one cataloged document without knowing whether the caller needs JSON or HTML.
 func (s *Server) readAnnotationDocumentOperation(documentPath string) (annotationDocumentResult, error) {
@@ -269,6 +281,70 @@ func (s *Server) transitionAnnotationOperation(input transitionAnnotationInput) 
 		return transitionAnnotationResult{}, operationError(annotationOperationInternal, "could not save annotation transition", err)
 	}
 	return transitionAnnotationResult{
+		Updated:  anchoredAnnotations[annotationIndex],
+		Document: annotationDocumentResult{Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations},
+	}, nil
+}
+
+// reattachAnnotationOperation replaces only a stale selector with a source
+// range verified against the current document revision.
+func (s *Server) reattachAnnotationOperation(input reattachAnnotationInput) (reattachAnnotationResult, error) {
+	document, catalogDocument, err := s.loadAnnotationSource(input.Document)
+	if err != nil {
+		return reattachAnnotationResult{}, err
+	}
+	if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
+		return reattachAnnotationResult{}, operationError(annotationOperationConflict, "document changed; refresh and select again", nil)
+	}
+	sidecar, _, err := s.annotations.Load(input.Document)
+	if err != nil {
+		return reattachAnnotationResult{}, operationError(annotationOperationInternal, "could not read annotations", err)
+	}
+	annotationIndex := findAnnotation(sidecar, input.AnnotationID)
+	if annotationIndex < 0 {
+		return reattachAnnotationResult{}, operationError(annotationOperationNotFound, "annotation not found", nil)
+	}
+	updated := &sidecar.Annotations[annotationIndex]
+	if updated.Source == nil && !updated.NeedsReattachment {
+		return reattachAnnotationResult{}, operationError(annotationOperationConflict, "document-level annotation cannot be reattached", nil)
+	}
+	oldAnchor := annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}
+	if updated.Source != nil {
+		oldAnchor, err = annotation.ResolveAnchor(document, *updated.Source)
+		if err != nil {
+			return reattachAnnotationResult{}, operationError(annotationOperationInternal, "could not resolve annotation anchor", err)
+		}
+	}
+	if oldAnchor.State != annotation.AnchorStale {
+		return reattachAnnotationResult{}, operationError(annotationOperationConflict, "annotation anchor is not stale", nil)
+	}
+
+	replacement, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
+	if err != nil {
+		return reattachAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
+	}
+	now := time.Now().UTC()
+	if now.Before(updated.UpdatedAt) {
+		now = updated.UpdatedAt
+	}
+	updated.Source = &replacement
+	updated.NeedsReattachment = false
+	updated.UpdatedAt = now
+	if err := sidecar.Validate(); err != nil {
+		return reattachAnnotationResult{}, operationError(annotationOperationInternal, "could not validate reattached annotation", err)
+	}
+	anchoredAnnotations, err := anchorAnnotations(document, sidecar.Annotations)
+	if err != nil {
+		return reattachAnnotationResult{}, operationError(annotationOperationInternal, "could not resolve replacement anchor", err)
+	}
+	revision, err := s.annotations.Save(sidecar, input.ExpectedRevision)
+	if err != nil {
+		if errors.Is(err, annotationstore.ErrConflict) {
+			return reattachAnnotationResult{}, &annotationOperationError{kind: annotationOperationConflict, message: "annotation sidecar revision conflict", revision: revision, cause: err}
+		}
+		return reattachAnnotationResult{}, operationError(annotationOperationInternal, "could not save annotation reattachment", err)
+	}
+	return reattachAnnotationResult{
 		Updated:  anchoredAnnotations[annotationIndex],
 		Document: annotationDocumentResult{Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations},
 	}, nil

@@ -238,6 +238,16 @@ submitted reply or transition values through escaped template fields and never
 retry a stale mutation automatically. The browser continues using the JSON
 routes until the HTMX activation gate.
 
+Reattachment uses the same transport-neutral pattern. The shared operation
+accepts only typed current-document byte offsets, verifies the document digest,
+requires an existing stale or pending selector, rebuilds the source, and saves
+optimistically. The inactive form route safely parses its hidden selection
+fields and returns the authoritative panel for success, `422` range errors,
+semantic `409` state/document conflicts, and sidecar revision conflicts.
+Obsolete selections are cleared after semantic conflicts; a selection that is
+still valid after only a sidecar revision conflict remains escaped in the form
+for an explicit retry. Creation errors now follow the same fragment contract.
+
 The browser treats `closed` and `rejected` as inactive presentation states.
 They remain in the API response and sidecar, but the default panel filters out
 their cards before rendering and passes only active annotations to the highlight

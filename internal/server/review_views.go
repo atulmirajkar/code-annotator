@@ -97,6 +97,9 @@ type annotationActionsView struct {
 	// Draft values preserve user input in expected validation/conflict fragments.
 	ReplyRole          annotation.Role
 	ReplyMessage       string
+	ReattachStartByte  string
+	ReattachEndByte    string
+	ReattachDigest     string
 	TransitionRole     annotation.Role
 	TransitionActivity string
 	TransitionCommit   string

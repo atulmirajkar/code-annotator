@@ -34,6 +34,10 @@ func (s *Server) handleCreateAnnotationForm(response http.ResponseWriter, reques
 	}
 	input, status, err := decodeCreateAnnotationForm(request)
 	if err != nil {
+		if status == http.StatusUnprocessableEntity && input.Document != "" {
+			s.renderAnnotationPanelFeedback(response, input.Document, "", annotationMutationDraft{}, err.Error(), "validation", status)
+			return
+		}
 		http.Error(response, err.Error(), status)
 		return
 	}
@@ -42,7 +46,7 @@ func (s *Server) handleCreateAnnotationForm(response http.ResponseWriter, reques
 		Role: input.Role, Selection: input.Selection, ExpectedRevision: expected,
 	})
 	if err != nil {
-		writeAnnotationOperationError(response, err, true)
+		s.renderAnnotationMutationError(response, input.Document, "", annotationMutationDraft{}, err)
 		return
 	}
 	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
@@ -87,6 +91,14 @@ type transitionAnnotationForm struct {
 	Commit   string
 }
 
+type reattachAnnotationForm struct {
+	Document  string
+	StartByte string
+	EndByte   string
+	Digest    string
+	Selection annotationSelection
+}
+
 func (s *Server) handleTransitionAnnotationForm(response http.ResponseWriter, request *http.Request) {
 	expected, status, err := parseIfMatch(request)
 	if err != nil {
@@ -117,8 +129,42 @@ func (s *Server) handleTransitionAnnotationForm(response http.ResponseWriter, re
 	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
 }
 
+func (s *Server) handleReattachAnnotationForm(response http.ResponseWriter, request *http.Request) {
+	expected, status, err := parseIfMatch(request)
+	if err != nil {
+		http.Error(response, err.Error(), status)
+		return
+	}
+	input, status, err := decodeReattachAnnotationForm(request)
+	annotationID := request.PathValue("id")
+	draft := annotationMutationDraft{Reattach: &input}
+	if err != nil {
+		if status == http.StatusUnprocessableEntity && input.Document != "" {
+			s.renderAnnotationPanelFeedback(response, input.Document, annotationID, draft, err.Error(), "validation", status)
+			return
+		}
+		http.Error(response, err.Error(), status)
+		return
+	}
+	result, err := s.reattachAnnotationOperation(reattachAnnotationInput{
+		Document: input.Document, AnnotationID: annotationID, Selection: input.Selection,
+		ExpectedRevision: expected,
+	})
+	if err != nil {
+		var operationErr *annotationOperationError
+		if errors.As(err, &operationErr) && operationErr.kind == annotationOperationConflict && operationErr.revision == "" {
+			draft.Reattach = nil
+		}
+		s.renderAnnotationMutationError(response, input.Document, annotationID, draft, err)
+		return
+	}
+	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
+	s.renderAnnotationPanel(response, newAnnotationPanelView(input.Document, string(result.Document.Revision), result.Document.Annotations, false), http.StatusOK)
+}
+
 type annotationMutationDraft struct {
 	Reply      *replyAnnotationForm
+	Reattach   *reattachAnnotationForm
 	Transition *transitionAnnotationForm
 }
 
@@ -146,6 +192,24 @@ func decodeTransitionAnnotationForm(request *http.Request) (transitionAnnotation
 	}, 0, nil
 }
 
+func decodeReattachAnnotationForm(request *http.Request) (reattachAnnotationForm, int, error) {
+	if status, err := parseAnnotationForm(request); err != nil {
+		return reattachAnnotationForm{}, status, err
+	}
+	input := reattachAnnotationForm{
+		Document:  request.PostForm.Get("document"),
+		StartByte: request.PostForm.Get("selection_start_byte"),
+		EndByte:   request.PostForm.Get("selection_end_byte"),
+		Digest:    request.PostForm.Get("document_sha256"),
+	}
+	selection, status, err := decodeAnnotationSelection(input.StartByte, input.EndByte, input.Digest, true)
+	if err != nil {
+		return input, status, err
+	}
+	input.Selection = *selection
+	return input, 0, nil
+}
+
 func decodeCreateAnnotationForm(request *http.Request) (createAnnotationRequest, int, error) {
 	if status, err := parseAnnotationForm(request); err != nil {
 		return createAnnotationRequest{}, status, err
@@ -156,25 +220,37 @@ func decodeCreateAnnotationForm(request *http.Request) (createAnnotationRequest,
 		Comment:  request.PostForm.Get("comment"),
 		Role:     annotation.Role(request.PostForm.Get("role")),
 	}
-	start := request.PostForm.Get("selection_start_byte")
-	end := request.PostForm.Get("selection_end_byte")
-	digest := request.PostForm.Get("document_sha256")
+	selection, status, err := decodeAnnotationSelection(
+		request.PostForm.Get("selection_start_byte"),
+		request.PostForm.Get("selection_end_byte"),
+		request.PostForm.Get("document_sha256"), false,
+	)
+	if err != nil {
+		return input, status, err
+	}
+	input.Selection = selection
+	return input, 0, nil
+}
+
+func decodeAnnotationSelection(start, end, digest string, required bool) (*annotationSelection, int, error) {
 	if start == "" && end == "" && digest == "" {
-		return input, 0, nil
+		if required {
+			return nil, http.StatusUnprocessableEntity, errors.New("selection fields are required")
+		}
+		return nil, 0, nil
 	}
 	if start == "" || end == "" || digest == "" {
-		return createAnnotationRequest{}, http.StatusUnprocessableEntity, errors.New("selection fields must be provided together")
+		return nil, http.StatusUnprocessableEntity, errors.New("selection fields must be provided together")
 	}
 	startByte, err := strconv.Atoi(start)
 	if err != nil {
-		return createAnnotationRequest{}, http.StatusUnprocessableEntity, errors.New("selection start byte must be an integer")
+		return nil, http.StatusUnprocessableEntity, errors.New("selection start byte must be an integer")
 	}
 	endByte, err := strconv.Atoi(end)
 	if err != nil {
-		return createAnnotationRequest{}, http.StatusUnprocessableEntity, errors.New("selection end byte must be an integer")
+		return nil, http.StatusUnprocessableEntity, errors.New("selection end byte must be an integer")
 	}
-	input.Selection = &annotationSelection{StartByte: startByte, EndByte: endByte, DocumentSHA256: digest}
-	return input, 0, nil
+	return &annotationSelection{StartByte: startByte, EndByte: endByte, DocumentSHA256: digest}, 0, nil
 }
 
 func parseAnnotationForm(request *http.Request) (int, error) {
@@ -194,20 +270,28 @@ func (s *Server) renderAnnotationMutationError(response http.ResponseWriter, doc
 		writeAnnotationOperationError(response, err, true)
 		return
 	}
-	result, readErr := s.readAnnotationDocumentOperation(document)
-	if readErr != nil {
-		writeAnnotationOperationError(response, readErr, true)
+	status := http.StatusUnprocessableEntity
+	message := operationErr.message
+	kind := "validation"
+	if operationErr.kind == annotationOperationConflict {
+		status = http.StatusConflict
+		kind = "conflict"
+		if operationErr.revision != "" {
+			message = "Annotations changed; review the latest state before retrying."
+		}
+	}
+	s.renderAnnotationPanelFeedback(response, document, annotationID, draft, message, kind, status)
+}
+
+func (s *Server) renderAnnotationPanelFeedback(response http.ResponseWriter, document, annotationID string, draft annotationMutationDraft, message, kind string, status int) {
+	result, err := s.readAnnotationDocumentOperation(document)
+	if err != nil {
+		writeAnnotationOperationError(response, err, true)
 		return
 	}
 	view := newAnnotationPanelView(document, string(result.Revision), result.Annotations, false)
-	status := http.StatusUnprocessableEntity
-	view.Feedback = operationErr.message
-	view.FeedbackKind = "validation"
-	if operationErr.kind == annotationOperationConflict {
-		status = http.StatusConflict
-		view.Feedback = "Annotations changed; review the latest state before retrying."
-		view.FeedbackKind = "conflict"
-	}
+	view.Feedback = message
+	view.FeedbackKind = kind
 	applyAnnotationMutationDraft(&view, annotationID, draft)
 	response.Header().Set("ETag", strconv.Quote(string(result.Revision)))
 	s.renderAnnotationPanel(response, view, status)
@@ -222,6 +306,11 @@ func applyAnnotationMutationDraft(view *annotationPanelView, annotationID string
 		if draft.Reply != nil {
 			actions.ReplyRole = draft.Reply.Role
 			actions.ReplyMessage = draft.Reply.Message
+		}
+		if draft.Reattach != nil {
+			actions.ReattachStartByte = draft.Reattach.StartByte
+			actions.ReattachEndByte = draft.Reattach.EndByte
+			actions.ReattachDigest = draft.Reattach.Digest
 		}
 		if draft.Transition != nil {
 			actions.TransitionRole = draft.Transition.Role

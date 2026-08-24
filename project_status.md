@@ -4,17 +4,18 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit gate 4 is implemented and awaiting
-maintainer review. Gate 5 must not begin without explicit approval.
+**Phase:** Server-rendered review UI commit gate 6 is implemented and awaiting
+maintainer review. Gate 7 must not begin without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
 `/static/htmx.min.js`, with provenance and checksums under `web/vendor/htmx/`.
 It is intentionally not loaded by viewer pages. Review-mode servers now
-register inactive HTML annotation read/create routes. Typed application
-operations share catalog/source reads, sidecar loading, anchor resolution,
-creation, and optimistic saves between those routes and the unchanged JSON
-API. The complete page and inactive annotation panel, card, and action
+register the complete inactive HTML annotation mutation surface. Typed
+application operations share catalog/source reads, sidecar loading, anchor
+resolution, creation, replies, lifecycle transitions, reattachment, and
+optimistic saves between those routes and the unchanged JSON API. The complete
+page and inactive annotation panel, card, and action
 fragments form one parsed template set. Presentation view models derive
 filtering, counts, threads, source/anchor display, and lifecycle action
 availability without request or store dependencies. The current
@@ -332,7 +333,7 @@ for explicit approval before starting the next item.
   use anchor terminology consistently across shared operations.
 - [x] Commit 5: share reply/transition operations and add 422/409 HTML
   responses while preserving JSON behavior.
-- [ ] Commit 6: share reattach operations and complete the inactive HTML
+- [x] Commit 6: share reattach operations and complete the inactive HTML
   mutation surface.
 - [ ] Commit 7: activate the HTMX annotation panel, retain browser-only
   selection/highlight/navigation adapters, and remove superseded DOM renderers.
@@ -384,12 +385,13 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 5 shares reply and transition application operations between
-the stable JSON API and inactive server-rendered form routes. Expected HTML
-validation and revision conflicts return authoritative panels with escaped
-draft values. Commit 5 is the current review gate. The next allowed
-implementation slice is commit 6, sharing reattachment operations and
-completing the inactive HTML mutation surface; it must not begin until the
+milestone. Commit 6 shares reattachment application logic between the stable
+JSON API and the inactive server-rendered form route, including safe hidden
+selection parsing and authoritative validation, semantic-conflict, and
+revision-conflict fragments. The inactive HTML mutation surface is complete.
+Commit 6 is the current review gate. The next allowed implementation slice is
+commit 7, activating the HTMX annotation panel while retaining browser-only
+selection, highlighting, and navigation adapters; it must not begin until the
 maintainer explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
