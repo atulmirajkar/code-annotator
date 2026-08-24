@@ -36,8 +36,10 @@ are the source of truth in
 The complete page and the currently inactive annotation fragments live under
 `web/templates/` and are parsed together by `internal/server`. Their focused
 tests render named templates directly and cover escaping and presentation
-rules. No build generation step is required for these authored HTML files, and
-no production `/ui/*` route uses the fragments before its later commit gate.
+rules. No build generation step is required for these authored HTML files.
+Review-mode servers register inactive HTML read/create routes under
+`/ui/review/annotations`; the current page still uses the JSON API until the
+HTMX activation gate.
 
 ## Run from source
 

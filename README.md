@@ -38,8 +38,10 @@ no viewer page loads it yet; the existing TypeScript review UI remains the
 production runtime until its later activation gate. Provenance and checksums
 are recorded in [`web/vendor/htmx/README.md`](web/vendor/htmx/README.md).
 The full page and inactive annotation panel/card/action fragments are parsed as
-one Go template set under `web/templates/`; no `/ui/*` fragment routes are
-registered yet.
+one Go template set under `web/templates/`. In review mode, inactive
+`GET /ui/review/annotations` and `POST /ui/review/annotations` routes now read
+and create annotations through the same application operations as the stable
+JSON API. Viewer pages do not call these routes yet.
 
 ## Usage
 

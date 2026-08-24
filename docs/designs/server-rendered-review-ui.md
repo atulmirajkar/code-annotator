@@ -2,8 +2,9 @@
 
 ## Status
 
-Implementation in progress. Commit gates 0 and 1 are implemented; commit 1 is
-awaiting maintainer review before gate 2 may begin.
+Implementation in progress. Commit gates 0 through 4 and the intervening
+role-only compatibility slice are implemented. Commit 4 is awaiting maintainer
+review before gate 5 may begin.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -531,7 +532,7 @@ Checks: `go test ./internal/server ./web`, `go test ./...`.
 
 ### Commit 3: add inactive fragment templates and view models
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -544,6 +545,8 @@ Scope:
 Checks: focused server/template tests, `go test ./...`.
 
 ### Commit 4: share annotation read/create operations and add UI handlers
+
+Status: implemented in the current review commit; awaiting maintainer approval.
 
 Scope:
 

@@ -219,10 +219,19 @@ func validateLoopbackOrigin(origin string) (string, error) {
 	return parsed.Scheme + "://" + parsed.Host, nil
 }
 
-// protectReviewMutation enforces the browser session boundary before invoking
-// an annotation mutation handler. The wrapped handler remains responsible for
-// decoding JSON and reporting an oversized body as a client error.
+// protectReviewMutation enforces the browser session boundary and JSON media
+// type used by the stable automation API.
 func (s *Server) protectReviewMutation(next http.Handler) http.Handler {
+	return s.protectReviewMutationMediaType(next, "application/json")
+}
+
+func (s *Server) protectReviewFormMutation(next http.Handler) http.Handler {
+	return s.protectReviewMutationMediaType(next, "application/x-www-form-urlencoded")
+}
+
+// protectReviewMutationMediaType centralizes origin, token, media-type, and
+// body-size enforcement for JSON and inactive form mutation routes.
+func (s *Server) protectReviewMutationMediaType(next http.Handler, requiredMediaType string) http.Handler {
 	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		if s.review == nil {
 			http.NotFound(response, request)
@@ -239,11 +248,11 @@ func (s *Server) protectReviewMutation(next http.Handler) http.Handler {
 		}
 		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 		if err != nil {
-			http.Error(response, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			http.Error(response, "Content-Type must be "+requiredMediaType, http.StatusUnsupportedMediaType)
 			return
 		}
-		if mediaType != "application/json" {
-			http.Error(response, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+		if mediaType != requiredMediaType {
+			http.Error(response, "Content-Type must be "+requiredMediaType, http.StatusUnsupportedMediaType)
 			return
 		}
 		request.Body = http.MaxBytesReader(response, request.Body, maxAnnotationMutationBytes)
@@ -383,6 +392,8 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
 	if server.review != nil {
+		mux.HandleFunc("GET /ui/review/annotations", server.handleAnnotationPanel)
+		mux.Handle("POST /ui/review/annotations", server.protectReviewFormMutation(http.HandlerFunc(server.handleCreateAnnotationForm)))
 		mux.Handle("POST /api/annotations", server.protectReviewMutation(http.HandlerFunc(server.handleCreateAnnotation)))
 		mux.Handle("PATCH /api/annotations/{id}", server.protectReviewMutation(http.HandlerFunc(server.handleTransitionAnnotation)))
 		mux.Handle("POST /api/annotations/{id}/replies", server.protectReviewMutation(http.HandlerFunc(server.handleReplyAnnotation)))

@@ -127,35 +127,21 @@ func (s *Server) handleAnnotations(response http.ResponseWriter, request *http.R
 		s.handleAnnotationQueue(response, request)
 		return
 	}
-	source, catalogDocument, ok := s.readAnnotationDocument(response, document)
-	if !ok {
-		return
-	}
-	sidecar, revision, err := s.annotations.Load(document)
+	result, err := s.readAnnotationDocumentOperation(document)
 	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
+		writeAnnotationOperationError(response, err, false)
 		return
-	}
-
-	annotations := make([]resolvedAnnotation, 0, len(sidecar.Annotations))
-	for _, item := range sidecar.Annotations {
-		view, err := resolveAnnotation(source, item)
-		if err != nil {
-			http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-			return
-		}
-		annotations = append(annotations, view)
 	}
 
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("ETag", strconv.Quote(string(revision)))
+	response.Header().Set("ETag", strconv.Quote(string(result.Revision)))
 	payload := annotationListResponse{
-		SchemaVersion: sidecar.SchemaVersion,
-		Document:      sidecar.Document,
-		Kind:          catalogDocument.Kind,
-		Language:      catalogDocument.Language,
-		Revision:      string(revision),
-		Annotations:   annotations,
+		SchemaVersion: annotation.SchemaVersion,
+		Document:      document,
+		Kind:          result.Document.Kind,
+		Language:      result.Document.Language,
+		Revision:      string(result.Revision),
+		Annotations:   result.Annotations,
 	}
 	if err := json.NewEncoder(response).Encode(payload); err != nil {
 		// The response may already be committed; structured request logging will
@@ -330,79 +316,22 @@ func (s *Server) handleCreateAnnotation(response http.ResponseWriter, request *h
 		http.Error(response, err.Error(), status)
 		return
 	}
-	document, _, ok := s.readAnnotationDocument(response, input.Document)
-	if !ok {
-		return
-	}
-
-	var source *annotation.Source
-	var anchor *annotation.AnchorResult
-	if input.Selection != nil {
-		if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
-			http.Error(response, "document changed; refresh and select again", http.StatusConflict)
-			return
-		}
-		created, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
-		if err != nil {
-			http.Error(response, err.Error(), http.StatusBadRequest)
-			return
-		}
-		source = &created
-		resolved, err := annotation.ResolveAnchor(document, created)
-		if err != nil {
-			http.Error(response, "could not resolve selected text", http.StatusInternalServerError)
-			return
-		}
-		anchor = &resolved
-	}
-
-	now := time.Now().UTC()
-	identifier, err := annotation.NewAnnotationID(now)
+	result, err := s.createAnnotationOperation(createAnnotationInput{
+		Document: input.Document, Intent: input.Intent, Comment: input.Comment,
+		Role: input.Role, Selection: input.Selection, ExpectedRevision: expected,
+	})
 	if err != nil {
-		http.Error(response, "could not generate annotation identifier", http.StatusInternalServerError)
-		return
-	}
-	created := annotation.Annotation{
-		ID:        identifier,
-		Intent:    input.Intent,
-		Status:    annotation.StatusOpen,
-		Comment:   input.Comment,
-		Role:      input.Role,
-		CreatedAt: now,
-		UpdatedAt: now,
-		Source:    source,
-		Thread:    []annotation.ThreadEntry{},
-	}
-	if err := created.Validate(); err != nil {
-		http.Error(response, err.Error(), http.StatusBadRequest)
+		writeAnnotationOperationError(response, err, false)
 		return
 	}
 
-	sidecar, _, err := s.annotations.Load(input.Document)
-	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
-		return
-	}
-	sidecar.Annotations = append(sidecar.Annotations, created)
-	revision, err := s.annotations.Save(sidecar, expected)
-	if err != nil {
-		if errors.Is(err, annotationstore.ErrConflict) {
-			response.Header().Set("ETag", strconv.Quote(string(revision)))
-			http.Error(response, "annotation sidecar revision conflict", http.StatusConflict)
-			return
-		}
-		http.Error(response, "could not save annotation", http.StatusInternalServerError)
-		return
-	}
-
-	view := resolvedAnnotation{Annotation: created, Anchor: anchor}
 	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("ETag", strconv.Quote(string(revision)))
-	response.Header().Set("Location", "/api/annotations/"+created.ID)
+	response.Header().Set("ETag", strconv.Quote(string(result.Document.Revision)))
+	response.Header().Set("Location", "/api/annotations/"+result.Created.ID)
 	response.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(response).Encode(createAnnotationResponse{
-		Annotation: view,
-		Revision:   string(revision),
+		Annotation: result.Created,
+		Revision:   string(result.Document.Revision),
 	})
 }
 
@@ -740,26 +669,40 @@ func decodeMutationJSON(request *http.Request, destination any) (int, error) {
 	return http.StatusBadRequest, errors.New("request body must contain one JSON value")
 }
 
+func writeAnnotationOperationError(response http.ResponseWriter, err error, formRequest bool) {
+	var operationErr *annotationOperationError
+	if !errors.As(err, &operationErr) {
+		http.Error(response, "could not process annotation", http.StatusInternalServerError)
+		return
+	}
+	status := http.StatusInternalServerError
+	switch operationErr.kind {
+	case annotationOperationInvalid:
+		status = http.StatusBadRequest
+		if formRequest {
+			status = http.StatusUnprocessableEntity
+		}
+	case annotationOperationNotFound:
+		status = http.StatusNotFound
+	case annotationOperationConflict:
+		status = http.StatusConflict
+	case annotationOperationTooLarge:
+		status = http.StatusRequestEntityTooLarge
+	case annotationOperationInternal:
+		status = http.StatusInternalServerError
+	}
+	if operationErr.revision != "" {
+		response.Header().Set("ETag", strconv.Quote(string(operationErr.revision)))
+	}
+	http.Error(response, operationErr.message, status)
+}
+
 // readAnnotationDocument requires both a safe annotation path and membership
 // in the configured reviewable catalog before reading current bytes.
 func (s *Server) readAnnotationDocument(response http.ResponseWriter, documentPath string) ([]byte, content.Document, bool) {
-	if err := annotation.ValidateDocumentPath(documentPath); err != nil {
-		http.Error(response, "document not found", http.StatusNotFound)
-		return nil, content.Document{}, false
-	}
-	index, err := s.root.IndexWithOptions(s.indexOptions)
+	document, catalogDocument, err := s.loadAnnotationSource(documentPath)
 	if err != nil {
-		http.Error(response, "could not index documents", http.StatusInternalServerError)
-		return nil, content.Document{}, false
-	}
-	catalogDocument, ok := findDocument(index, documentPath)
-	if !ok {
-		http.Error(response, "document not found", http.StatusNotFound)
-		return nil, content.Document{}, false
-	}
-	document, err := s.root.ReadFile(documentPath, maxDocumentBytes)
-	if err != nil {
-		s.writeAnnotationReadError(response, err)
+		writeAnnotationOperationError(response, err, false)
 		return nil, content.Document{}, false
 	}
 	return document, catalogDocument, true

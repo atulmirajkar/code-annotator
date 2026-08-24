@@ -73,9 +73,15 @@ behavior is unchanged. The page and inactive annotation panel, card, and
 action fragments are parsed from `web/templates/*.html` as one template set.
 Presentation-specific Go view models derive active filtering, counts, source
 labels, threads, stale-anchor state, and permitted lifecycle actions; action
-authorization delegates to `internal/annotation` transition validation. No
-fragment route executes these models in production yet. Later reviewed slices
-will add `/ui/*` handlers and retain browser-only interaction in testable
+authorization delegates to `internal/annotation` transition validation.
+Typed, transport-neutral application operations now own catalog/source reads,
+sidecar loading, anchor resolution, annotation creation, and optimistic saves.
+The JSON read/create handlers and inactive HTML read/create handlers call those
+same operations. Review-mode servers register `GET` and `POST`
+`/ui/review/annotations`; the GET renders the panel fragment and the secured
+form POST returns refreshed authoritative panel HTML. The current page does not
+request either route, and HTMX remains unloaded. Later reviewed slices will
+share the remaining mutations and retain browser-only interaction in testable
 TypeScript. The invariants, route plan, test strategy, documentation contract,
 and one-commit-at-a-time review gates are defined in
 [`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
@@ -176,7 +182,8 @@ unavailable rather than as an empty changed set.
 Unknown resources return `404`. Unsupported methods return `405`. Internal
 filesystem paths and raw errors are not returned to the browser.
 
-The annotation read route is registered only when `--review` supplies a store.
+The annotation JSON read route is registered whenever annotation storage is
+configured. The HTML read/create routes require a writable review session.
 Without a `document` query it traverses the stable content index, applies an
 optional status filter, and returns only documents with matching annotations.
 Each document carries its own sidecar revision for subsequent mutations.
@@ -197,7 +204,10 @@ Fenced code receives one source-backed span per content line. Browser mapping
 requires both endpoints to share that block and never includes its fences.
 The creation route requires the session security checks and a strong `If-Match`
 sidecar ETag. It recreates source selectors from current document bytes rather
-than trusting hashes or context supplied by the browser.
+than trusting hashes or context supplied by the browser. JSON creation retains
+its `201`, `Location`, JSON body, and ETag contract. The inactive form route
+accepts only URL-encoded bodies under the same 64 KiB limit and returns the
+complete annotation panel with `200` after the shared operation succeeds.
 The browser creation form uses the revision from its latest annotation read,
 preserves a captured selection while focus moves into the panel, and reloads
 the authoritative list after a successful write. Conflicts retain the draft

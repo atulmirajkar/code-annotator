@@ -4,18 +4,20 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** The role-only annotation migration following server-rendered review
-UI gate 3 is implemented and awaiting maintainer review. Gate 4 must not begin
-without explicit approval.
+**Phase:** Server-rendered review UI commit gate 4 is implemented and awaiting
+maintainer review. Gate 5 must not begin without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
 `/static/htmx.min.js`, with provenance and checksums under `web/vendor/htmx/`.
-It is intentionally not loaded by viewer pages, and no server-rendered fragment
-route is registered yet. The complete page and inactive annotation panel,
-card, and action fragments now form one parsed template set. Presentation view
-models derive filtering, counts, threads, source/anchor display, and lifecycle
-action availability without request or store dependencies. The current
+It is intentionally not loaded by viewer pages. Review-mode servers now
+register inactive HTML annotation read/create routes. Typed application
+operations share catalog/source reads, sidecar loading, anchor resolution,
+creation, and optimistic saves between those routes and the unchanged JSON
+API. The complete page and inactive annotation panel, card, and action
+fragments form one parsed template set. Presentation view models derive
+filtering, counts, threads, source/anchor display, and lifecycle action
+availability without request or store dependencies. The current
 imperative TypeScript frontend remains the production runtime until the
 corresponding reviewed gates are merged. Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
@@ -322,8 +324,8 @@ for explicit approval before starting the next item.
   models, and escaping/action-availability tests.
 - [x] Role-only compatibility commit: remove free-text authorship, use one role
   across storage/API/CLI/browser contracts, and migrate schema v1 sidecars on
-  their next successful save. Awaiting maintainer review before commit 4.
-- [ ] Commit 4: share annotation read/create application operations and add
+  their next successful save.
+- [x] Commit 4: share annotation read/create application operations and add
   compatible HTML handlers while preserving JSON behavior.
 - [ ] Commit 5: share reply/transition operations and add 422/409 HTML
   responses while preserving JSON behavior.
@@ -379,12 +381,11 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. After commit 3, the approved role-only compatibility slice removes
-free-text authorship and introduces sidecar schema version 2 with schema-v1
-read/migrate support. It is awaiting maintainer review. The next allowed
-implementation slice is commit 4, sharing annotation read/create operations
-and adding inactive HTML handlers; it must not begin until the maintainer
-explicitly approves proceeding.
+milestone. Commit 4 shares annotation read/create application operations
+between the unchanged JSON API and newly registered inactive HTML handlers. It
+is awaiting maintainer review. The next allowed implementation slice is commit
+5, sharing reply/transition operations and adding their HTML handlers; it must
+not begin until the maintainer explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.
