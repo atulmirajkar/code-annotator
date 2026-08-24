@@ -19,6 +19,8 @@ imperative TypeScript frontend remains the production runtime until the
 corresponding reviewed gates are merged. Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
+Reviewer lifecycle permissions include dismissing an irrelevant or accidental
+open annotation directly to `closed`; agents cannot perform that transition.
 
 The earlier TypeScript frontend migration is implemented and verified.
 The authored browser modules now compile under strict TypeScript into

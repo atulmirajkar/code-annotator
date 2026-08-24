@@ -21,6 +21,7 @@ func TestTransitionEntries(t *testing.T) {
 		{name: "apply", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, ActorRole: RoleAgent, Author: "codex", Summary: "Implemented", Commit: "abc1234"}, wantKinds: []ThreadKind{ThreadResolution, ThreadStatusChange}},
 		{name: "review changes", from: StatusApplied, input: TransitionInput{Status: StatusNeedsChanges, ActorRole: RoleReviewer, Author: "reviewer", Message: "Keep the default"}, wantKinds: []ThreadKind{ThreadReview, ThreadStatusChange}},
 		{name: "reject changes", from: StatusNeedsChanges, input: TransitionInput{Status: StatusRejected, ActorRole: RoleAgent, Author: "codex", Message: "This change is not applicable"}, wantKinds: []ThreadKind{ThreadReply, ThreadStatusChange}},
+		{name: "reviewer dismisses open", from: StatusOpen, input: TransitionInput{Status: StatusClosed, ActorRole: RoleReviewer, Author: "reviewer"}, wantKinds: []ThreadKind{ThreadStatusChange}},
 		{name: "agent cannot close", from: StatusApplied, input: TransitionInput{Status: StatusClosed, ActorRole: RoleAgent, Author: "codex"}, wantErr: "cannot transition"},
 		{name: "summary required", from: StatusAcknowledged, input: TransitionInput{Status: StatusApplied, ActorRole: RoleAgent, Author: "codex"}, wantErr: "summary"},
 	}

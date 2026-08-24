@@ -53,7 +53,7 @@ func TestAnnotationActionAvailabilityUsesLifecycleRules(t *testing.T) {
 		wantRoles      []annotation.ActorRole
 		wantQuickClose bool
 	}{
-		{status: annotation.StatusOpen, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent}},
+		{status: annotation.StatusOpen, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected, annotation.StatusClosed}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent, annotation.RoleReviewer}},
 		{status: annotation.StatusAcknowledged, wantStatuses: []annotation.Status{annotation.StatusApplied, annotation.StatusRejected}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent}},
 		{status: annotation.StatusNeedsChanges, wantStatuses: []annotation.Status{annotation.StatusAcknowledged, annotation.StatusRejected}, wantRoles: []annotation.ActorRole{annotation.RoleAgent, annotation.RoleAgent}},
 		{status: annotation.StatusApplied, wantStatuses: []annotation.Status{annotation.StatusNeedsChanges}, wantRoles: []annotation.ActorRole{annotation.RoleReviewer}, wantQuickClose: true},

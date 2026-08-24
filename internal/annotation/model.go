@@ -261,7 +261,8 @@ func (k ThreadKind) Valid() bool {
 }
 
 // ValidateTransition checks whether actor may move an annotation between two
-// lifecycle states. Only reviewers may close or return applied work for changes.
+// lifecycle states. Reviewers may dismiss open work, and only reviewers may
+// close or return applied work for changes.
 func ValidateTransition(from, to Status, actor ActorRole) error {
 	if !from.Valid() || !to.Valid() {
 		return fmt.Errorf("invalid annotation transition %q -> %q", from, to)
@@ -280,7 +281,8 @@ func ValidateTransition(from, to Status, actor ActorRole) error {
 			(from == StatusAcknowledged && (to == StatusApplied || to == StatusRejected)) ||
 			(from == StatusNeedsChanges && (to == StatusAcknowledged || to == StatusRejected))
 	case RoleReviewer:
-		allowed = (from == StatusApplied && (to == StatusClosed || to == StatusNeedsChanges)) ||
+		allowed = (from == StatusOpen && to == StatusClosed) ||
+			(from == StatusApplied && (to == StatusClosed || to == StatusNeedsChanges)) ||
 			((from == StatusClosed || from == StatusRejected) && to == StatusOpen)
 	}
 	if !allowed {

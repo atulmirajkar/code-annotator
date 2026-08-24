@@ -99,6 +99,8 @@ open -> acknowledged -> applied -> closed
   |          |            +-> needs_changes -> acknowledged -> applied
   |          |
   +----------+----------------> rejected
+  |
+  +---------------------------> closed (reviewer dismissal)
 
 closed or rejected -> open
 ```
@@ -109,7 +111,9 @@ an agent from closing its own review request implicitly. `needs_changes` means
 an attempted resolution was not satisfactory and remains actionable. It is not
 the same as `rejected`, which records a decision not to perform the request.
 
-Only a reviewer can transition `applied` to `closed`. When a reviewer selects
+Only a reviewer can transition `open` or `applied` to `closed`. Closing an open
+annotation dismisses one that is irrelevant or was created in error without
+requiring an agent response. When a reviewer selects
 `Needs changes`, a reply is required and the annotation transitions from
 `applied` to `needs_changes`. The next agent attempt reuses the same annotation
 ID rather than creating a replacement annotation.
@@ -121,6 +125,8 @@ The domain model validates transitions against the actor role:
 | Agent | `open -> acknowledged`, `open -> rejected` |
 | Agent | `acknowledged -> applied`, `acknowledged -> rejected` |
 | Agent | `needs_changes -> acknowledged` |
+| Agent | `needs_changes -> rejected` |
+| Reviewer | `open -> closed` |
 | Reviewer | `applied -> closed`, `applied -> needs_changes` |
 | Reviewer | `closed -> open`, `rejected -> open` |
 

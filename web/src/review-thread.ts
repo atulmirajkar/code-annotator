@@ -29,6 +29,7 @@ export function transitionOptions(status: AnnotationStatus): TransitionOption[] 
     open: [
       { status: "acknowledged", label: "Acknowledge", role: "agent" },
       { status: "rejected", label: "Reject", role: "agent", activity: "message" },
+      { status: "closed", label: "Close", role: "reviewer" },
     ],
     acknowledged: [
       { status: "applied", label: "Mark applied", role: "agent", activity: "summary" },
