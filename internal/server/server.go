@@ -260,13 +260,9 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		return nil, errors.New("create server: nil renderer")
 	}
 
-	pageSource, err := fs.ReadFile(web.Files, "page.html")
+	page, err := parseViewerTemplates()
 	if err != nil {
-		return nil, fmt.Errorf("read page template: %w", err)
-	}
-	page, err := template.New("page").Parse(string(pageSource))
-	if err != nil {
-		return nil, fmt.Errorf("parse page template: %w", err)
+		return nil, fmt.Errorf("parse viewer templates: %w", err)
 	}
 	styles, err := fs.ReadFile(web.Files, "generated/styles.css")
 	if err != nil {
@@ -401,6 +397,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	server.handler = securityHeaders(mux)
 
 	return server, nil
+}
+
+func parseViewerTemplates() (*template.Template, error) {
+	return template.ParseFS(web.Files, "templates/*.html")
 }
 
 // handleReviewScript serves the embedded annotation UI without requiring a
@@ -689,7 +689,7 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 	if s.review != nil {
 		data.ReviewToken = s.review.token
 	}
-	if err := s.page.Execute(response, data); err != nil {
+	if err := s.page.ExecuteTemplate(response, "page.html", data); err != nil {
 		// Headers may already be written; this message is primarily useful in
 		// tests and terminal diagnostics until structured logging is added.
 		http.Error(response, "could not render viewer page", http.StatusInternalServerError)

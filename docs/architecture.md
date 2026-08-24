@@ -68,11 +68,16 @@ The current browser still renders annotation cards and actions imperatively.
 The first infrastructure slices of an approved migration have added the
 TypeScript unit-test harness and a pinned, embedded HTMX 2.0.10 runtime. The
 server exposes HTMX at `/static/htmx.min.js` under the existing same-origin CSP,
-but `page.html` intentionally does not load it, so runtime behavior is
-unchanged. Later reviewed slices will move authoritative review HTML to Go
-templates and HTMX fragments while retaining browser-only interaction in
-testable TypeScript. Its invariants, separate `/ui/*` route plan, test strategy,
-documentation contract, and one-commit-at-a-time review gates are defined in
+but `web/templates/page.html` intentionally does not load it, so runtime
+behavior is unchanged. The page and inactive annotation panel, card, and
+action fragments are parsed from `web/templates/*.html` as one template set.
+Presentation-specific Go view models derive active filtering, counts, source
+labels, threads, stale-anchor state, and permitted lifecycle actions; action
+authorization delegates to `internal/annotation` transition validation. No
+fragment route executes these models in production yet. Later reviewed slices
+will add `/ui/*` handlers and retain browser-only interaction in testable
+TypeScript. The invariants, route plan, test strategy, documentation contract,
+and one-commit-at-a-time review gates are defined in
 [`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.

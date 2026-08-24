@@ -33,6 +33,12 @@ are the source of truth in
 [`../web/vendor/htmx/README.md`](../web/vendor/htmx/README.md), and
 `go test ./web` enforces the vendored file digests.
 
+The complete page and the currently inactive annotation fragments live under
+`web/templates/` and are parsed together by `internal/server`. Their focused
+tests render named templates directly and cover escaping and presentation
+rules. No build generation step is required for these authored HTML files, and
+no production `/ui/*` route uses the fragments before its later commit gate.
+
 ## Run from source
 
 From the repository root:

@@ -1,0 +1,61 @@
+{{define "annotation-actions"}}
+<div class="annotation-action-bar">
+  <details class="annotation-actions">
+    <summary>Actions</summary>
+    {{if .CanReattach}}
+    <form class="annotation-reattach" method="post" action="{{.ReattachURL}}" hx-post="{{.ReattachURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+      <input type="hidden" name="document" value="{{.Document}}">
+      <input type="hidden" name="selection_start_byte">
+      <input type="hidden" name="selection_end_byte">
+      <input type="hidden" name="document_sha256">
+      <p class="reattach-help">Select replacement text in the document to enable reattachment.</p>
+      <p class="reattach-status" role="status"></p>
+      <button type="submit" disabled>Reattach selection</button>
+    </form>
+    {{end}}
+    <form class="annotation-reply" method="post" action="{{.ReplyURL}}" hx-post="{{.ReplyURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+      <input type="hidden" name="document" value="{{.Document}}">
+      <label>Reply as
+        <select name="author" required>
+          <option value="reviewer">Reviewer</option>
+          <option value="author">Author</option>
+          <option value="agent">Agent</option>
+        </select>
+      </label>
+      <label>Reply<textarea name="message" rows="3" required></textarea></label>
+      <p class="reply-status" role="status"></p>
+      <button type="submit">Add reply</button>
+    </form>
+    {{if .Transitions}}
+    <form class="annotation-lifecycle" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+      <input type="hidden" name="document" value="{{.Document}}">
+      <label>Action
+        <select name="status" required>
+          {{range .Transitions}}<option value="{{.Status}}" data-role="{{.ActorRole}}"{{if .Activity}} data-activity="{{.Activity}}" data-activity-label="{{.ActivityLabel}}"{{end}}>{{.Label}}</option>{{end}}
+        </select>
+      </label>
+      <label>Author
+        <select name="author" required>
+          <option value="reviewer">Reviewer</option>
+          <option value="author">Author</option>
+          <option value="agent">Agent</option>
+        </select>
+      </label>
+      <label class="lifecycle-activity" hidden><span>Message</span><textarea name="activity" rows="3"></textarea></label>
+      <label class="lifecycle-commit" hidden>Commit (optional)<input name="commit"></label>
+      <p class="lifecycle-status" role="status"></p>
+      <button type="submit">Update status</button>
+    </form>
+    {{end}}
+  </details>
+  {{if .CanQuickClose}}
+  <form class="annotation-quick-close-form" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+    <input type="hidden" name="document" value="{{.Document}}">
+    <input type="hidden" name="status" value="closed">
+    <input type="hidden" name="actor_role" value="reviewer">
+    <input type="hidden" name="author" value="reviewer">
+    <button type="submit" class="annotation-quick-close" aria-label="Close annotation {{.AnnotationID}}">Close</button>
+  </form>
+  {{end}}
+</div>
+{{end}}

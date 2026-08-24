@@ -2,9 +2,12 @@
 
 ## Status
 
-Proposed design. This document describes the migration from the current browser
-JavaScript modules to TypeScript. It is intended to be the reference for the
-implementation and for future frontend changes.
+Implemented. This document records the completed migration from browser
+JavaScript modules to TypeScript. The later server-rendered review UI migration
+is authoritative for subsequent frontend work; it moved `web/page.html` to
+`web/templates/page.html` and added inactive fragment templates. See
+[`server-rendered-review-ui.md`](server-rendered-review-ui.md) and
+[`../architecture.md`](../architecture.md) for the current layout.
 
 ## Goals
 

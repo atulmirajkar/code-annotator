@@ -1,0 +1,37 @@
+{{define "annotation-card"}}
+<details class="annotation-card" data-annotation-id="{{.ID}}"{{if .Inactive}} data-inactive="true"{{end}}>
+  <summary class="annotation-summary" title="Show this annotation in the document">
+    <span class="annotation-meta">
+      <span class="badge">{{.Intent}}</span>
+      <span class="badge">{{.Status}}</span>
+      {{with .Turn}}<span class="badge {{.Class}}">{{.Label}}</span>{{end}}
+      {{if .AnchorStale}}<span class="badge stale">stale</span>{{end}}
+    </span>
+    <span class="annotation-summary-comment">{{.Comment}}</span>
+  </summary>
+  <div class="annotation-card-body">
+    <p class="annotation-navigation-status" role="status"></p>
+    {{if .DocumentLevel}}
+    <div class="annotation-source document-level">Whole document</div>
+    {{else}}
+    <div class="annotation-source"><q>{{.SourceQuote}}</q><span class="annotation-source-lines">{{.SourceLines}}</span></div>
+    {{end}}
+    <p class="annotation-comment">{{.Comment}}</p>
+    <p class="annotation-author">By {{.Author}}</p>
+    {{if .Thread}}
+    <ol class="annotation-thread">
+      {{range .Thread}}
+      <li class="annotation-thread-entry {{.Class}}" data-kind="{{.Kind}}"{{if .ActorRole}} data-role="{{.ActorRole}}"{{end}}>
+        <div class="annotation-thread-header">
+          <span class="annotation-thread-kind">{{.KindLabel}}</span>
+          <span class="annotation-thread-author">{{.Author}}</span>
+        </div>
+        <p class="annotation-thread-body">{{.Text}}</p>
+      </li>
+      {{end}}
+    </ol>
+    {{end}}
+    {{template "annotation-actions" .Actions}}
+  </div>
+</details>
+{{end}}

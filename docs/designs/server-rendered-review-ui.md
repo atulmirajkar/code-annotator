@@ -518,7 +518,7 @@ Checks: `npm run test:unit`, `npm run check:web`, `go test ./...`.
 
 ### Commit 2: vendor and serve HTMX without activating it
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -530,6 +530,8 @@ Scope:
 Checks: `go test ./internal/server ./web`, `go test ./...`.
 
 ### Commit 3: add inactive fragment templates and view models
+
+Status: implemented in the current review commit; awaiting maintainer approval.
 
 Scope:
 

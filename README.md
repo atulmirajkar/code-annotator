@@ -37,6 +37,9 @@ server-rendered review UI. The server exposes it at `/static/htmx.min.js`, but
 no viewer page loads it yet; the existing TypeScript review UI remains the
 production runtime until its later activation gate. Provenance and checksums
 are recorded in [`web/vendor/htmx/README.md`](web/vendor/htmx/README.md).
+The full page and inactive annotation panel/card/action fragments are parsed as
+one Go template set under `web/templates/`; no `/ui/*` fragment routes are
+registered yet.
 
 ## Usage
 

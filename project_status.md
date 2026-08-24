@@ -4,16 +4,19 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit gate 2 is implemented and awaiting
-maintainer review. Gate 3 must not begin without explicit approval.
+**Phase:** Server-rendered review UI commit gate 3 is implemented and awaiting
+maintainer review. Gate 4 must not begin without explicit approval.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
 `/static/htmx.min.js`, with provenance and checksums under `web/vendor/htmx/`.
 It is intentionally not loaded by viewer pages, and no server-rendered fragment
-implementation is present yet. The current imperative TypeScript frontend
-remains the production runtime until the corresponding reviewed gates are
-merged. Every milestone 17 commit must update
+route is registered yet. The complete page and inactive annotation panel,
+card, and action fragments now form one parsed template set. Presentation view
+models derive filtering, counts, threads, source/anchor display, and lifecycle
+action availability without request or store dependencies. The current
+imperative TypeScript frontend remains the production runtime until the
+corresponding reviewed gates are merged. Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
 
@@ -310,7 +313,7 @@ for explicit approval before starting the next item.
   pure TypeScript extraction without changing runtime behavior.
 - [x] Commit 2: vendor, license, embed, and serve HTMX 2.0.10 without loading it
   in the page.
-- [ ] Commit 3: add inactive annotation fragment templates, presentation view
+- [x] Commit 3: add inactive annotation fragment templates, presentation view
   models, and escaping/action-availability tests.
 - [ ] Commit 4: share annotation read/create application operations and add
   compatible HTML handlers while preserving JSON behavior.
@@ -367,10 +370,12 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 2 pins, licenses, embeds, and serves HTMX 2.0.10 without
-loading it in viewer pages. It is awaiting maintainer review. The next allowed
-implementation slice is commit 3, adding inactive fragment templates and view
-models; it must not begin until the maintainer explicitly approves proceeding.
+milestone. Commit 3 adds the shared page/fragment template set and tested,
+presentation-only annotation view models without registering production UI
+routes. It is awaiting maintainer review. The next allowed implementation
+slice is commit 4, sharing annotation read/create operations and adding
+inactive HTML handlers; it must not begin until the maintainer explicitly
+approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented; final suite
