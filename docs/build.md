@@ -188,7 +188,11 @@ annotations. Annotation cards expose only lifecycle transitions valid for their
 current status and collect the required resolution summary or review message.
 Inline replies append discussion without changing lifecycle state. Stale-anchor
 reattachment uses the current document selection from the stale annotation's
-card and is also available through the API.
+card and is also available through the API. If the Markdown changes after a
+selection is captured but before creation, the server still persists the
+comment with `needsReattachment: true`; select replacement text and use the
+same reattachment action. No source quote is stored until that replacement is
+verified against the current document.
 
 With no fixed port, the server binds to `127.0.0.1:0` and reports the port chosen
 by the operating system.

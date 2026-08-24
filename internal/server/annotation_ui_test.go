@@ -152,6 +152,34 @@ func TestCreateAnnotationUI(t *testing.T) {
 		}
 	})
 
+	t.Run("preserves comment when selection revision changed", func(t *testing.T) {
+		t.Parallel()
+		viewer, store := newViewer(t)
+		form := url.Values{
+			"document": {"README.md"}, "intent": {"question"},
+			"comment": {"Keep my draft."}, "role": {"reviewer"},
+			"selection_start_byte": {"7"}, "selection_end_byte": {"15"},
+			"document_sha256": {strings.Repeat("0", 64)},
+		}
+		request := httptest.NewRequest(http.MethodPost, "/ui/review/annotations", strings.NewReader(form.Encode()))
+		request.Header.Set("Origin", origin)
+		request.Header.Set(reviewTokenHeader, token)
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		request.Header.Set("If-Match", `""`)
+		response := httptest.NewRecorder()
+		viewer.Handler().ServeHTTP(response, request)
+		if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "Original selection unavailable; reattach required.") || !strings.Contains(response.Body.String(), "Keep my draft.") {
+			t.Fatalf("status = %d; body: %s", response.Code, response.Body.String())
+		}
+		stored, _, err := store.Load("README.md")
+		if err != nil {
+			t.Fatalf("Store.Load() error = %v", err)
+		}
+		if len(stored.Annotations) != 1 || !stored.Annotations[0].NeedsReattachment || stored.Annotations[0].Comment != "Keep my draft." {
+			t.Fatalf("stored sidecar = %#v", stored)
+		}
+	})
+
 	tests := []struct {
 		name        string
 		contentType string

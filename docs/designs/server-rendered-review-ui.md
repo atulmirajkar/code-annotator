@@ -303,7 +303,10 @@ in loaded fragments, disable the history cache for review pages, and set
 - Revision conflicts return `409 Conflict` with the latest authoritative panel
   and a conflict banner. The fragment rehydrates submitted role, intent, and
   draft text from the validated form input and escapes them through the
-  template; a source selection whose revision is stale must be captured again.
+  template.
+- If the document changed after selection capture, creation succeeds and saves
+  the comment as a stale selection awaiting reattachment. The panel never
+  substitutes text from stale byte offsets for the original selection.
 - A small `htmx:beforeSwap` adapter permits HTML fragment swaps for expected
   `409` and `422` responses only. Other error responses are not swapped and
   reach the shared error status region.

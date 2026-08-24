@@ -63,17 +63,20 @@ type Sidecar struct {
 }
 
 // Annotation is a review request and its durable discussion thread. Source is
-// nil for a document-level annotation.
+// nil for a document-level annotation or while a selection needs reattachment.
 type Annotation struct {
-	ID        string        `json:"id"`
-	Intent    Intent        `json:"intent"`
-	Status    Status        `json:"status"`
-	Comment   string        `json:"comment"`
-	Role      Role          `json:"role"`
-	CreatedAt time.Time     `json:"createdAt"`
-	UpdatedAt time.Time     `json:"updatedAt"`
-	Source    *Source       `json:"source,omitempty"`
-	Thread    []ThreadEntry `json:"thread"`
+	ID        string    `json:"id"`
+	Intent    Intent    `json:"intent"`
+	Status    Status    `json:"status"`
+	Comment   string    `json:"comment"`
+	Role      Role      `json:"role"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+	Source    *Source   `json:"source,omitempty"`
+	// NeedsReattachment marks a selection-backed annotation whose document
+	// changed before its source quote could be verified.
+	NeedsReattachment bool          `json:"needsReattachment,omitempty"`
+	Thread            []ThreadEntry `json:"thread"`
 }
 
 // Source identifies the document revision and selected Markdown source text.
@@ -161,6 +164,9 @@ func (a Annotation) Validate() error {
 		return errors.New("updatedAt cannot precede createdAt")
 	}
 	if a.Source != nil {
+		if a.NeedsReattachment {
+			return errors.New("annotation cannot have a source while awaiting reattachment")
+		}
 		if err := a.Source.Validate(); err != nil {
 			return fmt.Errorf("source: %w", err)
 		}

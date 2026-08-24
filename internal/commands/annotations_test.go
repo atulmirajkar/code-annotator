@@ -262,6 +262,26 @@ func TestRunAnnotationExport(t *testing.T) {
 	}
 }
 
+func TestWriteAnchorSummaryForSelectionAwaitingReattachment(t *testing.T) {
+	t.Parallel()
+
+	item := listAnnotation{
+		Annotation: annotation.Annotation{NeedsReattachment: true},
+		Anchor: &annotation.AnchorResult{
+			State:  annotation.AnchorStale,
+			Reason: annotation.StaleDocumentChanged,
+		},
+	}
+	var output strings.Builder
+
+	writeAnchorSummary(&output, item)
+
+	want := "- Original lines: unavailable\n- Anchor: `stale` (`document_changed`, candidates: 0)\n"
+	if output.String() != want {
+		t.Fatalf("writeAnchorSummary() = %q, want %q", output.String(), want)
+	}
+}
+
 // seedCommandAnnotations creates two valid sidecars in deliberately reversed
 // save order so the list test verifies content-index ordering.
 func seedCommandAnnotations(t *testing.T, directory string) {

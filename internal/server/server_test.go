@@ -970,6 +970,7 @@ func TestCreateAnnotationAPI(t *testing.T) {
 		wantStatus   int
 		wantExact    string
 		wantConflict bool
+		wantReattach bool
 	}{
 		{name: "selected text", body: selectedBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantExact: "selected"},
 		{name: "selection across formatting", body: crossTagBody, ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantExact: "Before **selected**"},
@@ -978,7 +979,7 @@ func TestCreateAnnotationAPI(t *testing.T) {
 		{name: "missing revision", body: documentBody, wantStatus: http.StatusPreconditionRequired},
 		{name: "malformed revision", body: documentBody, ifMatch: stringPointer("unquoted"), wantStatus: http.StatusBadRequest},
 		{name: "stale revision", body: documentBody, ifMatch: stringPointer(`""`), seedSidecar: true, wantStatus: http.StatusConflict, wantConflict: true},
-		{name: "stale document digest", body: strings.Replace(selectedBody, digest, strings.Repeat("0", 64), 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusConflict},
+		{name: "stale document digest preserves annotation", body: strings.Replace(selectedBody, digest, strings.Repeat("0", 64), 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusCreated, wantReattach: true},
 		{name: "selection range invalid", body: strings.Replace(selectedBody, `"endByte":17`, `"endByte":100`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
 		{name: "invalid intent", body: strings.Replace(documentBody, `"question"`, `"unsupported"`, 1), ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
 		{name: "unknown field", body: strings.TrimSuffix(documentBody, "}") + `,"status":"closed"}`, ifMatch: stringPointer(`""`), wantStatus: http.StatusBadRequest},
@@ -1046,7 +1047,11 @@ func TestCreateAnnotationAPI(t *testing.T) {
 			if got := response.Header().Get("Location"); got != "/api/annotations/"+payload.Annotation.ID {
 				t.Fatalf("Location = %q, want created annotation location", got)
 			}
-			if test.wantExact != "" {
+			if test.wantReattach {
+				if payload.Annotation.Source != nil || !payload.Annotation.NeedsReattachment || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorStale || payload.Annotation.Anchor.Reason != annotation.StaleDocumentChanged {
+					t.Fatalf("annotation awaiting reattachment = %#v", payload.Annotation)
+				}
+			} else if test.wantExact != "" {
 				if payload.Annotation.Source == nil || payload.Annotation.Source.Selector.Exact != test.wantExact || payload.Annotation.Anchor == nil || payload.Annotation.Anchor.State != annotation.AnchorExact {
 					t.Fatalf("selected annotation = %#v", payload.Annotation)
 				}
@@ -1057,7 +1062,7 @@ func TestCreateAnnotationAPI(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Store.Load() error = %v", err)
 			}
-			if len(stored.Annotations) != 1 || string(revision) != payload.Revision {
+			if len(stored.Annotations) != 1 || stored.Annotations[0].NeedsReattachment != test.wantReattach || string(revision) != payload.Revision {
 				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
 			}
 		})
@@ -1371,6 +1376,7 @@ func TestReattachAnnotationAPI(t *testing.T) {
 		wantConflict bool
 	}{
 		{name: "reattach stale anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "stale", useCurrent: true, wantStatus: http.StatusOK},
+		{name: "reattach selection lost during creation", annotationID: "ann_reattach_test", body: validBody, sourceMode: "pending", useCurrent: true, wantStatus: http.StatusOK},
 		{name: "resolved anchor", annotationID: "ann_reattach_test", body: validBody, sourceMode: "exact", useCurrent: true, wantStatus: http.StatusConflict},
 		{name: "document annotation", annotationID: "ann_reattach_test", body: validBody, sourceMode: "document", useCurrent: true, wantStatus: http.StatusConflict},
 		{name: "stale document digest", annotationID: "ann_reattach_test", body: strings.Replace(validBody, digest, strings.Repeat("0", 64), 1), sourceMode: "stale", useCurrent: true, wantStatus: http.StatusConflict},
@@ -1435,7 +1441,7 @@ func TestReattachAnnotationAPI(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Store.Load() error = %v", err)
 			}
-			if stored.Annotations[0].Source.Selector.Exact != "new selection" || string(revision) != payload.Revision {
+			if stored.Annotations[0].Source.Selector.Exact != "new selection" || stored.Annotations[0].NeedsReattachment || string(revision) != payload.Revision {
 				t.Fatalf("stored sidecar = %#v, revision %q", stored, revision)
 			}
 		})
@@ -1447,6 +1453,7 @@ func TestReattachAnnotationAPI(t *testing.T) {
 func saveReattachAnnotation(t *testing.T, store *annotationstore.Store, sourceMode string) annotationstore.Revision {
 	t.Helper()
 	var source *annotation.Source
+	needsReattachment := false
 	switch sourceMode {
 	case "stale":
 		created, err := annotation.NewSource([]byte("Before old selection after"), 7, 20)
@@ -1461,6 +1468,8 @@ func saveReattachAnnotation(t *testing.T, store *annotationstore.Store, sourceMo
 		}
 		source = &created
 	case "document":
+	case "pending":
+		needsReattachment = true
 	default:
 		t.Fatalf("unsupported source mode %q", sourceMode)
 	}
@@ -1470,15 +1479,16 @@ func saveReattachAnnotation(t *testing.T, store *annotationstore.Store, sourceMo
 		Document:      "README.md",
 		Annotations: []annotation.Annotation{
 			{
-				ID:        "ann_reattach_test",
-				Intent:    annotation.IntentChangeRequest,
-				Status:    annotation.StatusOpen,
-				Comment:   "Update this selection.",
-				Role:      "reviewer",
-				CreatedAt: createdAt,
-				UpdatedAt: createdAt,
-				Source:    source,
-				Thread:    []annotation.ThreadEntry{},
+				ID:                "ann_reattach_test",
+				Intent:            annotation.IntentChangeRequest,
+				Status:            annotation.StatusOpen,
+				Comment:           "Update this selection.",
+				Role:              "reviewer",
+				CreatedAt:         createdAt,
+				UpdatedAt:         createdAt,
+				Source:            source,
+				NeedsReattachment: needsReattachment,
+				Thread:            []annotation.ThreadEntry{},
 			},
 		},
 	}

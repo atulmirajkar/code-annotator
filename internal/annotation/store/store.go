@@ -472,7 +472,7 @@ func mergeUnknownJSON(existing, updated []byte) ([]byte, error) {
 var (
 	knownRootFields       = fieldSet("schemaVersion", "document", "annotations")
 	knownAnnotationFields = fieldSet(
-		"id", "intent", "status", "comment", "role", "author", "createdAt", "updatedAt", "source", "thread",
+		"id", "intent", "status", "comment", "role", "author", "createdAt", "updatedAt", "source", "needsReattachment", "thread",
 	)
 	knownSourceFields   = fieldSet("sha256", "selector")
 	knownSelectorFields = fieldSet("exact", "prefix", "suffix", "startByte", "endByte", "startLine", "endLine")

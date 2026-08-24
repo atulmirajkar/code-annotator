@@ -327,6 +327,9 @@ for explicit approval before starting the next item.
   their next successful save.
 - [x] Commit 4: share annotation read/create application operations and add
   compatible HTML handlers while preserving JSON behavior.
+- [x] Commit 4 review follow-up: preserve comments when a captured selection's
+  document digest is stale, expose the result as requiring reattachment, and
+  use anchor terminology consistently across shared operations.
 - [ ] Commit 5: share reply/transition operations and add 422/409 HTML
   responses while preserving JSON behavior.
 - [ ] Commit 6: share reattach operations and complete the inactive HTML
@@ -381,11 +384,12 @@ for explicit approval before starting the next item.
 ## Next milestone
 
 Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 4 shares annotation read/create application operations
-between the unchanged JSON API and newly registered inactive HTML handlers. It
-is awaiting maintainer review. The next allowed implementation slice is commit
-5, sharing reply/transition operations and adding their HTML handlers; it must
-not begin until the maintainer explicitly approves proceeding.
+milestone. Commit 4 is approved; its focused review follow-up preserves a
+selected comment when the document changes before creation and represents it as
+a stale annotation awaiting reattachment. That follow-up is the current review
+gate. The next allowed implementation slice is commit 5, sharing
+reply/transition operations and adding their HTML handlers; it must not begin
+until the maintainer explicitly approves proceeding.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.
@@ -393,7 +397,7 @@ Milestone 14
 (TypeScript frontend migration) is implemented and verified.
 Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
 previously available Playwright Edge tests passed when milestone 14 closed. The
-current suite's 39 browser cases passed on 2026-08-24. The only unchecked item
+current suite's 40 browser cases passed on 2026-08-24. The only unchecked item
 in milestone 14 is a CI workflow check for generated-asset reproducibility;
 this repository has no existing CI workflow yet. Live reload and source syntax
 highlighting remain separately scoped milestones.

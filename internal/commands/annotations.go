@@ -265,7 +265,9 @@ func collectList(configuration listConfig) (listOutput, error) {
 				}
 			}
 			view := listAnnotation{Annotation: item}
-			if item.Source != nil {
+			if item.NeedsReattachment {
+				view.Anchor = &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}
+			} else if item.Source != nil {
 				anchor, err := annotation.ResolveAnchor(source, *item.Source)
 				if err != nil {
 					return listOutput{}, fmt.Errorf("resolve annotation %q: %w", item.ID, err)
@@ -346,6 +348,11 @@ func runExport(configuration listConfig, output io.Writer) error {
 // writeAnchorSummary distinguishes original selector lines from the current
 // derived location so moved and stale annotations remain unambiguous to agents.
 func writeAnchorSummary(output *strings.Builder, item listAnnotation) {
+	if item.NeedsReattachment {
+		output.WriteString("- Original lines: unavailable\n")
+		output.WriteString("- Anchor: `stale` (`document_changed`, candidates: 0)\n")
+		return
+	}
 	if item.Source == nil {
 		output.WriteString("- Anchor: document\n")
 		return

@@ -208,6 +208,34 @@ test.describe("annotation review interactions", () => {
     await expect(card.locator(".annotation-source")).toContainText("Replacement anchor");
   });
 
+  test("preserves a selected comment when the document changes during creation", async ({ page, viewer }) => {
+    const documentPath = path.join(viewer.contentRoot, "changed-during-creation.md");
+    await writeFile(documentPath, "# Changed during creation\n\nReview this selected phrase before release.\n");
+    await page.goto(`${viewer.url}view/changed-during-creation.md`);
+    await openAnnotations(page);
+    await selectText(page, "selected phrase");
+    await openNewAnnotationForm(page);
+    await page.locator('.annotation-form textarea[name="comment"]').fill("Do not lose this comment.");
+
+    await writeFile(documentPath, "# Changed during creation\n\nReplacement anchor after the edit.\n");
+    await page.locator('.annotation-form button[type="submit"]').click();
+
+    const card = page.locator(".annotation-card");
+    await expect(page.locator(".annotation-form-status")).toHaveText("Annotation added.");
+    await expect(card).toContainText("Do not lose this comment.");
+    await expect(card.locator(".annotation-badge.stale")).toBeVisible();
+    await card.locator(".annotation-summary").click();
+    await expect(card.locator(".annotation-source")).toContainText("Original selection unavailable; reattach required.");
+
+    await page.reload();
+    await selectText(page, "Replacement anchor");
+    await card.locator(".annotation-summary").click();
+    await card.locator(".annotation-actions > summary").click();
+    await card.locator('.annotation-reattach button[type="submit"]').click();
+    await expect(card.locator(".annotation-badge.stale")).toHaveCount(0);
+    await expect(card.locator(".annotation-source")).toContainText("Replacement anchor");
+  });
+
   test("reloads authoritative annotations after a revision conflict", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/conflict.md`);
     await openAnnotations(page);

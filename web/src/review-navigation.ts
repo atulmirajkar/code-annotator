@@ -33,6 +33,9 @@ export function createAnnotationNavigator({ markdown, sourceRange, sourceSpan }:
   }
 
   function annotationNavigationTarget(annotation: Annotation): { target: HTMLElement | null; approximate: boolean } {
+    if (annotation.needsReattachment) {
+      return { target: null, approximate: true };
+    }
     if (!annotation.source || !annotation.source.selector) {
       return { target: markdown.querySelector<HTMLElement>("h1, h2, h3, h4, h5, h6") || markdown, approximate: false };
     }

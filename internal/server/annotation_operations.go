@@ -69,16 +69,16 @@ func (s *Server) readAnnotationDocumentOperation(documentPath string) (annotatio
 	if err != nil {
 		return annotationDocumentResult{}, operationError(annotationOperationInternal, "could not read annotations", err)
 	}
-	annotations, err := resolveAnnotations(document, sidecar.Annotations)
+	annotations, err := anchorAnnotations(document, sidecar.Annotations)
 	if err != nil {
 		return annotationDocumentResult{}, operationError(annotationOperationInternal, "could not resolve annotation anchor", err)
 	}
 	return annotationDocumentResult{Document: catalogDocument, Revision: revision, Annotations: annotations}, nil
 }
 
-// createAnnotationOperation validates browser-selected source bytes, appends a
-// new open annotation, and returns both the created record and refreshed panel
-// state from the same optimistic save.
+// createAnnotationOperation validates browser-selected source bytes when the
+// document revision matches. If it changed, the comment is still saved with a
+// stale selection marker so the reviewer can reattach it without losing text.
 func (s *Server) createAnnotationOperation(input createAnnotationInput) (createAnnotationResult, error) {
 	document, catalogDocument, err := s.loadAnnotationSource(input.Document)
 	if err != nil {
@@ -86,15 +86,17 @@ func (s *Server) createAnnotationOperation(input createAnnotationInput) (createA
 	}
 
 	var source *annotation.Source
+	needsReattachment := false
 	if input.Selection != nil {
 		if !strings.EqualFold(input.Selection.DocumentSHA256, annotation.DocumentSHA256(document)) {
-			return createAnnotationResult{}, operationError(annotationOperationConflict, "document changed; refresh and select again", nil)
+			needsReattachment = true
+		} else {
+			createdSource, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
+			if err != nil {
+				return createAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
+			}
+			source = &createdSource
 		}
-		createdSource, err := annotation.NewSource(document, input.Selection.StartByte, input.Selection.EndByte)
-		if err != nil {
-			return createAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
-		}
-		source = &createdSource
 	}
 
 	now := time.Now().UTC()
@@ -105,7 +107,8 @@ func (s *Server) createAnnotationOperation(input createAnnotationInput) (createA
 	created := annotation.Annotation{
 		ID: identifier, Intent: input.Intent, Status: annotation.StatusOpen,
 		Comment: input.Comment, Role: input.Role, CreatedAt: now, UpdatedAt: now,
-		Source: source, Thread: []annotation.ThreadEntry{},
+		Source: source, NeedsReattachment: needsReattachment,
+		Thread: []annotation.ThreadEntry{},
 	}
 	if err := created.Validate(); err != nil {
 		return createAnnotationResult{}, operationError(annotationOperationInvalid, err.Error(), err)
@@ -116,7 +119,7 @@ func (s *Server) createAnnotationOperation(input createAnnotationInput) (createA
 		return createAnnotationResult{}, operationError(annotationOperationInternal, "could not read annotations", err)
 	}
 	sidecar.Annotations = append(sidecar.Annotations, created)
-	resolved, err := resolveAnnotations(document, sidecar.Annotations)
+	anchoredAnnotations, err := anchorAnnotations(document, sidecar.Annotations)
 	if err != nil {
 		return createAnnotationResult{}, operationError(annotationOperationInternal, "could not resolve annotation anchor", err)
 	}
@@ -129,9 +132,9 @@ func (s *Server) createAnnotationOperation(input createAnnotationInput) (createA
 	}
 
 	return createAnnotationResult{
-		Created: resolved[len(resolved)-1],
+		Created: anchoredAnnotations[len(anchoredAnnotations)-1],
 		Document: annotationDocumentResult{
-			Document: catalogDocument, Revision: revision, Annotations: resolved,
+			Document: catalogDocument, Revision: revision, Annotations: anchoredAnnotations,
 		},
 	}, nil
 }
@@ -162,7 +165,7 @@ func (s *Server) loadAnnotationSource(documentPath string) ([]byte, content.Docu
 	return document, catalogDocument, nil
 }
 
-func resolveAnnotations(document []byte, items []annotation.Annotation) ([]resolvedAnnotation, error) {
+func anchorAnnotations(document []byte, items []annotation.Annotation) ([]resolvedAnnotation, error) {
 	result := make([]resolvedAnnotation, 0, len(items))
 	for _, item := range items {
 		view, err := resolveAnnotation(document, item)

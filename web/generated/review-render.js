@@ -49,7 +49,11 @@ export function createAnnotationRenderer({ list, count, showInactive, renderAnno
         navigationStatus.setAttribute("role", "status");
         body.append(navigationStatus);
         const source = element("div", "annotation-source");
-        if (annotation.source && annotation.source.selector) {
+        if (annotation.needsReattachment) {
+            source.textContent = "Original selection unavailable; reattach required.";
+            source.classList.add("stale-selection");
+        }
+        else if (annotation.source && annotation.source.selector) {
             const quote = document.createElement("q");
             quote.textContent = annotation.source.selector.exact || "";
             source.append(quote);

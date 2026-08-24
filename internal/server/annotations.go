@@ -20,11 +20,12 @@ import (
 // resolvedAnnotation combines persisted annotation data with the anchor
 // location derived from the current document bytes. It is shared by API
 // responses and presentation-model construction; it is not an HTML view model.
-// Document-level annotations have no anchor.
+// Document-level annotations have no anchor. A selection saved after its
+// document changed has a synthetic stale anchor until it is reattached.
 type resolvedAnnotation struct {
 	// Annotation is the validated record loaded from the document sidecar.
 	annotation.Annotation
-	// Anchor is resolved against current document bytes and is nil for
+	// Anchor is resolved against current document bytes and is nil only for
 	// document-level annotations.
 	Anchor *annotation.AnchorResult `json:"anchor,omitempty"`
 }
@@ -530,14 +531,17 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		return
 	}
 	updated := &sidecar.Annotations[annotationIndex]
-	if updated.Source == nil {
+	if updated.Source == nil && !updated.NeedsReattachment {
 		http.Error(response, "document-level annotation cannot be reattached", http.StatusConflict)
 		return
 	}
-	oldAnchor, err := annotation.ResolveAnchor(document, *updated.Source)
-	if err != nil {
-		http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
-		return
+	oldAnchor := annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}
+	if updated.Source != nil {
+		oldAnchor, err = annotation.ResolveAnchor(document, *updated.Source)
+		if err != nil {
+			http.Error(response, "could not resolve annotation anchor", http.StatusInternalServerError)
+			return
+		}
 	}
 	if oldAnchor.State != annotation.AnchorStale {
 		http.Error(response, "annotation anchor is not stale", http.StatusConflict)
@@ -560,6 +564,7 @@ func (s *Server) handleReattachAnnotation(response http.ResponseWriter, request 
 		now = updated.UpdatedAt
 	}
 	updated.Source = &replacement
+	updated.NeedsReattachment = false
 	updated.UpdatedAt = now
 	if err := sidecar.Validate(); err != nil {
 		http.Error(response, "could not validate reattached annotation", http.StatusInternalServerError)
@@ -602,10 +607,14 @@ func findAnnotation(sidecar annotation.Sidecar, identifier string) int {
 }
 
 // resolveAnnotation derives current anchor state without changing the
-// persisted annotation. Document-level annotations have no derived anchor.
+// persisted annotation. Document-level annotations have no derived anchor;
+// selections awaiting reattachment expose a synthetic stale anchor.
 func resolveAnnotation(document []byte, item annotation.Annotation) (resolvedAnnotation, error) {
 	view := resolvedAnnotation{Annotation: item}
 	if item.Source == nil {
+		if item.NeedsReattachment {
+			view.Anchor = &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}
+		}
 		return view, nil
 	}
 	anchor, err := annotation.ResolveAnchor(document, *item.Source)

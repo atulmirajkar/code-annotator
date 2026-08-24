@@ -210,8 +210,10 @@ accepts only URL-encoded bodies under the same 64 KiB limit and returns the
 complete annotation panel with `200` after the shared operation succeeds.
 The browser creation form uses the revision from its latest annotation read,
 preserves a captured selection while focus moves into the panel, and reloads
-the authoritative list after a successful write. Conflicts retain the draft
-comment and require a refreshed document selection.
+the authoritative list after a successful write. If the document changes
+before creation, the server saves the comment as a stale selection awaiting
+reattachment without trusting its old offsets. Sidecar revision conflicts
+retain the draft comment and require the latest annotation state.
 Annotation cards render the persisted selector quote and line range with DOM
 text nodes. This preserves the original review context even when the separately
 derived current anchor state is stale.

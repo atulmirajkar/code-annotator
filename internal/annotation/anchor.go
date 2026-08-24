@@ -25,8 +25,9 @@ const (
 type StaleReason string
 
 const (
-	StaleNotFound  StaleReason = "not_found"
-	StaleAmbiguous StaleReason = "ambiguous"
+	StaleNotFound        StaleReason = "not_found"
+	StaleAmbiguous       StaleReason = "ambiguous"
+	StaleDocumentChanged StaleReason = "document_changed"
 )
 
 // AnchorResult is the current location and derived state of a source selector.

@@ -194,6 +194,13 @@ prefers a valid legacy `actorRole`, maps `agent`, `codex`, and `claude` authors
 to `agent`, and maps other non-empty authors to `reviewer`. The next successful
 optimistic save writes schema version 2 while preserving unknown fields.
 
+A selected-text annotation normally has `source`; a document-level annotation
+does not. If the document changes after the browser captures a selection but
+before creation reaches the server, the server preserves the comment with
+`needsReattachment: true` and no unverified `source`. This is distinct from a
+document-level annotation and resolves as a stale anchor with reason
+`document_changed` until the reviewer attaches a new verified selection.
+
 ### Threaded activity and resolution attempts
 
 The original `comment` remains immutable review context. Follow-up discussion
@@ -422,8 +429,11 @@ overwriting another writer's annotations.
 
 The create body contains `document`, `intent`, `comment`, `role`, and an
 optional `selection` with `startByte`, exclusive `endByte`, and
-`documentSHA256`. The server reads the current Markdown, rejects a stale digest,
-then derives the exact source quote, context, and line range from those offsets.
+`documentSHA256`. The server reads the current Markdown and, when the digest
+matches, derives the exact source quote, context, and line range from those
+offsets. When the digest is stale, it still creates the annotation and
+preserves the comment as a stale selection awaiting reattachment; it never
+invents a quote from unverified offsets.
 Without `selection`, the
 annotation applies to the document. The server owns the initial `open` status,
 UTC timestamps, empty thread, and sortable collision-resistant `ann_` ID.
@@ -575,8 +585,11 @@ a missing annotation directory produces an empty list without creating storage.
 
 Markdown `export` reuses that collected model and adds stable IDs, original
 selector text and lines, derived anchor location or stale reason, comments, and
-the complete thread. Source and comment blocks choose a backtick fence longer
-than any run in their content, preserving arbitrary Markdown as data.
+the complete thread. An annotation awaiting reattachment exports a stale
+`document_changed` anchor and unavailable original lines rather than being
+misreported as document-level. Source and comment blocks choose a backtick
+fence longer than any run in their content, preserving arbitrary Markdown as
+data.
 
 Offline `reply` locates one globally unique annotation ID across the current
 content index, assigns a `msg_` ID and timestamp, and appends only an ordinary
@@ -650,13 +663,16 @@ The creation form supports document-level and currently captured text
 annotations. It submits the review token, the latest sidecar revision as a
 strong `If-Match`, and the digest-bound selection when selected scope is active.
 After a successful create it reloads the authoritative list and revision. A
-document or sidecar conflict keeps the comment in the form and asks the reviewer
-to refresh and select again.
+stale document selection is saved as an annotation awaiting reattachment. A
+sidecar revision conflict keeps the comment in the form and asks the reviewer
+to reload the latest annotation state before retrying.
 
 Each annotation card previews its persisted exact source quote and original
-line range. Stale annotations retain that original quote so the reviewer can see
-what disappeared or became ambiguous. Document-level annotations show a
-distinct whole-document label instead of an empty quote.
+line range. Stale annotations with a previously verified source retain that
+original quote so the reviewer can see what disappeared or became ambiguous. A
+selection lost during creation reports that its original text is unavailable
+and requires reattachment. Document-level annotations show a distinct
+whole-document label instead of an empty quote.
 
 Exact and moved anchors are highlighted at their current derived byte ranges.
 The browser converts UTF-8 source offsets back to DOM UTF-16 boundaries and uses

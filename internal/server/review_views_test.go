@@ -147,23 +147,29 @@ func TestAnnotationReattachActionRequiresStaleSourceAnchor(t *testing.T) {
 
 	source := &annotation.Source{Selector: annotation.Selector{Exact: "selected", StartLine: 1, EndLine: 1}}
 	tests := []struct {
-		name   string
-		source *annotation.Source
-		anchor *annotation.AnchorResult
-		want   bool
+		name              string
+		source            *annotation.Source
+		needsReattachment bool
+		anchor            *annotation.AnchorResult
+		want              bool
 	}{
 		{name: "document annotation", anchor: &annotation.AnchorResult{State: annotation.AnchorStale}},
 		{name: "exact source", source: source, anchor: &annotation.AnchorResult{State: annotation.AnchorExact}},
 		{name: "moved source", source: source, anchor: &annotation.AnchorResult{State: annotation.AnchorMoved}},
 		{name: "stale source", source: source, anchor: &annotation.AnchorResult{State: annotation.AnchorStale}, want: true},
+		{name: "selection lost during creation", needsReattachment: true, anchor: &annotation.AnchorResult{State: annotation.AnchorStale, Reason: annotation.StaleDocumentChanged}, want: true},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
-			item := resolvedAnnotation{Annotation: annotation.Annotation{ID: "ann_anchor", Status: annotation.StatusOpen, Source: test.source}, Anchor: test.anchor}
-			if got := newAnnotationCardView("README.md", item).Actions.CanReattach; got != test.want {
+			item := resolvedAnnotation{Annotation: annotation.Annotation{ID: "ann_anchor", Status: annotation.StatusOpen, Source: test.source, NeedsReattachment: test.needsReattachment}, Anchor: test.anchor}
+			view := newAnnotationCardView("README.md", item)
+			if got := view.Actions.CanReattach; got != test.want {
 				t.Fatalf("CanReattach = %t, want %t", got, test.want)
+			}
+			if view.SelectionUnavailable != test.needsReattachment {
+				t.Fatalf("SelectionUnavailable = %t, want %t", view.SelectionUnavailable, test.needsReattachment)
 			}
 		})
 	}

@@ -224,7 +224,9 @@ reviewers dismiss open work, close applied work, reopen, or request more
 changes. Each card also accepts inline
 discussion replies without changing its lifecycle status. The creation form can attach
 a new annotation to the current selection or the whole document, and annotation
-cards preview their selected source and line range. Resolved selections are highlighted in the document;
+cards preview their selected source and line range. If the document changes
+while a selected comment is being submitted, the comment is still saved and
+marked for reattachment instead of being lost. Resolved selections are highlighted in the document;
 stale and document-level annotations remain panel-only. Closed and rejected
 annotations and their highlights are hidden by default and can be restored with
 the panel's history toggle. A stale text annotation can be reattached by

@@ -80,6 +80,7 @@ func TestAnnotationValidate(t *testing.T) {
 		{name: "status", mutate: func(item *Annotation) { item.Status = "done" }, wantErr: "status"},
 		{name: "comment", mutate: func(item *Annotation) { item.Comment = " " }, wantErr: "comment"},
 		{name: "role", mutate: func(item *Annotation) { item.Role = "" }, wantErr: "role"},
+		{name: "source while awaiting reattachment", mutate: func(item *Annotation) { item.NeedsReattachment = true }, wantErr: "cannot have a source"},
 		{name: "timestamps", mutate: func(item *Annotation) { item.UpdatedAt = item.CreatedAt.Add(-time.Second) }, wantErr: "precede"},
 		{name: "digest", mutate: func(item *Annotation) { item.Source.SHA256 = "short" }, wantErr: "sha256"},
 		{name: "byte range", mutate: func(item *Annotation) { item.Source.Selector.EndByte = item.Source.Selector.StartByte }, wantErr: "byte range"},
@@ -105,6 +106,17 @@ func TestDocumentLevelAnnotationIsValid(t *testing.T) {
 
 	item := validSidecar().Annotations[0]
 	item.Source = nil
+	if err := item.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v", err)
+	}
+}
+
+func TestAnnotationAwaitingReattachmentIsValid(t *testing.T) {
+	t.Parallel()
+
+	item := validSidecar().Annotations[0]
+	item.Source = nil
+	item.NeedsReattachment = true
 	if err := item.Validate(); err != nil {
 		t.Fatalf("Validate() error = %v", err)
 	}

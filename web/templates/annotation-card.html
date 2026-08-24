@@ -11,7 +11,9 @@
   </summary>
   <div class="annotation-card-body">
     <p class="annotation-navigation-status" role="status"></p>
-    {{if .DocumentLevel}}
+    {{if .SelectionUnavailable}}
+    <div class="annotation-source stale-selection">Original selection unavailable; reattach required.</div>
+    {{else if .DocumentLevel}}
     <div class="annotation-source document-level">Whole document</div>
     {{else}}
     <div class="annotation-source"><q>{{.SourceQuote}}</q><span class="annotation-source-lines">{{.SourceLines}}</span></div>

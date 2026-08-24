@@ -58,6 +58,7 @@ export interface Annotation {
   status: AnnotationStatus;
   comment: string;
   role: Role;
+  needsReattachment?: boolean;
   source?: Source;
   anchor?: AnchorResult;
   thread: ThreadEntry[];

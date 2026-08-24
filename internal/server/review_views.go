@@ -42,6 +42,9 @@ type annotationCardView struct {
 	SourceLines string
 	// DocumentLevel selects the whole-document label instead of a source quote.
 	DocumentLevel bool
+	// SelectionUnavailable marks a selection that could not be verified after
+	// the document changed and must be reattached.
+	SelectionUnavailable bool
 	// AnchorStale adds the stale badge and permits a reattachment form.
 	AnchorStale bool
 	// Turn is the optional "waiting for" badge derived from recent activity.
@@ -171,7 +174,9 @@ func newAnnotationCardView(document string, item resolvedAnnotation) annotationC
 		Turn:     pendingTurnBadge(item.Annotation),
 		Thread:   annotationThread(item.Thread),
 	}
-	if item.Source == nil {
+	if item.NeedsReattachment {
+		view.SelectionUnavailable = true
+	} else if item.Source == nil {
 		view.DocumentLevel = true
 	} else {
 		view.SourceQuote = item.Source.Selector.Exact
@@ -194,7 +199,7 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 		ReplyURL:      baseURL + "/replies",
 		ReattachURL:   baseURL + "/reattach",
 		TransitionURL: baseURL + "/transition",
-		CanReattach:   item.Source != nil && anchorStale,
+		CanReattach:   (item.Source != nil || item.NeedsReattachment) && anchorStale,
 		CanQuickClose: item.Status == annotation.StatusApplied,
 	}
 	for _, definition := range lifecycleActionDefinitions {
