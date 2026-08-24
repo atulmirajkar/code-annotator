@@ -1,15 +1,26 @@
 # Project status
 
-Last updated: 2026-08-23
+Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** TypeScript frontend migration is implemented and verified.
+**Phase:** Server-rendered review UI design is approved; implementation is
+waiting at commit gate 1.
+The approved design and ordered review gates are documented in
+[`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
+No HTMX or server-rendered fragment implementation is present yet. The current
+imperative TypeScript frontend remains the production runtime until the
+corresponding reviewed gates are merged. Every milestone 17 commit must update
+the affected README, build, architecture, design, and status documentation in
+the same commit, then stop for maintainer approval before the next gate.
+
+The earlier TypeScript frontend migration is implemented and verified.
 The authored browser modules now compile under strict TypeScript into
 checked-in generated assets while preserving the existing Go `go:embed`
-workflow and `/static/*.js` runtime URLs. The full Playwright suite passes with
-Microsoft Edge. The long-file navigation regression now scrolls the desktop
-document pane, which is the actual scroll container, instead of asserting on
+workflow and `/static/*.js` runtime URLs. The full Playwright suite passed with
+Microsoft Edge when that phase closed. The long-file navigation regression now
+scrolls the desktop document pane, which is the actual scroll container,
+instead of asserting on
 the window scroll position. The shared sticky topbar now uses an opaque
 background, publishes its measured height to responsive sticky offsets, and
 the document pane no longer has top padding above its sticky tabs, so document
@@ -277,8 +288,43 @@ Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling
   unchanged polls, and `--once`.
 - [x] Document the helper in the skill and user-facing agent handoff docs.
 - [ ] Run the complete Go, vet, race, and browser checks and close the
-  milestone; the current Go suite has unrelated `internal/app` lifecycle test
-  timeouts in this environment.
+  milestone. `go test ./...` passed on 2026-08-24; browser verification is
+  currently environment-blocked because the configured Edge process aborts
+  before application startup and bundled Chromium is not installed.
+
+### 17. Server-rendered review UI and testable TypeScript
+
+Design:
+[`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
+
+Each unchecked item is one maintainer review gate. The implementing agent must
+complete and commit only one item, report its checks and commit hash, and wait
+for explicit approval before starting the next item.
+
+- [x] Commit 0: approve the architecture, documentation authority, milestones,
+  acceptance criteria, and one-commit-at-a-time review protocol.
+- [ ] Commit 1: add Vitest/`happy-dom`, `test:unit`, and the first surviving
+  pure TypeScript extraction without changing runtime behavior.
+- [ ] Commit 2: vendor, license, embed, and serve HTMX 2.0.10 without loading it
+  in the page.
+- [ ] Commit 3: add inactive annotation fragment templates, presentation view
+  models, and escaping/action-availability tests.
+- [ ] Commit 4: share annotation read/create application operations and add
+  compatible HTML handlers while preserving JSON behavior.
+- [ ] Commit 5: share reply/transition operations and add 422/409 HTML
+  responses while preserving JSON behavior.
+- [ ] Commit 6: share reattach operations and complete the inactive HTML
+  mutation surface.
+- [ ] Commit 7: activate the HTMX annotation panel, retain browser-only
+  selection/highlight/navigation adapters, and remove superseded DOM renderers.
+- [ ] Commit 8: server-render the document tree and counts; activate server
+  filtering only if the documented 5,000-path benchmark passes.
+- [ ] Commit 9: server-render comparison selection while retaining the JSON
+  comparison API.
+- [ ] Commit 10: replace remaining import-time IIFEs with explicit,
+  dependency-injected initializers and finish TypeScript unit/lint coverage.
+- [ ] Commit 11: run the complete verification matrix, reconcile all docs,
+  remove dead assets/tests, and refresh distributions after source approval.
 
 ## Decisions
 
@@ -299,6 +345,11 @@ Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling
 | Discovery registry never stores the review mutation token | Approved |
 | TypeScript source compiles to checked-in generated browser assets | Approved |
 | Existing browser module boundaries and `/static/*.js` URLs remain stable | Approved |
+| Go templates own authoritative review HTML; TypeScript owns browser-only interaction | Approved |
+| Existing `/api/*` JSON contracts remain stable; browser fragments use separate `/ui/*` routes | Approved |
+| HTMX 2.0.10 is pinned, vendored, licensed, embedded, and loaded only from the viewer origin | Approved |
+| Milestone 17 advances one reviewed commit at a time and stops after every commit | Approved |
+| Repository documentation is updated with each slice and is the cross-session handoff contract | Approved |
 
 ## Known risks
 
@@ -312,14 +363,22 @@ Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling
 
 ## Next milestone
 
+Milestone 17 (server-rendered review UI and testable TypeScript) is the active
+milestone. Commit 0 contains the approved design and review gates. The next
+allowed implementation slice is commit 1, the TypeScript unit-test harness and
+first behavior-preserving pure extraction; it must not begin until the
+maintainer approves proceeding.
+
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented; final suite
-verification remains pending because of the noted `internal/app` lifecycle
-timeouts.
+verification remains pending because browser startup is unavailable in this
+environment, as noted in milestone 16.
 Milestone 14
 (TypeScript frontend migration) is implemented and verified.
 Typecheck, Go tests, vet, race checks, generated-output reproducibility, and all
-35 Playwright Edge tests pass. The only unchecked item in this milestone is a
-CI workflow check for generated-asset reproducibility; this repository has no
-existing CI workflow yet. Live reload and source syntax highlighting remain
-separately scoped milestones.
+previously available Playwright Edge tests passed when milestone 14 closed. The
+current suite discovers 39 browser cases, but this environment cannot launch
+Edge and does not have bundled Chromium installed. The only unchecked item in
+milestone 14 is a CI workflow check for generated-asset reproducibility; this
+repository has no existing CI workflow yet. Live reload and source syntax
+highlighting remain separately scoped milestones.

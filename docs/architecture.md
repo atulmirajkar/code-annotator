@@ -64,6 +64,15 @@ the existing `/static/*.js` URLs and native ES-module import structure, while
 [`docs/designs/typescript-migration.md`](designs/typescript-migration.md) for
 the frontend dependency graph, typing rules, and compiler configuration.
 
+The current browser still renders annotation cards and actions imperatively.
+An approved, not-yet-implemented migration will move authoritative review HTML
+to Go templates and HTMX fragments while retaining browser-only interaction in
+testable TypeScript. Its invariants, separate `/ui/*` route plan, test strategy,
+documentation contract, and one-commit-at-a-time review gates are defined in
+[`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
+This architecture document must be updated in each implementation commit so it
+continues to describe the code that exists rather than the future target.
+
 `internal/server` owns the concurrency-safe active Git comparison base: a
 single explicit commit behind a mutex, seeded at startup from the resolved
 `--diff-base` commit. It never moves on its own. A browser selection request

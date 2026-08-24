@@ -373,6 +373,7 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 - [MVP design](docs/designs/mvp.md)
 - [Annotation review design](docs/designs/annotations.md)
 - [Code review and Git diff design](docs/designs/code-review.md)
+- [Server-rendered review UI and testable TypeScript design](docs/designs/server-rendered-review-ui.md)
 - [Agent server discovery design](docs/designs/server-discovery.md)
 - [Architecture](docs/architecture.md)
 - [Build and run](docs/build.md)
@@ -383,6 +384,9 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 
 The manual-refresh MVP, annotation review workflow, agent handoff, embedded
 Mermaid rendering, and code review with side-by-side Git diff comparison are
-implemented and browser-tested. See
-[`project_status.md`](project_status.md) for release readiness and the planned
-live-reload milestone.
+implemented and browser-tested. A staged server-rendered review UI and
+TypeScript testability rewrite is approved but not yet implemented; the current
+imperative TypeScript frontend remains the production runtime. See the
+[approved design](docs/designs/server-rendered-review-ui.md) and
+[`project_status.md`](project_status.md) for the exact reviewed commit gate,
+release readiness, and subsequent milestones.

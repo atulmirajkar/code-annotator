@@ -11,6 +11,20 @@ are not runtime dependencies of `code-annotator`.
 
 The Go toolchain downloads declared module dependencies during the first build.
 
+## Active frontend architecture migration
+
+The approved server-rendered review UI migration is defined in
+[`designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
+Until its individual commit gates are implemented and approved, the current
+imperative TypeScript modules and the commands below remain authoritative.
+
+The migration advances exactly one commit at a time. Every frontend slice must
+include its generated assets, tests, and affected README, build, architecture,
+design, and status updates in the same commit, then stop for maintainer review.
+The active and next allowed gates are recorded in
+[`../project_status.md`](../project_status.md), so a new agent session must read
+those two files before starting frontend work.
+
 ## Run from source
 
 From the repository root:
