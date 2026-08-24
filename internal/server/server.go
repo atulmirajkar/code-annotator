@@ -66,6 +66,7 @@ type Server struct {
 	reviewThreadJS  []byte
 	documentTreeJS  []byte
 	viewerJS        []byte
+	htmxJS          []byte
 	mermaidJS       []byte
 	mermaidTiny     []byte
 	handler         http.Handler
@@ -327,6 +328,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid library: %w", err)
 	}
+	htmxJS, err := fs.ReadFile(web.Files, "vendor/htmx/htmx.min.js")
+	if err != nil {
+		return nil, fmt.Errorf("read HTMX library: %w", err)
+	}
 
 	server := &Server{
 		root:            root,
@@ -345,6 +350,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewThreadJS:  reviewThreadJS,
 		documentTreeJS:  documentTreeJS,
 		viewerJS:        viewerJS,
+		htmxJS:          htmxJS,
 		mermaidJS:       mermaidJS,
 		mermaidTiny:     mermaidTiny,
 	}
@@ -374,6 +380,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
 	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
+	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
 	if server.annotations != nil {
@@ -464,6 +471,13 @@ func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.
 func (s *Server) handleStyles(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/css; charset=utf-8")
 	_, _ = response.Write(s.styles)
+}
+
+// handleHTMXLibrary serves the pinned HTMX bundle. Pages do not load it until
+// the server-rendered review UI is activated by a later migration gate.
+func (s *Server) handleHTMXLibrary(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.htmxJS)
 }
 
 // handleMermaidScript serves the application-owned diagram integration.

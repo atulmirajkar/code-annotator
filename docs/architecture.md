@@ -65,8 +65,12 @@ the existing `/static/*.js` URLs and native ES-module import structure, while
 the frontend dependency graph, typing rules, and compiler configuration.
 
 The current browser still renders annotation cards and actions imperatively.
-An approved, not-yet-implemented migration will move authoritative review HTML
-to Go templates and HTMX fragments while retaining browser-only interaction in
+The first infrastructure slices of an approved migration have added the
+TypeScript unit-test harness and a pinned, embedded HTMX 2.0.10 runtime. The
+server exposes HTMX at `/static/htmx.min.js` under the existing same-origin CSP,
+but `page.html` intentionally does not load it, so runtime behavior is
+unchanged. Later reviewed slices will move authoritative review HTML to Go
+templates and HTMX fragments while retaining browser-only interaction in
 testable TypeScript. Its invariants, separate `/ui/*` route plan, test strategy,
 documentation contract, and one-commit-at-a-time review gates are defined in
 [`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).

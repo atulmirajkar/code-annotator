@@ -518,6 +518,8 @@ Checks: `npm run test:unit`, `npm run check:web`, `go test ./...`.
 
 ### Commit 2: vendor and serve HTMX without activating it
 
+Status: implemented in the current review commit; awaiting maintainer approval.
+
 Scope:
 
 - vendor HTMX 2.0.10 and its license under `web/vendor/htmx/`;

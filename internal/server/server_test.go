@@ -1666,6 +1666,9 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `class="document-search"`) || !strings.Contains(body, `src="/static/viewer.js"`) {
 				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
 			}
+			if body := response.Body.String(); strings.Contains(body, `src="/static/htmx.min.js"`) {
+				t.Fatalf("page loads HTMX before the activation gate:\n%s", body)
+			}
 			hasToken := strings.Contains(response.Body.String(), `name="code-annotator-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
@@ -1719,9 +1722,11 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-tree.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
 		{name: "get document tree module", path: "/static/document-tree.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "updateTreeVisibility", "document-tree-expanded"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
+		{name: "get HTMX library", path: "/static/htmx.min.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"htmx", "2.0.10"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},
 		{name: "get Mermaid library", path: "/static/mermaid.tiny.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"mermaid"}},
-		{name: "reject post", path: "/static/review.js", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
+		{name: "reject review script post", path: "/static/review.js", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
+		{name: "reject HTMX library post", path: "/static/htmx.min.js", method: http.MethodPost, wantStatus: http.StatusMethodNotAllowed},
 	}
 
 	for _, test := range tests {
@@ -1906,7 +1911,7 @@ func TestSecurityHeaders(t *testing.T) {
 	t.Parallel()
 
 	handler := newTestHandler(t, nil)
-	for _, requestPath := range []string{"/", "/healthz", "/missing"} {
+	for _, requestPath := range []string{"/", "/healthz", "/static/htmx.min.js", "/missing"} {
 		request := httptest.NewRequest(http.MethodGet, requestPath, nil)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)

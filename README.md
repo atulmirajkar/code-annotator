@@ -32,6 +32,12 @@ CDN or runtime network dependency. In review mode, clicking a rendered diagram
 selects its complete source definition for annotation; its collapsible source
 remains available for line-level comments.
 
+HTMX 2.0.10 is also pinned, licensed, and embedded for the planned
+server-rendered review UI. The server exposes it at `/static/htmx.min.js`, but
+no viewer page loads it yet; the existing TypeScript review UI remains the
+production runtime until its later activation gate. Provenance and checksums
+are recorded in [`web/vendor/htmx/README.md`](web/vendor/htmx/README.md).
+
 ## Usage
 
 Run directly from the repository:
