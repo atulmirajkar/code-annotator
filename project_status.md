@@ -4,7 +4,7 @@ Last updated: 2026-08-25
 
 ## Current state
 
-**Phase:** Diff overview ruler implementation is complete through review gate 2
+**Phase:** Diff overview ruler implementation is complete through review gate 3
 and stopped for maintainer review. The approved design and six review gates are
 documented in
 [`docs/designs/diff-overview-ruler.md`](docs/designs/diff-overview-ruler.md).
@@ -14,7 +14,11 @@ first and last current-side cells, and emits ordered accessible overview links
 with non-focusable end references. Those links remain hidden until the browser
 geometry and styling gates activate the ruler; no production layout has
 changed. Focused renderer tests cover grouping, mixed-kind classification, all
-marker kinds, empty diffs, deletion-only targets, and line labels.
+marker kinds, empty diffs, deletion-only targets, and line labels. The new
+DOM-free `diff-overview-geometry.ts` module calculates proportional marker
+sizes, collision packing, device-pixel density groups, viewport projection, and
+current/next selection from typed numeric inputs. It is covered by Vitest and
+the pure-state architecture guard but remains unbound to browser markup.
 
 Server-rendered review UI milestone 17 is complete through commit 11.
 The approved design and ordered review gates are documented in

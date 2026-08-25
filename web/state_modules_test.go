@@ -13,7 +13,7 @@ func TestPureStateModulesDoNotDependOnDOM(t *testing.T) {
 	t.Parallel()
 
 	forbidden := regexp.MustCompile(`(?m)\b(?:window|HTMLElement|HTML[A-Za-z]+Element|Element|Node|Document|querySelector|querySelectorAll|classList|dataset|textContent)\b|\bdocument\s*\.\s*(?:body|documentElement|querySelector|querySelectorAll|createElement|createTextNode|createRange|addEventListener)`)
-	for _, relative := range []string{"web/src/document-catalog.ts", "web/src/viewer-preferences.ts"} {
+	for _, relative := range []string{"web/src/diff-overview-geometry.ts", "web/src/document-catalog.ts", "web/src/viewer-preferences.ts"} {
 		body, err := os.ReadFile(filepath.Join(repositoryRoot(t), relative))
 		if err != nil {
 			t.Fatalf("read %s: %v", relative, err)

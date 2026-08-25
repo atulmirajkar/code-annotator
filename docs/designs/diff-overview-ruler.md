@@ -2,11 +2,13 @@
 
 ## Status
 
-Approved on 2026-08-25. Implementation is complete through review gate 2 and
-stopped for maintainer review. The server now derives request-local hunks and
-renders hidden semantic targets and overview links; the ruler remains invisible
-until the browser activation gate. The review gates at the end of this document
-define the remaining commits.
+Approved on 2026-08-25. Implementation is complete through review gate 3 and
+stopped for maintainer review. The server derives request-local hunks and
+renders hidden semantic targets and overview links. DOM-free TypeScript now
+owns proportional marker sizing, collision packing, density grouping, viewport
+projection, and current/next selection. The ruler remains invisible until the
+browser activation gate. The review gates at the end of this document define
+the remaining commits.
 
 ## Problem
 

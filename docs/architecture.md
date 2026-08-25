@@ -157,6 +157,14 @@ default to expanded. This adapter lives independently in `document-tree.ts`.
 with focused document-search, layout, comparison-control, diff-divider,
 environment, and browser-storage modules; it owns no feature implementation.
 
+`diff-overview-geometry.ts` is the DOM-free rule layer for the pending diff
+overview ruler. It accepts ordered numeric hunk ranges and measured content and
+track bounds. It returns proportional marker sizes, collision-packed positions,
+device-pixel density groups, a viewport projection, and the current or next
+hunk identity. It performs no browser lookup or event binding and is included
+in the pure-state architecture guard. The hidden server-rendered overview is
+not activated until a later browser-controller gate.
+
 `review.ts` uses a module-scoped `ReviewContext` rather than initializer-local
 helpers. Its panel, selection, highlight, navigation, and HTMX controllers
 receive browser services explicitly. Controller startup uses `start()`; browser
