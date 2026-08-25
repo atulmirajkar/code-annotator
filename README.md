@@ -59,7 +59,9 @@ validated catalog only for keyboard navigation and tab-local preferences.
 Viewer, review, and Mermaid browser entrypoints are named initializers rather
 than whole-file IIFEs. Pure preference rules and all typed state derivation are
 unit tested without DOM inputs; browser adapters use semantic IDs, explicit
-interaction values, and narrow injected ports.
+interaction values, and narrow injected ports. Viewer interfaces and helpers
+remain at module scope; its initializer only wires dependencies, and handlers
+receive any shared mutable state through explicit typed context parameters.
 
 ## Usage
 

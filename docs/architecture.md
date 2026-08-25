@@ -132,7 +132,9 @@ functions. Browser entrypoints are thin composition roots; pure preference
 rules live in `viewer-preferences.ts`. Typed annotation statuses determine the
 display/highlight set, HTMX supplies an explicit mutation kind, and typed
 diagram definitions plus ordered source maps replace node text/order as
-application inputs.
+application inputs. `viewer.ts` declares interfaces and helpers at module
+scope. Its initializer performs wiring only, with storage, browser services,
+and mutable interaction contexts passed explicitly to handlers.
 
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production

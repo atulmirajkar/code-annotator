@@ -1,385 +1,454 @@
 import { filterDocuments } from "./document-catalog.js";
 import { fetchDocumentCatalogState } from "./document-state.js";
 import { clampInteger, resolveDocumentScope } from "./viewer-preferences.js";
-export function initializeViewer(environment = {
-    document,
-    window,
-    location,
-    storage: sessionStorage,
-    resizeObserver: ResizeObserver,
-}) {
-    const { document, window, location } = environment;
-    const sessionStorage = environment.storage;
-    const ResizeObserver = environment.resizeObserver;
-    const changedOnlyStorageKey = "code-annotator.changed-only";
-    const documentScopeStorageKey = "code-annotator.document-scope";
-    const documentTreeStorageKey = "code-annotator.document-tree-expanded";
-    const sourceModeStorageKey = "code-annotator.source-mode";
-    const diffSplitStorageKey = "code-annotator.diff-split";
-    const panelStoragePrefix = "code-annotator.panel-collapsed.";
-    const diffSplitMin = 20;
-    const diffSplitMax = 80;
-    const diffSplitStep = 2;
-    const layout = document.querySelector(".layout");
+const changedOnlyStorageKey = "code-annotator.changed-only";
+const documentScopeStorageKey = "code-annotator.document-scope";
+const documentTreeStorageKey = "code-annotator.document-tree-expanded";
+const sourceModeStorageKey = "code-annotator.source-mode";
+const diffSplitStorageKey = "code-annotator.diff-split";
+const panelStoragePrefix = "code-annotator.panel-collapsed.";
+const diffSplitMin = 20;
+const diffSplitMax = 80;
+const diffSplitStep = 2;
+function browserHTMX() {
+    return Reflect.get(globalThis, "htmx") ?? null;
+}
+function defaultViewerEnvironment() {
+    return {
+        document,
+        window,
+        location,
+        storage: sessionStorage,
+        resizeObserver: ResizeObserver,
+        htmx: browserHTMX(),
+    };
+}
+export function initializeViewer(environment = defaultViewerEnvironment()) {
+    const layout = environment.document.querySelector(".layout");
     if (!layout)
         return;
-    configureHTMX();
-    bindTopbarHeight();
+    configureHTMX(environment.htmx);
+    bindTopbarHeight(environment.document, environment.resizeObserver);
     bindPanelToggle({
-        button: document.querySelector(".documents-toggle"),
-        panel: document.querySelector("#documents-sidebar"),
+        button: environment.document.querySelector(".documents-toggle"),
+        panel: environment.document.querySelector("#documents-sidebar"),
+        layout,
+        storage: environment.storage,
         collapsedClass: "documents-collapsed",
         name: "documents",
     });
     bindPanelToggle({
-        button: document.querySelector(".review-toggle"),
-        panel: document.querySelector("#annotation-sidebar"),
+        button: environment.document.querySelector(".review-toggle"),
+        panel: environment.document.querySelector("#annotation-sidebar"),
+        layout,
+        storage: environment.storage,
         collapsedClass: "review-collapsed",
         name: "annotations",
         defaultCollapsed: true,
     });
-    bindSourceModePreference();
-    bindDocumentSearch();
-    bindComparisonControl();
-    bindDiffDivider();
-    function configureHTMX() {
-        const api = Reflect.get(globalThis, "htmx");
-        if (!api)
+    bindSourceModePreference(environment.document, environment.storage);
+    bindDocumentSearch(environment);
+    bindComparisonControl(environment.document);
+    bindDiffDivider(environment.document, environment.storage);
+}
+function configureHTMX(api) {
+    if (!api)
+        return;
+    api.config.allowEval = false;
+    api.config.allowNestedOobSwaps = false;
+    api.config.allowScriptTags = false;
+    api.config.historyCacheSize = 0;
+    api.config.selfRequestsOnly = true;
+}
+function bindTopbarHeight(document, ResizeObserver) {
+    const topbar = document.querySelector(".topbar");
+    if (!topbar)
+        return;
+    updateTopbarHeight(document, topbar);
+    new ResizeObserver(updateTopbarHeight.bind(null, document, topbar)).observe(topbar);
+}
+function updateTopbarHeight(document, topbar) {
+    document.documentElement.style.setProperty("--topbar-height", `${topbar.getBoundingClientRect().height}px`);
+}
+function bindPanelToggle(options) {
+    if (!options.button || !options.panel)
+        return;
+    const context = {
+        button: options.button,
+        panel: options.panel,
+        layout: options.layout,
+        storage: options.storage,
+        collapsedClass: options.collapsedClass,
+        name: options.name,
+    };
+    setPanelCollapsed(context, readPanelCollapsedPreference(options.storage, options.name, options.defaultCollapsed ?? false));
+    options.button.addEventListener("click", handlePanelToggle.bind(null, context));
+}
+function handlePanelToggle(context) {
+    const collapsed = !context.panel.hidden;
+    setPanelCollapsed(context, collapsed);
+    writePreference(context.storage, `${panelStoragePrefix}${context.name}`, String(collapsed));
+}
+function setPanelCollapsed(context, collapsed) {
+    context.panel.hidden = collapsed;
+    context.layout.classList.toggle(context.collapsedClass, collapsed);
+    context.button.setAttribute("aria-expanded", String(!collapsed));
+    context.button.textContent = `${collapsed ? "Show" : "Hide"} ${context.name}`;
+}
+function bindSourceModePreference(document, storage) {
+    const tabs = document.querySelector(".source-mode-tabs");
+    const activeTab = tabs?.querySelector('a[aria-current="page"]');
+    if (!tabs || !activeTab)
+        return;
+    persistSourceMode(storage, activeTab);
+    for (const tab of tabs.querySelectorAll("a")) {
+        tab.addEventListener("click", persistSourceMode.bind(null, storage, tab));
+    }
+}
+function persistSourceMode(storage, tab) {
+    writePreference(storage, sourceModeStorageKey, new URL(tab.href).searchParams.get("mode") === "diff" ? "diff" : "file");
+}
+function bindDocumentSearch(environment) {
+    if (!environment.document.querySelector("#document-panel-content"))
+        return;
+    const context = {
+        document: environment.document,
+        window: environment.window,
+        location: environment.location,
+        storage: environment.storage,
+        htmx: environment.htmx,
+        path: decodeURIComponent(environment.location.pathname.startsWith("/view/")
+            ? environment.location.pathname.slice(6)
+            : ""),
+        mode: new URL(environment.location.href).searchParams.get("mode") === "diff"
+            ? "diff"
+            : "file",
+        state: null,
+        scope: "all",
+        searchTimer: 0,
+        requestRunning: false,
+        queuedRequest: null,
+    };
+    void refreshDocumentCatalog(context, true);
+    environment.document.addEventListener("change", handleDocumentScopeChange.bind(null, context), true);
+    environment.document.addEventListener("input", handleDocumentSearchInput.bind(null, context), true);
+    environment.document.addEventListener("search", handleDocumentSearch.bind(null, context), true);
+    environment.document.addEventListener("click", handleDocumentDirectoryClick.bind(null, context));
+    environment.document.addEventListener("htmx:afterSwap", restoreExpandedDirectories.bind(null, context));
+    environment.document.addEventListener("code-annotator:annotations-updated", handleAnnotationsUpdated.bind(null, context));
+    environment.document.addEventListener("keydown", handleDocumentSearchKeydown.bind(null, context));
+    environment.document.addEventListener("keydown", handleDocumentShortcutKeydown.bind(null, context));
+    restoreExpandedDirectories(context);
+}
+async function refreshDocumentCatalog(context, restoreScope) {
+    try {
+        const catalog = await fetchDocumentCatalogState(context.path, context.mode);
+        context.state = catalog;
+        if (!restoreScope)
             return;
-        api.config.allowEval = false;
-        api.config.allowNestedOobSwaps = false;
-        api.config.allowScriptTags = false;
-        api.config.historyCacheSize = 0;
-        api.config.selfRequestsOnly = true;
-    }
-    function bindTopbarHeight() {
-        const topbar = document.querySelector(".topbar");
-        if (!topbar)
-            return;
-        const update = () => {
-            document.documentElement.style.setProperty("--topbar-height", `${topbar.getBoundingClientRect().height}px`);
-        };
-        update();
-        new ResizeObserver(update).observe(topbar);
-    }
-    // bindPanelToggle keeps the visual state, accessible state, and grid layout
-    // synchronized for one optional viewer panel. defaultCollapsed applies only
-    // on the panel's first use in a tab; an explicit prior choice always wins.
-    function bindPanelToggle({ button, panel, collapsedClass, name, defaultCollapsed = false }) {
-        if (!button || !panel)
-            return;
-        const toggleButton = button;
-        const togglePanel = panel;
-        setPanelCollapsed(readPanelCollapsedPreference(name, defaultCollapsed));
-        toggleButton.addEventListener("click", () => {
-            const collapsed = !togglePanel.hidden;
-            setPanelCollapsed(collapsed);
-            writeBooleanPreference(`${panelStoragePrefix}${name}`, collapsed);
-        });
-        // setPanelCollapsed restores and updates all representations of one panel
-        // choice so navigation never briefly leaves the grid in a stale state.
-        function setPanelCollapsed(collapsed) {
-            togglePanel.hidden = collapsed;
-            layout.classList.toggle(collapsedClass, collapsed);
-            toggleButton.setAttribute("aria-expanded", String(!collapsed));
-            toggleButton.textContent = `${collapsed ? "Show" : "Hide"} ${name}`;
+        context.scope = resolveDocumentScope(readPreference(context.storage, documentScopeStorageKey), readPreference(context.storage, changedOnlyStorageKey), catalog.documents);
+        const checkbox = context.document.querySelector(`.document-filter-form input[value="${context.scope}"]`);
+        if (context.scope !== "all" && checkbox && !checkbox.checked) {
+            checkbox.checked = true;
+            requestDocumentPanel(context, "", context.scope);
         }
     }
-    // Document links are rendered in the active mode by the server. TypeScript
-    // only remembers an explicit tab choice; it never rewrites the catalog DOM.
-    function bindSourceModePreference() {
-        const tabs = document.querySelector(".source-mode-tabs");
-        const activeTab = tabs?.querySelector('a[aria-current="page"]');
-        if (activeTab) {
-            const activeMode = new URL(activeTab.href).searchParams.get("mode") === "diff" ? "diff" : "file";
-            writePreference(sourceModeStorageKey, activeMode);
-            tabs.querySelectorAll("a").forEach((tab) => {
-                tab.addEventListener("click", () => {
-                    const mode = new URL(tab.href).searchParams.get("mode") === "diff" ? "diff" : "file";
-                    writePreference(sourceModeStorageKey, mode);
-                });
-            });
-        }
+    catch (_) {
+        // The server-rendered catalog remains usable if typed state is unavailable.
     }
-    // The server owns tree construction, filtering, counts, and links. This
-    // adapter retains only keyboard behavior and tab-local view preferences,
-    // deriving navigation choices from the validated typed catalog.
-    function bindDocumentSearch() {
-        const panel = document.querySelector("#document-panel-content");
-        if (!panel)
-            return;
-        let state = null;
-        let scope = "all";
-        let searchTimer = 0;
-        let documentRequestRunning = false;
-        let queuedDocumentRequest = null;
-        const mode = new URL(location.href).searchParams.get("mode") === "diff" ? "diff" : "file";
-        const path = decodeURIComponent(location.pathname.startsWith("/view/") ? location.pathname.slice(6) : "");
-        fetchDocumentCatalogState(path, mode).then((catalog) => {
-            state = catalog;
-            scope = readDocumentScope(catalog);
-            const checkbox = document.querySelector(`.document-filter-form input[value="${scope}"]`);
-            if (scope !== "all" && checkbox && !checkbox.checked) {
-                checkbox.checked = true;
-                requestDocumentPanel("", scope);
-            }
-        }).catch(() => undefined);
-        document.addEventListener("change", (event) => {
-            const input = event.target;
-            if (!(input instanceof HTMLInputElement) || input.form?.classList.contains("document-filter-form") !== true || input.name !== "scope")
-                return;
-            scope = input.checked && (input.value === "changed" || input.value === "open-comments") ? input.value : "all";
-            input.form.querySelectorAll('input[name="scope"]').forEach((candidate) => {
-                if (candidate !== input)
-                    candidate.checked = false;
-            });
-            writePreference(documentScopeStorageKey, scope);
-            requestDocumentPanel(input.form.querySelector("#document-search-input")?.value || "", scope);
-        }, true);
-        document.addEventListener("input", (event) => {
-            const input = event.target;
-            if (!(input instanceof HTMLInputElement) || input.id !== "document-search-input")
-                return;
-            window.clearTimeout(searchTimer);
-            searchTimer = window.setTimeout(() => requestDocumentPanel(input.value, scope), 150);
-        }, true);
-        document.addEventListener("search", (event) => {
-            const input = event.target;
-            if (!(input instanceof HTMLInputElement) || input.id !== "document-search-input")
-                return;
-            window.clearTimeout(searchTimer);
-            requestDocumentPanel(input.value, scope);
-        }, true);
-        document.addEventListener("click", (event) => {
-            const button = event.target instanceof Element ? event.target.closest(".document-directory-toggle") : null;
-            if (!button)
-                return;
-            const item = button.closest(".document-directory");
-            if (!item)
-                return;
-            const expanded = button.getAttribute("aria-expanded") !== "true";
-            button.setAttribute("aria-expanded", String(expanded));
-            item.classList.toggle("collapsed", !expanded);
-            writeExpandedDirectories();
-        });
-        document.addEventListener("htmx:afterSwap", () => {
-            restoreExpandedDirectories();
-        });
-        restoreExpandedDirectories();
-        document.addEventListener("code-annotator:annotations-updated", () => {
-            fetchDocumentCatalogState(path, mode).then((catalog) => {
-                state = catalog;
-                document.querySelector("#document-search-input")?.dispatchEvent(new Event("search", { bubbles: true }));
-            }).catch(() => undefined);
-        });
-        document.addEventListener("keydown", (event) => {
-            const input = document.querySelector("#document-search-input");
-            if (!input)
-                return;
-            if (event.target === input && event.key === "Escape") {
-                event.preventDefault();
-                input.value = "";
-                input.dispatchEvent(new Event("search", { bubbles: true }));
-            }
-            else if (event.target === input && event.key === "Enter") {
-                event.preventDefault();
-                const destination = state ? filterDocuments(state.documents, input.value, scope).documents[0] : undefined;
-                if (destination)
-                    location.assign(destination.url);
-            }
-            else if (event.target === input && event.key === "ArrowDown") {
-                event.preventDefault();
-                document.querySelector(".documents .document-file a")?.focus();
-            }
-        });
-        document.addEventListener("keydown", (event) => {
-            const target = event.target;
-            const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
-            if (event.key === "/" && !editing && !event.metaKey && !event.ctrlKey && !event.altKey) {
-                event.preventDefault();
-                document.querySelector("#document-search-input")?.focus();
-            }
-        });
-        function restoreExpandedDirectories() {
-            const stored = readPreference(documentTreeStorageKey);
-            if (stored === null)
-                return;
-            const expanded = readStringSet(stored);
-            document.querySelectorAll(".document-directory[id]").forEach((item) => {
-                const isExpanded = expanded.has(item.id);
-                item.classList.toggle("collapsed", !isExpanded);
-                item.querySelector(":scope > .document-directory-toggle")?.setAttribute("aria-expanded", String(isExpanded));
-            });
-        }
-        function writeExpandedDirectories() {
-            const expanded = Array.from(document.querySelectorAll(".document-directory[id]"))
-                .filter((item) => !item.classList.contains("collapsed"))
-                .map((item) => item.id)
-                .sort();
-            writePreference(documentTreeStorageKey, JSON.stringify(expanded));
-        }
-        function requestDocumentPanel(queryValue, nextScope) {
-            queuedDocumentRequest = { query: queryValue, scope: nextScope };
-            if (documentRequestRunning)
-                return;
-            void sendNextDocumentRequest();
-        }
-        async function sendNextDocumentRequest() {
-            const api = Reflect.get(globalThis, "htmx");
-            const request = queuedDocumentRequest;
-            if (!api || !request)
-                return;
-            queuedDocumentRequest = null;
-            documentRequestRunning = true;
-            const parameters = new URLSearchParams({ document: path, mode });
-            if (request.query)
-                parameters.set("query", request.query);
-            if (request.scope !== "all")
-                parameters.set("scope", request.scope);
-            try {
-                await api.ajax("GET", `/ui/review/documents?${parameters.toString()}`, { target: "#document-panel-content", swap: "outerHTML" });
-            }
-            finally {
-                documentRequestRunning = false;
-                if (queuedDocumentRequest)
-                    void sendNextDocumentRequest();
-            }
-        }
+}
+function handleDocumentScopeChange(context, event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) ||
+        input.form?.classList.contains("document-filter-form") !== true ||
+        input.name !== "scope")
+        return;
+    context.scope =
+        input.checked && isFilteredDocumentScope(input.value) ? input.value : "all";
+    for (const candidate of input.form.querySelectorAll('input[name="scope"]')) {
+        if (candidate !== input)
+            candidate.checked = false;
     }
-    function readDocumentScope(state) {
-        return resolveDocumentScope(readPreference(documentScopeStorageKey), readPreference(changedOnlyStorageKey), state.documents);
+    writePreference(context.storage, documentScopeStorageKey, context.scope);
+    requestDocumentPanel(context, input.form.querySelector("#document-search-input")
+        ?.value ?? "", context.scope);
+}
+function isFilteredDocumentScope(value) {
+    return value === "changed" || value === "open-comments";
+}
+function handleDocumentSearchInput(context, event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) ||
+        input.id !== "document-search-input")
+        return;
+    context.window.clearTimeout(context.searchTimer);
+    context.searchTimer = context.window.setTimeout(requestDocumentPanel.bind(null, context, input.value, context.scope), 150);
+}
+function handleDocumentSearch(context, event) {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement) ||
+        input.id !== "document-search-input")
+        return;
+    context.window.clearTimeout(context.searchTimer);
+    requestDocumentPanel(context, input.value, context.scope);
+}
+function handleDocumentDirectoryClick(context, event) {
+    const button = event.target instanceof Element
+        ? event.target.closest(".document-directory-toggle")
+        : null;
+    const item = button?.closest(".document-directory");
+    if (!button || !item)
+        return;
+    const expanded = button.getAttribute("aria-expanded") !== "true";
+    button.setAttribute("aria-expanded", String(expanded));
+    item.classList.toggle("collapsed", !expanded);
+    writeExpandedDirectories(context);
+}
+function restoreExpandedDirectories(context) {
+    const stored = readPreference(context.storage, documentTreeStorageKey);
+    if (stored === null)
+        return;
+    const expanded = readStringSet(stored);
+    for (const item of context.document.querySelectorAll(".document-directory[id]")) {
+        const isExpanded = expanded.has(item.id);
+        item.classList.toggle("collapsed", !isExpanded);
+        item
+            .querySelector(":scope > .document-directory-toggle")
+            ?.setAttribute("aria-expanded", String(isExpanded));
     }
-    function readStringSet(value) {
-        try {
-            const parsed = JSON.parse(value);
-            return new Set(Array.isArray(parsed) ? parsed.filter((item) => typeof item === "string") : []);
-        }
-        catch (_) {
-            return new Set();
-        }
+}
+function writeExpandedDirectories(context) {
+    const expanded = [];
+    for (const item of context.document.querySelectorAll(".document-directory[id]")) {
+        if (!item.classList.contains("collapsed"))
+            expanded.push(item.id);
     }
-    // The server renders comparison state and validates the selected commit.
-    // This adapter only adds the secret transport header and submits on change.
-    function bindComparisonControl() {
-        const control = document.querySelector(".diff-comparison-control");
-        const token = document.querySelector('meta[name="code-annotator-comparison-token"]')?.content || "";
-        if (!control || !token)
-            return;
-        const selector = control.querySelector(".revision-selector");
-        const status = control.querySelector(".diff-comparison-status");
-        if (!selector || !status)
-            return;
-        selector.addEventListener("change", () => {
-            status.textContent = "Updating comparison base…";
-            status.classList.remove("error");
-            control.requestSubmit();
-        });
-        document.body.addEventListener("htmx:configRequest", (event) => {
-            if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null)
-                return;
-            const source = Reflect.get(event.detail, "elt");
-            if (!(source instanceof Element) || source.closest(".diff-comparison-control") !== control)
-                return;
-            const headers = Reflect.get(event.detail, "headers");
-            if (typeof headers === "object" && headers !== null)
-                Reflect.set(headers, "X-Code-Annotator-Comparison-Token", token);
-        });
-        document.body.addEventListener("htmx:responseError", (event) => {
-            if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null)
-                return;
-            const source = Reflect.get(event.detail, "elt");
-            if (!(source instanceof Element) || source.closest(".diff-comparison-control") !== control)
-                return;
-            status.textContent = "The Git comparison could not be updated.";
-            status.classList.add("error");
+    expanded.sort();
+    writePreference(context.storage, documentTreeStorageKey, JSON.stringify(expanded));
+}
+function readStringSet(value) {
+    try {
+        const parsed = JSON.parse(value);
+        return new Set(Array.isArray(parsed) ? parsed.filter(isString) : []);
+    }
+    catch (_) {
+        return new Set();
+    }
+}
+function isString(value) {
+    return typeof value === "string";
+}
+function handleAnnotationsUpdated(context) {
+    void refreshDocumentCatalog(context, false).then(dispatchDocumentSearch.bind(null, context));
+}
+function dispatchDocumentSearch(context) {
+    context.document
+        .querySelector("#document-search-input")
+        ?.dispatchEvent(new Event("search", { bubbles: true }));
+}
+function handleDocumentSearchKeydown(context, event) {
+    const input = context.document.querySelector("#document-search-input");
+    if (!input || event.target !== input)
+        return;
+    if (event.key === "Escape") {
+        event.preventDefault();
+        input.value = "";
+        input.dispatchEvent(new Event("search", { bubbles: true }));
+    }
+    else if (event.key === "Enter") {
+        event.preventDefault();
+        const destination = context.state
+            ? filterDocuments(context.state.documents, input.value, context.scope)
+                .documents[0]
+            : undefined;
+        if (destination)
+            context.location.assign(destination.url);
+    }
+    else if (event.key === "ArrowDown") {
+        event.preventDefault();
+        context.document
+            .querySelector(".documents .document-file a")
+            ?.focus();
+    }
+}
+function handleDocumentShortcutKeydown(context, event) {
+    const target = event.target;
+    const editing = target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+    if (event.key !== "/" ||
+        editing ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey)
+        return;
+    event.preventDefault();
+    context.document
+        .querySelector("#document-search-input")
+        ?.focus();
+}
+function requestDocumentPanel(context, query, scope) {
+    context.queuedRequest = { query, scope };
+    if (!context.requestRunning)
+        void sendNextDocumentRequest(context);
+}
+async function sendNextDocumentRequest(context) {
+    const request = context.queuedRequest;
+    if (!context.htmx || !request)
+        return;
+    context.queuedRequest = null;
+    context.requestRunning = true;
+    const parameters = new URLSearchParams({
+        document: context.path,
+        mode: context.mode,
+    });
+    if (request.query)
+        parameters.set("query", request.query);
+    if (request.scope !== "all")
+        parameters.set("scope", request.scope);
+    try {
+        await context.htmx.ajax("GET", `/ui/review/documents?${parameters}`, {
+            target: "#document-panel-content",
+            swap: "outerHTML",
         });
     }
-    // bindDiffDivider lets the reviewer drag or use the keyboard to resize the
-    // base and current diff panes. The column headings share the same CSS grid
-    // template as the panes, so setting one custom property keeps both aligned.
-    // The chosen split is a tab-scoped preference restored across navigation,
-    // matching the other reviewer preferences on this page.
-    function bindDiffDivider() {
-        const view = document.querySelector(".diff-view");
-        const divider = view?.querySelector(".diff-divider");
-        if (!view || !divider)
-            return;
-        let percent = clampDiffSplit(readDiffSplitPreference());
-        applyDiffSplit(view, divider, percent);
-        divider.addEventListener("keydown", (event) => {
-            if (event.key === "ArrowLeft")
-                setSplit(percent - diffSplitStep);
-            else if (event.key === "ArrowRight")
-                setSplit(percent + diffSplitStep);
-            else if (event.key === "Home")
-                setSplit(diffSplitMin);
-            else if (event.key === "End")
-                setSplit(diffSplitMax);
-            else
-                return;
-            event.preventDefault();
-        });
-        divider.addEventListener("pointerdown", (event) => {
-            if (event.button !== 0)
-                return;
-            event.preventDefault();
-            const rect = view.getBoundingClientRect();
-            const onMove = (moveEvent) => setSplit(((moveEvent.clientX - rect.left) / rect.width) * 100);
-            const onUp = () => {
-                document.removeEventListener("pointermove", onMove);
-                document.removeEventListener("pointerup", onUp);
-            };
-            document.addEventListener("pointermove", onMove);
-            document.addEventListener("pointerup", onUp);
-        });
-        function setSplit(value) {
-            percent = clampDiffSplit(value);
-            applyDiffSplit(view, divider, percent);
-            writeDiffSplitPreference(percent);
-        }
+    finally {
+        context.requestRunning = false;
+        if (context.queuedRequest)
+            void sendNextDocumentRequest(context);
     }
-    function applyDiffSplit(view, divider, percent) {
-        view.style.setProperty("--diff-split", `${percent}%`);
-        divider.setAttribute("aria-valuenow", String(percent));
+}
+function bindComparisonControl(document) {
+    const control = document.querySelector(".diff-comparison-control");
+    const token = document.querySelector('meta[name="code-annotator-comparison-token"]')?.content ?? "";
+    const selector = control?.querySelector(".revision-selector");
+    const status = control?.querySelector(".diff-comparison-status");
+    if (!control || !token || !selector || !status)
+        return;
+    const context = { control, status, token };
+    selector.addEventListener("change", handleComparisonChange.bind(null, context));
+    document.body.addEventListener("htmx:configRequest", handleComparisonConfigRequest.bind(null, context));
+    document.body.addEventListener("htmx:responseError", handleComparisonResponseError.bind(null, context));
+}
+function handleComparisonChange(context) {
+    context.status.textContent = "Updating comparison base…";
+    context.status.classList.remove("error");
+    context.control.requestSubmit();
+}
+function handleComparisonConfigRequest(context, event) {
+    const detail = customEventDetail(event);
+    if (!detail || !comparisonEventTargetsControl(detail, context.control))
+        return;
+    const headers = Reflect.get(detail, "headers");
+    if (typeof headers === "object" && headers !== null)
+        Reflect.set(headers, "X-Code-Annotator-Comparison-Token", context.token);
+}
+function handleComparisonResponseError(context, event) {
+    const detail = customEventDetail(event);
+    if (!detail || !comparisonEventTargetsControl(detail, context.control))
+        return;
+    context.status.textContent = "The Git comparison could not be updated.";
+    context.status.classList.add("error");
+}
+function customEventDetail(event) {
+    return event instanceof CustomEvent &&
+        typeof event.detail === "object" &&
+        event.detail !== null
+        ? event.detail
+        : null;
+}
+function comparisonEventTargetsControl(detail, control) {
+    const source = Reflect.get(detail, "elt");
+    return (source instanceof Element &&
+        source.closest(".diff-comparison-control") === control);
+}
+function bindDiffDivider(document, storage) {
+    const view = document.querySelector(".diff-view");
+    const divider = view?.querySelector(".diff-divider");
+    if (!view || !divider)
+        return;
+    const context = {
+        document,
+        storage,
+        view,
+        divider,
+        percent: clampDiffSplit(readDiffSplitPreference(storage)),
+        dragRect: null,
+        pointerMoveHandler: null,
+    };
+    context.pointerMoveHandler = handleDiffPointerMove.bind(null, context);
+    renderDiffSplit(context);
+    divider.addEventListener("keydown", handleDiffDividerKeydown.bind(null, context));
+    divider.addEventListener("pointerdown", handleDiffPointerDown.bind(null, context));
+}
+function handleDiffDividerKeydown(context, event) {
+    let next;
+    if (event.key === "ArrowLeft")
+        next = context.percent - diffSplitStep;
+    else if (event.key === "ArrowRight")
+        next = context.percent + diffSplitStep;
+    else if (event.key === "Home")
+        next = diffSplitMin;
+    else if (event.key === "End")
+        next = diffSplitMax;
+    else
+        return;
+    event.preventDefault();
+    setDiffSplit(context, next);
+}
+function handleDiffPointerDown(context, event) {
+    if (event.button !== 0)
+        return;
+    event.preventDefault();
+    context.dragRect = context.view.getBoundingClientRect();
+    if (context.pointerMoveHandler)
+        context.document.addEventListener("pointermove", context.pointerMoveHandler);
+    context.document.addEventListener("pointerup", handleDiffPointerUp.bind(null, context), { once: true });
+}
+function handleDiffPointerMove(context, event) {
+    if (context.dragRect)
+        setDiffSplit(context, ((event.clientX - context.dragRect.left) / context.dragRect.width) * 100);
+}
+function handleDiffPointerUp(context) {
+    context.dragRect = null;
+    if (context.pointerMoveHandler)
+        context.document.removeEventListener("pointermove", context.pointerMoveHandler);
+}
+function setDiffSplit(context, value) {
+    context.percent = clampDiffSplit(value);
+    renderDiffSplit(context);
+    writePreference(context.storage, diffSplitStorageKey, String(context.percent));
+}
+function renderDiffSplit(context) {
+    context.view.style.setProperty("--diff-split", `${context.percent}%`);
+    context.divider.setAttribute("aria-valuenow", String(context.percent));
+}
+function clampDiffSplit(value) {
+    return clampInteger(value, diffSplitMin, diffSplitMax);
+}
+function readDiffSplitPreference(storage) {
+    const stored = Number.parseFloat(readPreference(storage, diffSplitStorageKey) ?? "");
+    return Number.isFinite(stored) ? stored : 50;
+}
+function readPanelCollapsedPreference(storage, name, defaultCollapsed) {
+    const stored = readPreference(storage, `${panelStoragePrefix}${name}`);
+    return stored === null ? defaultCollapsed : stored === "true";
+}
+function readPreference(storage, key) {
+    try {
+        return storage.getItem(key);
     }
-    function clampDiffSplit(value) {
-        return clampInteger(value, diffSplitMin, diffSplitMax);
+    catch (_) {
+        return null;
     }
-    function readDiffSplitPreference() {
-        const stored = Number.parseFloat(readPreference(diffSplitStorageKey) || "");
-        return Number.isFinite(stored) ? stored : 50;
+}
+function writePreference(storage, key, value) {
+    try {
+        storage.setItem(key, value);
     }
-    function writeDiffSplitPreference(percent) {
-        writePreference(diffSplitStorageKey, String(percent));
-    }
-    // readPanelCollapsedPreference falls back to defaultCollapsed only when the
-    // panel has never been toggled in this tab, so an explicit "false" (shown)
-    // choice is never overridden by a panel's own default.
-    function readPanelCollapsedPreference(name, defaultCollapsed) {
-        const stored = readPreference(`${panelStoragePrefix}${name}`);
-        return stored === null ? defaultCollapsed : stored === "true";
-    }
-    function readBooleanPreference(key) {
-        return readPreference(key) === "true";
-    }
-    function writeBooleanPreference(key, enabled) {
-        writePreference(key, String(enabled));
-    }
-    function readPreference(key) {
-        try {
-            return sessionStorage.getItem(key);
-        }
-        catch (_) {
-            return null;
-        }
-    }
-    function writePreference(key, value) {
-        try {
-            sessionStorage.setItem(key, value);
-        }
-        catch (_) {
-            // The current-page interaction still works when storage is unavailable.
-        }
+    catch (_) {
+        // The current-page interaction still works when storage is unavailable.
     }
 }
 initializeViewer();

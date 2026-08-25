@@ -8,13 +8,44 @@ import { initializeViewer } from "./viewer.js";
 describe("explicit browser initializers", () => {
   it("lets the viewer be instantiated against an injected empty root", () => {
     document.body.innerHTML = "";
-    expect(() => initializeViewer({
+    expect(() =>
+      initializeViewer({
+        document,
+        window,
+        location: window.location,
+        storage: window.sessionStorage,
+        resizeObserver: window.ResizeObserver,
+        htmx: null,
+      }),
+    ).not.toThrow();
+  });
+
+  it("configures an explicitly injected HTMX API", () => {
+    document.body.innerHTML = `<main class="layout"></main>`;
+    const config = {
+      allowEval: true,
+      allowNestedOobSwaps: true,
+      allowScriptTags: true,
+      historyCacheSize: 10,
+      selfRequestsOnly: false,
+    };
+
+    initializeViewer({
       document,
       window,
       location: window.location,
       storage: window.sessionStorage,
       resizeObserver: window.ResizeObserver,
-    })).not.toThrow();
+      htmx: { config, ajax: vi.fn() },
+    });
+
+    expect(config).toEqual({
+      allowEval: false,
+      allowNestedOobSwaps: false,
+      allowScriptTags: false,
+      historyCacheSize: 0,
+      selfRequestsOnly: true,
+    });
   });
 
   it("renders Mermaid through injected ports", async () => {
@@ -32,8 +63,15 @@ describe("explicit browser initializers", () => {
       definitions: new Map([["diagram-test", "graph TD; A-->B"]]),
     });
 
-    expect(initialize).toHaveBeenCalledWith(expect.objectContaining({ securityLevel: "strict", theme: "dark" }));
-    expect(render).toHaveBeenCalledWith("code-annotator-mermaid-0", "graph TD; A-->B");
-    expect(document.querySelector(".mermaid-output")?.innerHTML).toBe("<svg></svg>");
+    expect(initialize).toHaveBeenCalledWith(
+      expect.objectContaining({ securityLevel: "strict", theme: "dark" }),
+    );
+    expect(render).toHaveBeenCalledWith(
+      "code-annotator-mermaid-0",
+      "graph TD; A-->B",
+    );
+    expect(document.querySelector(".mermaid-output")?.innerHTML).toBe(
+      "<svg></svg>",
+    );
   });
 });

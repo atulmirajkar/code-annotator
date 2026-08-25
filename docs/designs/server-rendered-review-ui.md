@@ -836,6 +836,8 @@ Implementation notes:
 
 - viewer, review, and Mermaid entrypoints are named initializers; viewer and
   Mermaid accept explicit browser/service ports for isolated tests;
+- viewer interfaces and helpers are module-scoped; the initializer is a thin
+  composition root, and handlers receive shared state through typed contexts;
 - root-page document identity comes from typed catalog state rather than an
   active link, and visible annotation decisions come from typed statuses;
 - HTMX reports explicit create/reattach/other mutation kinds, so review logic
