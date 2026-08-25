@@ -65,8 +65,9 @@ remain at module scope; its initializer only wires dependencies, and handlers
 receive any shared mutable state through explicit typed context parameters.
 `web/src/viewer.ts` is a composition root. Layout, document search, document
 tree, comparison, diff-divider, environment, and safe-storage concerns live in
-focused modules. The document-tree module keeps a typed expansion set across
-server-rendered HTMX swaps.
+focused modules. The document-tree module keeps a typed set of explicit
+collapses across server-rendered HTMX swaps, so newly revealed directories
+default to expanded.
 The review entrypoint follows the same convention: its initializer composes a
 typed context, while event handlers and state transitions remain module-level.
 Review controllers receive document, window, storage, and HTMX ports explicitly.

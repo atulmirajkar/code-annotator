@@ -135,6 +135,34 @@ test.describe("viewer navigation", () => {
     await expect(changedOnly).toBeChecked();
   });
 
+  test("preserves collapsed directories while newly revealed directories default expanded", async ({ page, viewer }) => {
+    const changedDirectory = path.join(viewer.contentRoot, "expansion-changed");
+    await mkdir(changedDirectory, { recursive: true });
+    await writeFile(path.join(changedDirectory, "changed.go"), "package changed\n");
+    await page.goto(viewer.url);
+
+    const changedOnly = page.getByRole("checkbox", { name: "Changed only" });
+    await expect(changedOnly).toBeChecked();
+    const changedToggle = page.locator(".document-directory-toggle", { hasText: "expansion-changed" });
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "true");
+    await changedToggle.click();
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+
+    await page.reload();
+    await expect(changedOnly).toBeChecked();
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+
+    const newDirectory = path.join(viewer.contentRoot, "expansion-new");
+    await mkdir(newDirectory, { recursive: true });
+    await writeFile(path.join(newDirectory, "new.go"), "package new\n");
+    await changedOnly.uncheck();
+
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      page.locator(".document-directory-toggle", { hasText: "expansion-new" }),
+    ).toHaveAttribute("aria-expanded", "true");
+  });
+
   test("preserves diff mode and collapsed annotations across code navigation", async ({ page, viewerURL }) => {
     await page.goto(`${viewerURL}view/diff-layout.go?mode=diff`);
     await expect(page.getByRole("link", { name: "Changes" })).toHaveAttribute("aria-current", "page");

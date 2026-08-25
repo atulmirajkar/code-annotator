@@ -1,11 +1,14 @@
 import { readPreference, writePreference } from "./browser-storage.js";
 
-const expandedDirectoriesStorageKey = "code-annotator.document-tree-expanded";
+const collapsedDirectoriesStorageKey =
+  "code-annotator.document-tree-collapsed";
+const legacyExpandedDirectoriesStorageKey =
+  "code-annotator.document-tree-expanded";
 
 interface DocumentTreeContext {
   document: Document;
   storage: Storage;
-  expandedIds: Set<string>;
+  collapsedIds: Set<string>;
 }
 
 // Directory expansion is browser-owned presentation state. Semantic element
@@ -16,7 +19,7 @@ export function bindDocumentTree(document: Document, storage: Storage): void {
   const context: DocumentTreeContext = {
     document,
     storage,
-    expandedIds: readExpandedIds(document, storage),
+    collapsedIds: readCollapsedIds(document, storage),
   };
 
   document.addEventListener("click", (event) =>
@@ -37,12 +40,12 @@ function handleDirectoryClick(
   const item = button?.closest<HTMLLIElement>(".document-directory[id]");
   if (!button || !item) return;
 
-  const expanded = !context.expandedIds.has(item.id);
-  if (expanded) context.expandedIds.add(item.id);
-  else context.expandedIds.delete(item.id);
+  const collapsed = !context.collapsedIds.has(item.id);
+  if (collapsed) context.collapsedIds.add(item.id);
+  else context.collapsedIds.delete(item.id);
 
-  renderDirectory(item, button, expanded);
-  writeExpandedIds(context.storage, context.expandedIds);
+  renderDirectory(item, button, !collapsed);
+  writeCollapsedIds(context.storage, context.collapsedIds);
 }
 
 // HTMX replaces the entire document panel. Project the existing state onto
@@ -54,7 +57,9 @@ function renderTree(context: DocumentTreeContext): void {
     const button = item.querySelector<HTMLButtonElement>(
       ":scope > .document-directory-toggle",
     );
-    if (button) renderDirectory(item, button, context.expandedIds.has(item.id));
+    if (button) {
+      renderDirectory(item, button, !context.collapsedIds.has(item.id));
+    }
   }
 }
 
@@ -67,25 +72,36 @@ function renderDirectory(
   button.setAttribute("aria-expanded", String(expanded));
 }
 
-function readExpandedIds(document: Document, storage: Storage): Set<string> {
-  const stored = readPreference(storage, expandedDirectoriesStorageKey);
-  if (stored !== null) return parseExpandedIds(stored);
+function readCollapsedIds(document: Document, storage: Storage): Set<string> {
+  const stored = readPreference(storage, collapsedDirectoriesStorageKey);
+  if (stored !== null) return parseDirectoryIds(stored) ?? new Set();
 
-  // The server's initial tree is fully expanded. Use its semantic IDs to seed
-  // state without inspecting presentation classes or accessible attributes.
-  const expandedIds = new Set<string>();
+  // Migrate only directories visible in the initial fragment. A directory
+  // absent from that filtered fragment has no known legacy preference and
+  // therefore keeps the new default-expanded behavior when later revealed.
+  const legacyStored = readPreference(
+    storage,
+    legacyExpandedDirectoriesStorageKey,
+  );
+  const legacyExpandedIds = legacyStored
+    ? parseDirectoryIds(legacyStored)
+    : null;
+  if (!legacyExpandedIds) return new Set();
+
+  const collapsedIds = new Set<string>();
   for (const item of document.querySelectorAll<HTMLLIElement>(
     ".document-directory[id]",
   )) {
-    expandedIds.add(item.id);
+    if (!legacyExpandedIds.has(item.id)) collapsedIds.add(item.id);
   }
-  return expandedIds;
+  writeCollapsedIds(storage, collapsedIds);
+  return collapsedIds;
 }
 
-function parseExpandedIds(value: string): Set<string> {
+function parseDirectoryIds(value: string): Set<string> | null {
   try {
     const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) return new Set();
+    if (!Array.isArray(parsed)) return null;
 
     const ids = new Set<string>();
     for (const item of parsed) {
@@ -93,14 +109,14 @@ function parseExpandedIds(value: string): Set<string> {
     }
     return ids;
   } catch (_) {
-    return new Set();
+    return null;
   }
 }
 
-function writeExpandedIds(storage: Storage, expandedIds: Set<string>): void {
+function writeCollapsedIds(storage: Storage, collapsedIds: Set<string>): void {
   writePreference(
     storage,
-    expandedDirectoriesStorageKey,
-    JSON.stringify(Array.from(expandedIds).sort()),
+    collapsedDirectoriesStorageKey,
+    JSON.stringify(Array.from(collapsedIds).sort()),
   );
 }

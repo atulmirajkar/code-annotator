@@ -50,9 +50,11 @@ documents the non-obvious state ownership and interaction invariants inline
 and uses an idiomatic observer callback while keeping the update operation
 separate. All viewer callback adapters now use the same arrow-function style;
 the underlying interaction operations remain named module-level functions.
-Directory expansion now has one typed ID-set source of truth that is rendered
-onto initial and HTMX-replaced directory elements. Its listener, persistence,
-and render lifecycle is isolated and directly tested in `document-tree.ts`.
+Directory expansion now has one typed set of explicitly collapsed IDs rendered
+onto initial and HTMX-replaced directory elements. Newly revealed directories
+default to expanded, while user collapses persist within the tab. Its listener,
+persistence, migration, and render lifecycle are isolated and directly tested
+in `document-tree.ts`.
 The remaining viewer behavior is split by responsibility into document-search,
 layout, comparison-control, diff-divider, environment, and storage modules;
 `viewer.ts` now contains only security configuration and composition.

@@ -74,7 +74,8 @@ viewer, review, and Mermaid initialization with injected roots and services,
 including the viewer's injected HTMX security configuration;
 `viewer-preferences.test.ts` covers DOM-free preference derivation. The latter
 is included in `web/state_modules_test.go`'s no-DOM architecture guard.
-`document-tree.test.ts` covers directory toggling, persistence, and restoration
+`document-tree.test.ts` covers directory toggling, explicit-collapse
+persistence, legacy preference migration, and default-expanded directories
 after an HTMX fragment replacement.
 `review-htmx.test.ts` verifies the injected HTMX security configuration and
 mutation headers; `entrypoints.test.ts` also covers an injected empty review

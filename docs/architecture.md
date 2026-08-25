@@ -106,8 +106,9 @@ recursive tree, filters it, renders counts and links, and serves replacement
 fragments. Small adapters read only interaction values, focus targets,
 semantic IDs, geometry, events, native selection, and rendered selection text.
 Application decisions consume runtime-validated state or explicit interaction
-values. Directory expansion is a typed browser-owned ID set projected onto
-each replacement fragment.
+values. Directory expansion is a typed browser-owned set of explicitly
+collapsed IDs projected onto each replacement fragment; directories absent
+from that set default to expanded when a filter first reveals them.
 
 `GET /ui/document-state?document={optional path}&mode={file|diff}` is the active
 versioned catalog boundary. An omitted path selects the index default,
@@ -132,10 +133,11 @@ and mutable interaction contexts passed explicitly to handlers. Inline
 comments in the adapter document state ownership, delegated-event reasons,
 request-serialization guarantees, and drag-lifecycle invariants. Browser
 callbacks use idiomatic arrow adapters while behavior remains in named,
-module-scoped helpers. Directory expansion lives in a typed set keyed by
-semantic directory IDs; HTMX swaps receive that state through a one-way render
-step instead of having classes or ARIA attributes read back as state. This
-adapter lives independently in `document-tree.ts`. `viewer.ts` composes it
+module-scoped helpers. Explicit directory collapses live in a typed set keyed
+by semantic directory IDs; HTMX swaps receive that state through a one-way
+render step instead of having classes or ARIA attributes read back as state.
+Unknown directories default to expanded. This adapter lives independently in
+`document-tree.ts`. `viewer.ts` composes it
 with focused document-search, layout, comparison-control, diff-divider,
 environment, and browser-storage modules; it owns no feature implementation.
 
