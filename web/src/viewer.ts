@@ -205,10 +205,7 @@ function bindPanelToggle(options: PanelToggleOptions): void {
       options.defaultCollapsed ?? false,
     ),
   );
-  options.button.addEventListener(
-    "click",
-    handlePanelToggle.bind(null, context),
-  );
+  options.button.addEventListener("click", () => handlePanelToggle(context));
 }
 
 function handlePanelToggle(context: PanelToggleContext): void {
@@ -241,7 +238,7 @@ function bindSourceModePreference(document: Document, storage: Storage): void {
   if (!tabs || !activeTab) return;
   persistSourceMode(storage, activeTab);
   for (const tab of tabs.querySelectorAll<HTMLAnchorElement>("a")) {
-    tab.addEventListener("click", persistSourceMode.bind(null, storage, tab));
+    tab.addEventListener("click", () => persistSourceMode(storage, tab));
   }
 }
 
@@ -281,38 +278,34 @@ function bindDocumentSearch(environment: ViewerEnvironment): void {
   void refreshDocumentCatalog(context, true);
   environment.document.addEventListener(
     "change",
-    handleDocumentScopeChange.bind(null, context),
+    (event) => handleDocumentScopeChange(context, event),
     true,
   );
   environment.document.addEventListener(
     "input",
-    handleDocumentSearchInput.bind(null, context),
+    (event) => handleDocumentSearchInput(context, event),
     true,
   );
   environment.document.addEventListener(
     "search",
-    handleDocumentSearch.bind(null, context),
+    (event) => handleDocumentSearch(context, event),
     true,
   );
-  environment.document.addEventListener(
-    "click",
-    handleDocumentDirectoryClick.bind(null, context),
+  environment.document.addEventListener("click", (event) =>
+    handleDocumentDirectoryClick(context, event),
   );
-  environment.document.addEventListener(
-    "htmx:afterSwap",
-    restoreExpandedDirectories.bind(null, context),
+  environment.document.addEventListener("htmx:afterSwap", () =>
+    restoreExpandedDirectories(context),
   );
   environment.document.addEventListener(
     "code-annotator:annotations-updated",
-    handleAnnotationsUpdated.bind(null, context),
+    () => handleAnnotationsUpdated(context),
   );
-  environment.document.addEventListener(
-    "keydown",
-    handleDocumentSearchKeydown.bind(null, context),
+  environment.document.addEventListener("keydown", (event) =>
+    handleDocumentSearchKeydown(context, event),
   );
-  environment.document.addEventListener(
-    "keydown",
-    handleDocumentShortcutKeydown.bind(null, context),
+  environment.document.addEventListener("keydown", (event) =>
+    handleDocumentShortcutKeydown(context, event),
   );
   restoreExpandedDirectories(context);
 }
@@ -393,7 +386,7 @@ function handleDocumentSearchInput(
     return;
   context.window.clearTimeout(context.searchTimer);
   context.searchTimer = context.window.setTimeout(
-    requestDocumentPanel.bind(null, context, input.value, context.scope),
+    () => requestDocumentPanel(context, input.value, context.scope),
     150,
   );
 }
@@ -478,8 +471,8 @@ function isString(value: unknown): value is string {
 // Annotation mutations can change open-comment counts and scope membership, so
 // refresh typed state before asking the server to rerender the active filter.
 function handleAnnotationsUpdated(context: DocumentSearchContext): void {
-  void refreshDocumentCatalog(context, false).then(
-    dispatchDocumentSearch.bind(null, context),
+  void refreshDocumentCatalog(context, false).then(() =>
+    dispatchDocumentSearch(context),
   );
 }
 
@@ -592,17 +585,12 @@ function bindComparisonControl(document: Document): void {
   const status = control?.querySelector<HTMLElement>(".diff-comparison-status");
   if (!control || !token || !selector || !status) return;
   const context: ComparisonControlContext = { control, status, token };
-  selector.addEventListener(
-    "change",
-    handleComparisonChange.bind(null, context),
+  selector.addEventListener("change", () => handleComparisonChange(context));
+  document.body.addEventListener("htmx:configRequest", (event) =>
+    handleComparisonConfigRequest(context, event),
   );
-  document.body.addEventListener(
-    "htmx:configRequest",
-    handleComparisonConfigRequest.bind(null, context),
-  );
-  document.body.addEventListener(
-    "htmx:responseError",
-    handleComparisonResponseError.bind(null, context),
+  document.body.addEventListener("htmx:responseError", (event) =>
+    handleComparisonResponseError(context, event),
   );
 }
 
@@ -671,15 +659,13 @@ function bindDiffDivider(document: Document, storage: Storage): void {
     dragRect: null,
     pointerMoveHandler: null,
   };
-  context.pointerMoveHandler = handleDiffPointerMove.bind(null, context);
+  context.pointerMoveHandler = (event) => handleDiffPointerMove(context, event);
   renderDiffSplit(context);
-  divider.addEventListener(
-    "keydown",
-    handleDiffDividerKeydown.bind(null, context),
+  divider.addEventListener("keydown", (event) =>
+    handleDiffDividerKeydown(context, event),
   );
-  divider.addEventListener(
-    "pointerdown",
-    handleDiffPointerDown.bind(null, context),
+  divider.addEventListener("pointerdown", (event) =>
+    handleDiffPointerDown(context, event),
   );
 }
 
@@ -713,7 +699,7 @@ function handleDiffPointerDown(
     );
   context.document.addEventListener(
     "pointerup",
-    handleDiffPointerUp.bind(null, context),
+    () => handleDiffPointerUp(context),
     { once: true },
   );
 }

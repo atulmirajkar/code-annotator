@@ -93,7 +93,7 @@ function bindPanelToggle(options) {
         name: options.name,
     };
     setPanelCollapsed(context, readPanelCollapsedPreference(options.storage, options.name, options.defaultCollapsed ?? false));
-    options.button.addEventListener("click", handlePanelToggle.bind(null, context));
+    options.button.addEventListener("click", () => handlePanelToggle(context));
 }
 function handlePanelToggle(context) {
     const collapsed = !context.panel.hidden;
@@ -115,7 +115,7 @@ function bindSourceModePreference(document, storage) {
         return;
     persistSourceMode(storage, activeTab);
     for (const tab of tabs.querySelectorAll("a")) {
-        tab.addEventListener("click", persistSourceMode.bind(null, storage, tab));
+        tab.addEventListener("click", () => persistSourceMode(storage, tab));
     }
 }
 function persistSourceMode(storage, tab) {
@@ -145,14 +145,14 @@ function bindDocumentSearch(environment) {
         queuedRequest: null,
     };
     void refreshDocumentCatalog(context, true);
-    environment.document.addEventListener("change", handleDocumentScopeChange.bind(null, context), true);
-    environment.document.addEventListener("input", handleDocumentSearchInput.bind(null, context), true);
-    environment.document.addEventListener("search", handleDocumentSearch.bind(null, context), true);
-    environment.document.addEventListener("click", handleDocumentDirectoryClick.bind(null, context));
-    environment.document.addEventListener("htmx:afterSwap", restoreExpandedDirectories.bind(null, context));
-    environment.document.addEventListener("code-annotator:annotations-updated", handleAnnotationsUpdated.bind(null, context));
-    environment.document.addEventListener("keydown", handleDocumentSearchKeydown.bind(null, context));
-    environment.document.addEventListener("keydown", handleDocumentShortcutKeydown.bind(null, context));
+    environment.document.addEventListener("change", (event) => handleDocumentScopeChange(context, event), true);
+    environment.document.addEventListener("input", (event) => handleDocumentSearchInput(context, event), true);
+    environment.document.addEventListener("search", (event) => handleDocumentSearch(context, event), true);
+    environment.document.addEventListener("click", (event) => handleDocumentDirectoryClick(context, event));
+    environment.document.addEventListener("htmx:afterSwap", () => restoreExpandedDirectories(context));
+    environment.document.addEventListener("code-annotator:annotations-updated", () => handleAnnotationsUpdated(context));
+    environment.document.addEventListener("keydown", (event) => handleDocumentSearchKeydown(context, event));
+    environment.document.addEventListener("keydown", (event) => handleDocumentShortcutKeydown(context, event));
     restoreExpandedDirectories(context);
 }
 // Catalog state is fetched separately from rendered HTML and runtime-validated
@@ -203,7 +203,7 @@ function handleDocumentSearchInput(context, event) {
         input.id !== "document-search-input")
         return;
     context.window.clearTimeout(context.searchTimer);
-    context.searchTimer = context.window.setTimeout(requestDocumentPanel.bind(null, context, input.value, context.scope), 150);
+    context.searchTimer = context.window.setTimeout(() => requestDocumentPanel(context, input.value, context.scope), 150);
 }
 function handleDocumentSearch(context, event) {
     const input = event.target;
@@ -266,7 +266,7 @@ function isString(value) {
 // Annotation mutations can change open-comment counts and scope membership, so
 // refresh typed state before asking the server to rerender the active filter.
 function handleAnnotationsUpdated(context) {
-    void refreshDocumentCatalog(context, false).then(dispatchDocumentSearch.bind(null, context));
+    void refreshDocumentCatalog(context, false).then(() => dispatchDocumentSearch(context));
 }
 function dispatchDocumentSearch(context) {
     context.document
@@ -360,9 +360,9 @@ function bindComparisonControl(document) {
     if (!control || !token || !selector || !status)
         return;
     const context = { control, status, token };
-    selector.addEventListener("change", handleComparisonChange.bind(null, context));
-    document.body.addEventListener("htmx:configRequest", handleComparisonConfigRequest.bind(null, context));
-    document.body.addEventListener("htmx:responseError", handleComparisonResponseError.bind(null, context));
+    selector.addEventListener("change", () => handleComparisonChange(context));
+    document.body.addEventListener("htmx:configRequest", (event) => handleComparisonConfigRequest(context, event));
+    document.body.addEventListener("htmx:responseError", (event) => handleComparisonResponseError(context, event));
 }
 function handleComparisonChange(context) {
     context.status.textContent = "Updating comparison base…";
@@ -414,10 +414,10 @@ function bindDiffDivider(document, storage) {
         dragRect: null,
         pointerMoveHandler: null,
     };
-    context.pointerMoveHandler = handleDiffPointerMove.bind(null, context);
+    context.pointerMoveHandler = (event) => handleDiffPointerMove(context, event);
     renderDiffSplit(context);
-    divider.addEventListener("keydown", handleDiffDividerKeydown.bind(null, context));
-    divider.addEventListener("pointerdown", handleDiffPointerDown.bind(null, context));
+    divider.addEventListener("keydown", (event) => handleDiffDividerKeydown(context, event));
+    divider.addEventListener("pointerdown", (event) => handleDiffPointerDown(context, event));
 }
 function handleDiffDividerKeydown(context, event) {
     let next;
@@ -443,7 +443,7 @@ function handleDiffPointerDown(context, event) {
     context.dragRect = context.view.getBoundingClientRect();
     if (context.pointerMoveHandler)
         context.document.addEventListener("pointermove", context.pointerMoveHandler);
-    context.document.addEventListener("pointerup", handleDiffPointerUp.bind(null, context), { once: true });
+    context.document.addEventListener("pointerup", () => handleDiffPointerUp(context), { once: true });
 }
 function handleDiffPointerMove(context, event) {
     if (context.dragRect)

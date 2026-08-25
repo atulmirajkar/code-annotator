@@ -136,7 +136,9 @@ application inputs. `viewer.ts` declares interfaces and helpers at module
 scope. Its initializer performs wiring only, with storage, browser services,
 and mutable interaction contexts passed explicitly to handlers. Inline
 comments in the adapter document state ownership, delegated-event reasons,
-request-serialization guarantees, and drag-lifecycle invariants.
+request-serialization guarantees, and drag-lifecycle invariants. Browser
+callbacks use idiomatic arrow adapters while behavior remains in named,
+module-scoped helpers.
 
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production

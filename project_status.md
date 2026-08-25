@@ -49,7 +49,8 @@ every interface and helper to module scope and passes initializer-owned state
 to event handlers through explicit typed contexts. A readability follow-up
 documents the non-obvious state ownership and interaction invariants inline
 and uses an idiomatic observer callback while keeping the update operation
-separate.
+separate. All viewer callback adapters now use the same arrow-function style;
+the underlying interaction operations remain named module-level functions.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
