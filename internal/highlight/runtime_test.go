@@ -48,6 +48,17 @@ func TestIsCoreExtension(t *testing.T) {
 	}
 }
 
+func TestIsChangesExtensionIncludesMarkdown(t *testing.T) {
+	for _, extension := range []string{".md", ".go", ".jsx", ".json"} {
+		if !IsChangesExtension(extension) {
+			t.Errorf("IsChangesExtension(%q) = false", extension)
+		}
+	}
+	if IsChangesExtension(".py") {
+		t.Fatal("IsChangesExtension(.py) = true")
+	}
+}
+
 func TestRuntimeHighlightsDefaultGrammarSet(t *testing.T) {
 	tests := []struct {
 		extension string

@@ -174,6 +174,26 @@ func TestRenderDiff(t *testing.T) {
 	}
 }
 
+func TestRenderDiffWithSyntaxHighlightsBothPanes(t *testing.T) {
+	base := []byte("const before = 1\n")
+	current := []byte("const after = 2\n")
+	diff := gitdiff.FileDiff{
+		BaseSource: base,
+		Rows:       []gitdiff.Row{{Kind: gitdiff.RowModified, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: len(current) - 1, BaseText: "const before = 1"}},
+	}
+	result := &highlight.HighlightResult{Ranges: []highlight.Range{{StartByte: 0, EndByte: 5, Capture: "keyword"}, {StartByte: 14, EndByte: 15, Capture: "number"}}}
+	output, err := New().RenderDiffWithSyntax(current, diff, true, result, result)
+	if err != nil {
+		t.Fatalf("RenderDiffWithSyntax() error = %v", err)
+	}
+	if strings.Count(string(output), `class="syntax-keyword"`) != 2 || strings.Count(string(output), `class="syntax-number"`) != 2 {
+		t.Fatalf("both diff panes were not highlighted:\n%s", output)
+	}
+	if !strings.Contains(string(output), `id="source-0-15" class="source-text"><span class="syntax-keyword">const</span> after`) {
+		t.Fatalf("current source identity or token markup changed:\n%s", output)
+	}
+}
+
 func TestRenderGitHubFlavoredMarkdown(t *testing.T) {
 	t.Parallel()
 

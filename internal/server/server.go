@@ -703,7 +703,17 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 			// exposing command output or repository details in the browser.
 			fragment = []byte(`<section class="diff-unavailable"><h1>Changes unavailable</h1><p>The Git comparison for this file could not be generated. File view remains available.</p></section>`)
 		} else {
-			fragment, err = s.renderer.RenderDiff(source, diff, s.review != nil)
+			var baseSyntax, currentSyntax *highlight.HighlightResult
+			extension := filepath.Ext(document.Path)
+			if s.highlighter != nil && highlight.IsChangesExtension(extension) {
+				if result, highlightErr := s.highlighter.Highlight(ctx, extension, diff.BaseSource); highlightErr == nil {
+					baseSyntax = &result
+				}
+				if result, highlightErr := s.highlighter.Highlight(ctx, extension, source); highlightErr == nil {
+					currentSyntax = &result
+				}
+			}
+			fragment, err = s.renderer.RenderDiffWithSyntax(source, diff, s.review != nil, baseSyntax, currentSyntax)
 		}
 	} else if document.Kind == content.KindCode {
 		var syntax *highlight.HighlightResult

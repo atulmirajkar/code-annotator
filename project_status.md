@@ -290,7 +290,10 @@ Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-synta
   highlighting now admits JSON, HTML, CSS, SCSS, and XML-backed `.csproj`
   documents; JavaScript aliases remain explicitly covered, while Markdown and
   unsupported custom extensions retain their existing plain/Goldmark paths.
-- [ ] Complete submilestone 12.5: Changes-view highlighting.
+- [x] Complete submilestone 12.5: Changes-view highlighting. Base and current
+  panes now receive independent bounded token ranges; current source IDs and
+  annotation offsets remain stable, base rows remain non-selectable, and
+  Markdown uses its grammar only in Changes view.
 - [ ] Complete submilestone 12.6: hardening and release.
 
 ### 13. Agent server discovery

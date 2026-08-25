@@ -87,6 +87,12 @@ func IsCoreExtension(extension string) bool {
 	}
 }
 
+// IsChangesExtension includes Markdown because Changes view may use the
+// Markdown grammar while File view continues through Goldmark.
+func IsChangesExtension(extension string) bool {
+	return IsCoreExtension(extension) || strings.EqualFold(strings.TrimSpace(extension), ".md")
+}
+
 // Highlight parses one bounded document and returns data only. The renderer
 // remains responsible for capture classes, source escaping, and HTML.
 func (r *Runtime) Highlight(ctx context.Context, extension string, source []byte) (HighlightResult, error) {

@@ -820,6 +820,11 @@ and unsupported custom extensions remain escaped plain text.
 Exit gate: both panes are contextually highlighted while all review mutations
 remain anchored only to exact current-document bytes.
 
+Status: implemented. Git diffs retain the exact base bytes alongside aligned
+rows, parse base and current sources independently, and render token spans in
+each pane without changing current-side source IDs. Markdown highlighting is
+limited to Changes view.
+
 ### 12.6 Hardening and release
 
 - Run full Go, race, frontend, browser, CSP, and six-platform distribution

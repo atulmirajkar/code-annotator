@@ -433,6 +433,12 @@ func (r *Renderer) CodeSourceMap(source []byte) (SourceMap, error) {
 // on the left and current source on the right. Only current-side text receives
 // source offsets because annotations always target the editable current file.
 func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool) ([]byte, error) {
+	return r.RenderDiffWithSyntax(current, diff, review, nil, nil)
+}
+
+// RenderDiffWithSyntax renders both diff panes with optional bounded token
+// ranges. Current source IDs and byte offsets remain unchanged for review mode.
+func (r *Renderer) RenderDiffWithSyntax(current []byte, diff gitdiff.FileDiff, review bool, baseSyntax, currentSyntax *highlight.HighlightResult) ([]byte, error) {
 	if !utf8.Valid(current) || bytes.IndexByte(current, 0) >= 0 {
 		return nil, ErrUnsupportedText
 	}
@@ -440,14 +446,19 @@ func (r *Renderer) RenderDiff(current []byte, diff gitdiff.FileDiff, review bool
 		return nil, err
 	}
 
+	baseRanges := sourceRanges(diff.BaseSource)
 	var basePane, currentPane strings.Builder
 	for _, row := range diff.Rows {
-		renderDiffCell(&basePane, "base", row.Kind, diffMarker(row.Kind, false), row.OldLine, row.BaseText, 0, 0, false)
+		baseStart, baseEnd := 0, 0
+		if row.OldLine > 0 && row.OldLine <= len(baseRanges) {
+			baseStart, baseEnd = baseRanges[row.OldLine-1][0], baseRanges[row.OldLine-1][1]
+		}
+		renderDiffCell(&basePane, "base", row.Kind, diffMarker(row.Kind, false), row.OldLine, row.BaseText, baseStart, baseEnd, false, diff.BaseSource, baseSyntax)
 		currentText := ""
 		if row.NewLine > 0 {
 			currentText = string(current[row.CurrentStart:row.CurrentEnd])
 		}
-		renderDiffCell(&currentPane, "current", row.Kind, diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review)
+		renderDiffCell(&currentPane, "current", row.Kind, diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review, current, currentSyntax)
 	}
 
 	var output strings.Builder
@@ -543,14 +554,18 @@ func sourceRanges(source []byte) [][2]int {
 
 // renderDiffCell writes one escaped diff cell. A zero line number represents
 // the intentionally empty half of an added or deleted row.
-func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, marker string, line int, content string, start, end int, review bool) {
+func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, marker string, line int, content string, start, end int, review bool, source []byte, syntax *highlight.HighlightResult) {
 	fmt.Fprintf(output, `<div class="diff-cell diff-%s diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, kind, marker)
 	if line > 0 {
 		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
 		if review && side == "current" {
 			fmt.Fprintf(output, `<span id="%s" class="source-text">`, sourceElementID(start, end))
 		}
-		output.WriteString(html.EscapeString(content))
+		if syntax != nil && start >= 0 && end >= start {
+			renderCodeLine(output, source, start, end, syntax)
+		} else {
+			output.WriteString(html.EscapeString(content))
+		}
 		if review && side == "current" {
 			output.WriteString(`</span>`)
 		}

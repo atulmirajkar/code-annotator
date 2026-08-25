@@ -31,6 +31,7 @@ type FileDiff struct {
 	Path       string
 	BasePath   string
 	BaseCommit string
+	BaseSource []byte
 	Rows       []Row
 }
 
@@ -99,7 +100,7 @@ func ParsePatch(documentPath, baseCommit string, base, current, patch []byte) (F
 	if hunks == 0 && !bytes.Equal(base, current) {
 		return FileDiff{}, fmt.Errorf("%w: content differs without textual hunks", ErrUnsupportedPatch)
 	}
-	return FileDiff{Path: documentPath, BasePath: documentPath, BaseCommit: strings.ToLower(baseCommit), Rows: rows}, nil
+	return FileDiff{Path: documentPath, BasePath: documentPath, BaseCommit: strings.ToLower(baseCommit), BaseSource: append([]byte(nil), base...), Rows: rows}, nil
 }
 
 // alignPatch skips non-consuming file headers, consumes all hunks exactly once,
