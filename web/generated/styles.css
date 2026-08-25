@@ -386,7 +386,7 @@ a {
 }
 .markdown-body mark.annotation-highlight-fallback {
   border-radius: 0.15em;
-  background: rgba(255, 204, 0, 0.38);
+  background: rgba(255, 204, 0, 0.2);
   color: inherit;
 }
 .markdown-body .annotation-navigation-target {
@@ -561,6 +561,8 @@ a {
   color: var(--muted);
   text-align: right;
   user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
 }
 
 .source-line code {
@@ -733,7 +735,7 @@ a {
 }
 
 ::highlight(code-annotator-annotations) {
-  background: rgba(255, 204, 0, 0.38);
+  background: rgba(255, 204, 0, 0.2);
   color: inherit;
 }
 
