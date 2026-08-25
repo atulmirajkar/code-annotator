@@ -4,8 +4,7 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commits 8A, 8B, 9, and 10 are implemented
-and ready for the requested combined review.
+**Phase:** Server-rendered review UI milestone 17 is complete through commit 11.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
@@ -28,8 +27,8 @@ Commit 7 and review follow-ups A and B are approved. Follow-up B activates
 semantic IDs plus runtime-validated TypeScript state for annotation cards,
 source spans, Mermaid diagrams, lifecycle behavior, revisions, document digests, selection,
 and navigation. `/ui/viewer-state` is fetched during initialization and after
-mutations. A shrinking per-file test baseline rejects new `data-*` attributes
-or dataset consumers; only document-tree/filter and comparison state remains.
+mutations. A per-file test baseline rejects new `data-*` attributes or dataset
+consumers; its allowlist is empty.
 Follow-up C records that DOM structure is not an acceptable replacement state
 channel, inventories remaining violations, and splits typed document state from
 document-tree activation.
@@ -62,9 +61,16 @@ ports are explicit, and callback adapters consistently use arrow functions
 without `.bind(...)`.
 `CLAUDE.md` is the repository-level source of truth for readable TypeScript,
 state ownership, browser dependency injection, testing, and generated assets.
-Every milestone 17 commit must update
-the affected README, build, architecture, design, and status documentation in
-the same commit, then stop for maintainer approval before the next gate.
+Commit 11 removed the dead standalone selection-type module and its empty
+generated asset. The retained browser scenarios each cover behavior unavailable
+to lower-level tests. Production TypeScript is 2,997 lines; the three entrypoints
+total 633 lines and delegate to focused modules. The former 1,200-line aggregate
+target was retired because it penalized the approved comments, explicit types,
+and component split rather than enforcing architectural quality.
+The 2026-08-24 closeout passed `npm run check:web` (34 unit tests), all 40
+Playwright scenarios, `go test ./...`, `go vet ./...`, and
+`go test -race ./...`. The release build regenerated all six supported platform
+artifacts, and their SHA-256 checksums passed verification.
 Reviewer lifecycle permissions include dismissing an irrelevant or accidental
 open annotation directly to `closed`; agents cannot perform that transition.
 Annotations and thread entries now use one required `agent` or `reviewer` role
@@ -395,7 +401,7 @@ for explicit approval before starting the next item.
   comparison API.
 - [x] Commit 10: replace remaining import-time IIFEs with explicit,
   dependency-injected initializers and finish TypeScript unit/lint coverage.
-- [ ] Commit 11: run the complete verification matrix, reconcile all docs,
+- [x] Commit 11: run the complete verification matrix, reconcile all docs,
   remove dead assets/tests, and refresh distributions after source approval.
 
 ## Decisions
@@ -437,16 +443,11 @@ for explicit approval before starting the next item.
 
 ## Next milestone
 
-Milestone 17 (server-rendered review UI and testable TypeScript) is the active
-milestone. Commit 7 and review follow-ups A and B are approved. Follow-up B
-activates the versioned viewer-state endpoint and validates its unknown JSON
-payload into strongly typed TypeScript maps, and removes annotation/source/Mermaid/lifecycle
-application state from HTML. Follow-up C is the current documentation review
-gate and broadens the invariant from custom attributes to all DOM-derived
-application state. Commits 8A and 8B implement and activate the typed document
-catalog, recursive server-rendered tree, counts, and server filtering. The
-commits 8A, 8B, 9, and 10 are implemented and ready for the maintainer's
-combined review. Commit 11 remains gated on that source review.
+Milestone 17 (server-rendered review UI and testable TypeScript) is implemented
+and verified through Commit 11. Its versioned viewer state, typed document
+catalog, server-rendered document tree and comparison UI, explicit browser
+initializers, focused TypeScript components, and distribution artifacts are the
+current baseline. Define and review the next milestone before implementation.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

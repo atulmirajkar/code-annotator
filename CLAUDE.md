@@ -44,13 +44,13 @@ responsibility.
 
 ```ts
 interface SearchContext {
-  document: Document;
-  storage: Storage;
-  scope: DocumentScope;
+    document: Document;
+    storage: Storage;
+    scope: DocumentScope;
 }
 
 document.addEventListener("change", (event) =>
-  handleScopeChange(context, event),
+    handleScopeChange(context, event),
 );
 ```
 
@@ -58,9 +58,7 @@ Use modern arrow callbacks to adapt event or observer arguments. Do not use
 `Function.prototype.bind` to prefill callback parameters.
 
 ```ts
-const observer = new ResizeObserver(() =>
-  updateTopbarHeight(document, topbar),
-);
+const observer = new ResizeObserver(() => updateTopbarHeight(document, topbar));
 ```
 
 Keep the underlying operation named and independently understandable. Inline

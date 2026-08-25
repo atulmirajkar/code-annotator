@@ -6,7 +6,7 @@ import type { ReviewHtmxAPI, ReviewMutationKind } from "./review-htmx.js";
 import { createAnnotationNavigator } from "./review-navigation.js";
 import { createReviewPanelController } from "./review-panel.js";
 import { createSelectionController } from "./review-selection.js";
-import type { SelectionPayload } from "./types.js";
+import type { SelectionPayload } from "./review-selection.js";
 import { fetchViewerState } from "./viewer-state.js";
 import type { AnnotationBrowserState, ViewerState } from "./viewer-state.js";
 

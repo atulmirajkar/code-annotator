@@ -1,5 +1,10 @@
-import type { SelectionPayload } from "./types.js";
 import type { DiagramPosition, SourcePosition } from "./viewer-state.js";
+
+export interface SelectionPayload {
+  startByte: number;
+  endByte: number;
+  documentSHA256: string;
+}
 
 interface SelectionControllerOptions {
   document: Document;

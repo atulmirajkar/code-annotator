@@ -100,20 +100,14 @@ presentation, semantic IDs, accessibility
 attributes, links, and normal form semantics—not application state encoded in
 custom attributes.
 
-Custom attributes are not the only remaining state concern. The document
-sidebar no longer treats rendered nodes as catalog state: Go builds the
+Custom attributes are not the only state concern. The document sidebar no
+longer treats rendered nodes as catalog state: Go builds the
 recursive tree, filters it, renders counts and links, and serves replacement
-fragments. A small adapter reads only interaction values, focus targets,
-semantic directory IDs, and presentation expansion state; Enter uses the
-runtime-validated catalog to choose a destination. Review code still has
-smaller cases that infer visible annotations, mutation kind, conflict
-feedback, or a root-page document from nodes. These are documented migration
-debt, not the target architecture. DOM reads are valid for native selection,
-focus, form input, geometry, events, rendered selection text, and semantic-ID
-lookup; application decisions must instead consume runtime-validated state or
-explicit interaction values. The ordered remediation is commit 8A typed
-document state, commit 8B document activation, commit 9 comparison state, and
-commit 10 residual view-adapter cleanup.
+fragments. Small adapters read only interaction values, focus targets,
+semantic IDs, geometry, events, native selection, and rendered selection text.
+Application decisions consume runtime-validated state or explicit interaction
+values. Directory expansion is a typed browser-owned ID set projected onto
+each replacement fragment.
 
 `GET /ui/document-state?document={optional path}&mode={file|diff}` is the active
 versioned catalog boundary. An omitted path selects the index default,

@@ -49,8 +49,8 @@ Rendered review content carries semantic IDs only; TypeScript joins those IDs
 to typed in-memory maps. No authored custom `data-*` state attributes remain.
 The same migration rule applies when no custom attribute is involved: rendered
 nodes, classes, text, links, and visibility are presentation rather than an
-application-state store. Remaining smaller view-adapter violations are
-explicitly tracked in the milestone design.
+application-state store. Browser-owned presentation state flows one way from
+typed contexts into those rendered nodes.
 The active `/ui/document-state` boundary exposes the complete catalog,
 selected document, File/Changes mode, changed state, navigation URLs, and open
 comment counts as runtime-validated TypeScript state. The server renders the

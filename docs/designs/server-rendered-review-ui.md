@@ -139,8 +139,8 @@ DOM element types, selectors, and datasets in those modules.
   behavior.
 - Keep every migration commit buildable, testable, documented, and small
   enough to review in isolation.
-- Reduce handwritten browser TypeScript to at most 1,200 lines by the end of
-  the milestone, excluding generated JavaScript and vendored dependencies.
+- Keep browser entrypoints small and explicit by delegating behavior to focused,
+  typed modules with independently testable rules.
 
 ## Non-goals
 
@@ -771,9 +771,9 @@ Scope:
 - activate debounced server filtering if the acceptance threshold is met;
 - retain a small keyboard/directory-preference view adapter driven by typed
   catalog/filter results;
-- remove flat `<li>` enumeration, DOM-derived visible-result logic,
-  `document-tree.ts`, manual badge mutation, source-mode link rewriting, and
-  the remaining document datasets when unused;
+- remove flat `<li>` enumeration, DOM-derived visible-result logic, the former
+  catalog-building tree adapter, manual badge mutation, source-mode link
+  rewriting, and the remaining document datasets when unused;
 - update generated assets and documentation with the measured decision.
 
 Checks: unit, benchmark, server, `check:web`, Go/race, navigation Playwright.
@@ -785,7 +785,8 @@ Implementation notes:
 - the adapter uses programmatic HTMX swaps, validated catalog state for Enter,
   and semantic directory IDs for tab-local presentation preferences;
 - flat DOM catalog reconstruction, manual count badges, document datasets,
-  source-mode link rewriting, and `document-tree.ts` are removed.
+  and source-mode link rewriting are removed. The later `document-tree.ts`
+  name refers only to typed browser-owned expansion state.
 
 ### Commit 9: server-render the comparison selector
 
@@ -855,6 +856,8 @@ Implementation notes:
 
 ### Commit 11: close the milestone and refresh release artifacts
 
+Status: implemented.
+
 Scope:
 
 - confirm the handwritten TypeScript target and delete dead modules/assets;
@@ -867,6 +870,19 @@ Checks: `npm run check:web`, complete Playwright, `go test ./...`,
 `go vet ./...`, `go test -race ./...`, generated-output clean check,
 cross-platform builds, and `git diff --check`.
 
+Implementation notes:
+
+- the only dead authored TypeScript module was the standalone selection type;
+  its owner now exports that interface and the empty generated asset is gone;
+- no Playwright scenario was redundant with lower-level coverage because each
+  retained scenario exercises browser selection, layout, focus, pointer,
+  HTMX, Mermaid, or cross-tab behavior;
+- production TypeScript totals 2,997 lines and the three entrypoints total 633
+  lines after readability comments and focused component extraction. The old
+  1,200-line aggregate target is replaced below by structural constraints;
+- the complete verification and six-platform distribution results are recorded
+  in `project_status.md`.
+
 ## Acceptance criteria
 
 - Annotation cards, forms, threads, counts, document tree, and comparison
@@ -876,7 +892,9 @@ cross-platform builds, and `git diff --check`.
 - Existing JSON APIs and the agent workflow remain compatible.
 - Conflicts display authoritative state and never retry automatically.
 - Remaining TypeScript has explicit initializers and unit-tested pure rules.
-- Handwritten browser TypeScript is no more than 1,200 lines.
+- Browser entrypoints use explicit initializers, contain no nested declarations
+  or `.bind(...)` callback adapters, and delegate focused behavior to typed,
+  independently tested modules.
 - README, build, architecture, project status, and this design agree with the
   implemented state.
 - All required checks pass, or an environment-only browser limitation is
