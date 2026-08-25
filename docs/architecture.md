@@ -235,6 +235,15 @@ makes an explicit choice in the tab, defaults on when a changed document
 exists. Discovery failure leaves the full catalog usable and is presented as
 unavailable rather than as an empty changed set.
 
+`internal/render` derives request-local overview hunks from the validated,
+complete aligned row sequence. Each contiguous changed run becomes an added,
+deleted, or modified hunk. The current pane identifies the range through its
+existing first and last cells, and the renderer emits an ordered, accessible
+link plus a non-focusable end reference for every hunk. This adds no persisted
+diff state, JSON field, custom `data-*` channel, or row wrapper. The overview
+navigation remains hidden until its browser geometry and styles are implemented
+in the next review gates, so existing diff layout and selection are unchanged.
+
 ## HTTP routes
 
 | Route | Purpose |

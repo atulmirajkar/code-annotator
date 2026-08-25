@@ -2,9 +2,11 @@
 
 ## Status
 
-Approved on 2026-08-25. Implementation has not started. The review gates at the
-end of this document define the planned commits; each gate stops for maintainer
-review before the next begins.
+Approved on 2026-08-25. Implementation is complete through review gate 2 and
+stopped for maintainer review. The server now derives request-local hunks and
+renders hidden semantic targets and overview links; the ruler remains invisible
+until the browser activation gate. The review gates at the end of this document
+define the remaining commits.
 
 ## Problem
 
@@ -284,22 +286,31 @@ hunk model. The server-rendered links are the complete browser contract.
 2. classify each hunk as added, deleted, or modified;
 3. assign stable page-local identities in display order, such as
    `diff-change-1`;
-4. place that identity on the first current-side cell of the hunk, including
-   the empty current cell for a deletion-only hunk; and
+4. place start and end identities on the hunk's first and last current-side
+   cells, including empty current cells for a deletion-only hunk; and
 5. render one ordered overview link for every hunk.
 
 The proposed semantic markup shape is:
 
 ```html
 <div class="diff-cell diff-current diff-modified" id="diff-change-1">...</div>
+<div class="diff-cell diff-current diff-added" id="diff-change-1-end">...</div>
 ...
 <nav class="diff-overview" aria-label="Changes in this file">
   <span class="diff-overview-viewport" aria-hidden="true"></span>
-  <a
-    class="diff-overview-marker diff-overview-modified"
-    href="#diff-change-1"
-    aria-label="Change 1 of 4, modified near current line 27"
-  ></a>
+  <span class="diff-overview-item">
+    <a
+      class="diff-overview-marker diff-overview-modified"
+      href="#diff-change-1"
+      aria-label="Change 1 of 4, modified near current line 27"
+    ></a>
+    <a
+      class="diff-overview-end"
+      href="#diff-change-1-end"
+      tabindex="-1"
+      aria-hidden="true"
+    ></a>
+  </span>
 </nav>
 ```
 
@@ -310,9 +321,11 @@ current line number for an empty cell. The labels do not include source text.
 
 The rendered contract uses semantic IDs and ordinary links rather than custom
 `data-*` attributes. Go owns hunk formation, order, classification, target
-identity, and accessible labels. TypeScript resolves each link target and
-measures its browser position; it does not inspect row classes or line text to
-rebuild the hunk list.
+identity, extent, and accessible labels. Each item has one normal navigation
+link to its start and one non-focusable, hidden link to its end. A one-row hunk
+uses the same target for both. TypeScript resolves those explicit targets and
+measures their browser positions; it does not inspect row classes, siblings, or
+line text to rebuild the hunk list.
 
 A file with no changed rows renders no overview navigation. An empty diff and
 a diff-unavailable page retain their current markup and behavior.

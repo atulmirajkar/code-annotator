@@ -447,18 +447,27 @@ func (r *Renderer) RenderDiffWithSyntax(current []byte, diff gitdiff.FileDiff, r
 	}
 
 	baseRanges := sourceRanges(diff.BaseSource)
+	overviewHunks := deriveDiffOverviewHunks(diff.Rows)
+	overviewTargetByRow := make(map[int]string, len(overviewHunks)*2)
+	for hunkIndex, hunk := range overviewHunks {
+		identifier := fmt.Sprintf("diff-change-%d", hunkIndex+1)
+		overviewTargetByRow[hunk.StartRow] = identifier
+		if hunk.EndRow > hunk.StartRow+1 {
+			overviewTargetByRow[hunk.EndRow-1] = identifier + "-end"
+		}
+	}
 	var basePane, currentPane strings.Builder
-	for _, row := range diff.Rows {
+	for rowIndex, row := range diff.Rows {
 		baseStart, baseEnd := 0, 0
 		if row.OldLine > 0 && row.OldLine <= len(baseRanges) {
 			baseStart, baseEnd = baseRanges[row.OldLine-1][0], baseRanges[row.OldLine-1][1]
 		}
-		renderDiffCell(&basePane, "base", row.Kind, diffMarker(row.Kind, false), row.OldLine, row.BaseText, baseStart, baseEnd, false, diff.BaseSource, baseSyntax)
+		renderDiffCell(&basePane, "", "base", row.Kind, diffMarker(row.Kind, false), row.OldLine, row.BaseText, baseStart, baseEnd, false, diff.BaseSource, baseSyntax)
 		currentText := ""
 		if row.NewLine > 0 {
 			currentText = string(current[row.CurrentStart:row.CurrentEnd])
 		}
-		renderDiffCell(&currentPane, "current", row.Kind, diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review, current, currentSyntax)
+		renderDiffCell(&currentPane, overviewTargetByRow[rowIndex], "current", row.Kind, diffMarker(row.Kind, true), row.NewLine, currentText, row.CurrentStart, row.CurrentEnd, review, current, currentSyntax)
 	}
 
 	var output strings.Builder
@@ -466,8 +475,76 @@ func (r *Renderer) RenderDiffWithSyntax(current []byte, diff gitdiff.FileDiff, r
 	output.WriteString(basePane.String())
 	output.WriteString(`</div><div class="diff-divider" role="separator" aria-orientation="vertical" aria-label="Resize base and current panes" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0"></div><div class="diff-pane diff-current-pane">`)
 	output.WriteString(currentPane.String())
-	output.WriteString(`</div></div></div>`)
+	output.WriteString(`</div>`)
+	writeDiffOverview(&output, overviewHunks, diff.Rows)
+	output.WriteString(`</div></div>`)
 	return []byte(output.String()), nil
+}
+
+// diffOverviewHunk is a request-local projection over the complete aligned
+// row sequence. It stores no source text or persisted state.
+type diffOverviewHunk struct {
+	StartRow int
+	EndRow   int
+	Kind     gitdiff.RowKind
+}
+
+func deriveDiffOverviewHunks(rows []gitdiff.Row) []diffOverviewHunk {
+	hunks := make([]diffOverviewHunk, 0)
+	for rowIndex := 0; rowIndex < len(rows); {
+		if rows[rowIndex].Kind == gitdiff.RowUnchanged {
+			rowIndex++
+			continue
+		}
+		hunk := diffOverviewHunk{StartRow: rowIndex, Kind: rows[rowIndex].Kind}
+		for rowIndex < len(rows) && rows[rowIndex].Kind != gitdiff.RowUnchanged {
+			if rows[rowIndex].Kind != hunk.Kind {
+				hunk.Kind = gitdiff.RowModified
+			}
+			rowIndex++
+		}
+		hunk.EndRow = rowIndex
+		hunks = append(hunks, hunk)
+	}
+	return hunks
+}
+
+func writeDiffOverview(output *strings.Builder, hunks []diffOverviewHunk, rows []gitdiff.Row) {
+	if len(hunks) == 0 {
+		return
+	}
+	output.WriteString(`<nav class="diff-overview" aria-label="Changes in this file" hidden><span class="diff-overview-viewport" aria-hidden="true"></span>`)
+	for index, hunk := range hunks {
+		identifier := fmt.Sprintf("diff-change-%d", index+1)
+		endIdentifier := identifier
+		if hunk.EndRow > hunk.StartRow+1 {
+			endIdentifier += "-end"
+		}
+		label := diffOverviewLabel(hunk, rows, index+1, len(hunks))
+		fmt.Fprintf(output, `<span class="diff-overview-item"><a class="diff-overview-marker diff-overview-%s" href="#%s" aria-label="%s"></a><a class="diff-overview-end" href="#%s" tabindex="-1" aria-hidden="true"></a></span>`, hunk.Kind, identifier, html.EscapeString(label), endIdentifier)
+	}
+	output.WriteString(`</nav>`)
+}
+
+func diffOverviewLabel(hunk diffOverviewHunk, rows []gitdiff.Row, ordinal, total int) string {
+	if hunk.Kind != gitdiff.RowDeleted {
+		for _, row := range rows[hunk.StartRow:hunk.EndRow] {
+			if row.NewLine > 0 {
+				return fmt.Sprintf("Change %d of %d, %s near current line %d", ordinal, total, hunk.Kind, row.NewLine)
+			}
+		}
+	}
+	for rowIndex := hunk.StartRow - 1; rowIndex >= 0; rowIndex-- {
+		if rows[rowIndex].NewLine > 0 {
+			return fmt.Sprintf("Change %d of %d, deletion after current line %d", ordinal, total, rows[rowIndex].NewLine)
+		}
+	}
+	for rowIndex := hunk.EndRow; rowIndex < len(rows); rowIndex++ {
+		if rows[rowIndex].NewLine > 0 {
+			return fmt.Sprintf("Change %d of %d, deletion before current line %d", ordinal, total, rows[rowIndex].NewLine)
+		}
+	}
+	return fmt.Sprintf("Change %d of %d, deletion from current file", ordinal, total)
 }
 
 // DiffSourceMap derives selectable current-side identities for a validated
@@ -554,8 +631,12 @@ func sourceRanges(source []byte) [][2]int {
 
 // renderDiffCell writes one escaped diff cell. A zero line number represents
 // the intentionally empty half of an added or deleted row.
-func renderDiffCell(output *strings.Builder, side string, kind gitdiff.RowKind, marker string, line int, content string, start, end int, review bool, source []byte, syntax *highlight.HighlightResult) {
-	fmt.Fprintf(output, `<div class="diff-cell diff-%s diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, kind, marker)
+func renderDiffCell(output *strings.Builder, elementID, side string, kind gitdiff.RowKind, marker string, line int, content string, start, end int, review bool, source []byte, syntax *highlight.HighlightResult) {
+	fmt.Fprintf(output, `<div`)
+	if elementID != "" {
+		fmt.Fprintf(output, ` id="%s"`, elementID)
+	}
+	fmt.Fprintf(output, ` class="diff-cell diff-%s diff-%s"><span class="diff-marker" aria-hidden="true">%s</span>`, side, kind, marker)
 	if line > 0 {
 		fmt.Fprintf(output, `<span class="diff-line-number" aria-hidden="true">%d</span><code>`, line)
 		if review && side == "current" {

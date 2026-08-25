@@ -2,6 +2,7 @@ package render
 
 import (
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -109,6 +110,11 @@ func TestRenderDiff(t *testing.T) {
 				`id="source-5-16" class="source-text">new &lt;value&gt;</span>`,
 				`removed &amp; gone`,
 				`id="source-17-29" class="source-text">added &amp; more</span>`,
+				`<div id="diff-change-1" class="diff-cell diff-current diff-modified">`,
+				`<div id="diff-change-1-end" class="diff-cell diff-current diff-added">`,
+				`<nav class="diff-overview" aria-label="Changes in this file" hidden>`,
+				`class="diff-overview-marker diff-overview-modified" href="#diff-change-1" aria-label="Change 1 of 1, modified near current line 2"`,
+				`class="diff-overview-end" href="#diff-change-1-end" tabindex="-1" aria-hidden="true"`,
 			},
 			excludes: []string{`id="source-0-0"`, `>old &lt;value&gt;</span>`},
 		},
@@ -131,7 +137,36 @@ func TestRenderDiff(t *testing.T) {
 			}},
 			contains: []string{`id="source-0-1" class="source-text">a</span>`, `<span class="diff-line-number" aria-hidden="true">2</span><code><span id="source-3-3" class="source-text"></span></code>`},
 		},
-		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-pane diff-base-pane"></div>`, `<div class="diff-pane diff-current-pane"></div>`}},
+		{name: "empty source and rows", diff: gitdiff.FileDiff{}, contains: []string{`<div class="diff-pane diff-base-pane"></div>`, `<div class="diff-pane diff-current-pane"></div>`}, excludes: []string{`class="diff-overview"`}},
+		{
+			name: "targets a deletion-only file",
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowDeleted, OldLine: 1, BaseText: "removed"},
+			}},
+			contains: []string{
+				`<div id="diff-change-1" class="diff-cell diff-current diff-deleted">`,
+				`href="#diff-change-1" aria-label="Change 1 of 1, deletion from current file"`,
+				`class="diff-overview-end" href="#diff-change-1" tabindex="-1" aria-hidden="true"`,
+			},
+		},
+		{
+			name:    "renders separate overview hunk kinds and locations",
+			current: []byte("first\nadded\nmiddle\nbridge\nchanged\nlast"),
+			diff: gitdiff.FileDiff{Rows: []gitdiff.Row{
+				{Kind: gitdiff.RowUnchanged, OldLine: 1, NewLine: 1, CurrentStart: 0, CurrentEnd: 5, BaseText: "first"},
+				{Kind: gitdiff.RowAdded, NewLine: 2, CurrentStart: 6, CurrentEnd: 11},
+				{Kind: gitdiff.RowUnchanged, OldLine: 2, NewLine: 3, CurrentStart: 12, CurrentEnd: 18, BaseText: "middle"},
+				{Kind: gitdiff.RowDeleted, OldLine: 3, BaseText: "removed"},
+				{Kind: gitdiff.RowUnchanged, OldLine: 4, NewLine: 4, CurrentStart: 19, CurrentEnd: 25, BaseText: "bridge"},
+				{Kind: gitdiff.RowModified, OldLine: 5, NewLine: 5, CurrentStart: 26, CurrentEnd: 33, BaseText: "old"},
+				{Kind: gitdiff.RowUnchanged, OldLine: 6, NewLine: 6, CurrentStart: 34, CurrentEnd: 38, BaseText: "last"},
+			}},
+			contains: []string{
+				`class="diff-overview-marker diff-overview-added" href="#diff-change-1" aria-label="Change 1 of 3, added near current line 2"`,
+				`class="diff-overview-marker diff-overview-deleted" href="#diff-change-2" aria-label="Change 2 of 3, deletion after current line 3"`,
+				`class="diff-overview-marker diff-overview-modified" href="#diff-change-3" aria-label="Change 3 of 3, modified near current line 5"`,
+			},
+		},
 		{
 			name:    "markdown source never renders through goldmark",
 			current: []byte("## Heading"),
@@ -171,6 +206,60 @@ func TestRenderDiff(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDeriveDiffOverviewHunks(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		rows []gitdiff.Row
+		want []diffOverviewHunk
+	}{
+		{name: "empty"},
+		{name: "unchanged only", rows: []gitdiff.Row{{Kind: gitdiff.RowUnchanged}}},
+		{
+			name: "separate kinds",
+			rows: []gitdiff.Row{
+				{Kind: gitdiff.RowUnchanged},
+				{Kind: gitdiff.RowAdded},
+				{Kind: gitdiff.RowUnchanged},
+				{Kind: gitdiff.RowDeleted},
+				{Kind: gitdiff.RowUnchanged},
+				{Kind: gitdiff.RowModified},
+			},
+			want: []diffOverviewHunk{
+				{StartRow: 1, EndRow: 2, Kind: gitdiff.RowAdded},
+				{StartRow: 3, EndRow: 4, Kind: gitdiff.RowDeleted},
+				{StartRow: 5, EndRow: 6, Kind: gitdiff.RowModified},
+			},
+		},
+		{
+			name: "mixed contiguous rows are modified",
+			rows: []gitdiff.Row{{Kind: gitdiff.RowAdded}, {Kind: gitdiff.RowDeleted}, {Kind: gitdiff.RowAdded}},
+			want: []diffOverviewHunk{{StartRow: 0, EndRow: 3, Kind: gitdiff.RowModified}},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := deriveDiffOverviewHunks(test.rows); !slices.Equal(got, test.want) {
+				t.Fatalf("deriveDiffOverviewHunks() = %#v, want %#v", got, test.want)
+			}
+		})
+	}
+}
+
+func TestDiffOverviewLabelBeforeFirstCurrentLine(t *testing.T) {
+	t.Parallel()
+	rows := []gitdiff.Row{
+		{Kind: gitdiff.RowDeleted, OldLine: 1},
+		{Kind: gitdiff.RowUnchanged, OldLine: 2, NewLine: 1},
+	}
+	hunk := diffOverviewHunk{StartRow: 0, EndRow: 1, Kind: gitdiff.RowDeleted}
+	want := "Change 1 of 1, deletion before current line 1"
+	if got := diffOverviewLabel(hunk, rows, 1, 1); got != want {
+		t.Fatalf("diffOverviewLabel() = %q, want %q", got, want)
 	}
 }
 

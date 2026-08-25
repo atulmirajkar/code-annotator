@@ -4,7 +4,19 @@ Last updated: 2026-08-25
 
 ## Current state
 
-**Phase:** Server-rendered review UI milestone 17 is complete through commit 11.
+**Phase:** Diff overview ruler implementation is complete through review gate 2
+and stopped for maintainer review. The approved design and six review gates are
+documented in
+[`docs/designs/diff-overview-ruler.md`](docs/designs/diff-overview-ruler.md).
+The renderer now derives request-local added, deleted, and modified hunks from
+the complete aligned diff rows, identifies each range through its existing
+first and last current-side cells, and emits ordered accessible overview links
+with non-focusable end references. Those links remain hidden until the browser
+geometry and styling gates activate the ruler; no production layout has
+changed. Focused renderer tests cover grouping, mixed-kind classification, all
+marker kinds, empty diffs, deletion-only targets, and line labels.
+
+Server-rendered review UI milestone 17 is complete through commit 11.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
