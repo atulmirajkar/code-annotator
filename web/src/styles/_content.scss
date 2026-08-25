@@ -226,9 +226,12 @@
   white-space: pre;
 }
 .source-line-number {
+  position: relative;
+  z-index: 1;
   padding-right: 1rem;
   color: var(--muted);
   text-align: right;
+  background: var(--code);
   user-select: none;
   -webkit-user-select: none;
   pointer-events: none;
