@@ -76,6 +76,12 @@ viewer and Mermaid initialization with injected roots and services, including
 the viewer's injected HTMX security configuration;
 `viewer-preferences.test.ts` covers DOM-free preference derivation. The latter
 is included in `web/state_modules_test.go`'s no-DOM architecture guard.
+`document-tree.test.ts` covers directory toggling, persistence, and restoration
+after an HTMX fragment replacement.
+
+The server explicitly embeds and serves each generated viewer component under
+`/static/`. When adding a browser module imported by `viewer.ts`, update
+`web/embed.go`, the server's static asset registration, and its asset test.
 
 ## Run from source
 

@@ -838,6 +838,11 @@ Implementation notes:
   Mermaid accept explicit browser/service ports for isolated tests;
 - viewer interfaces and helpers are module-scoped; the initializer is a thin
   composition root, and handlers receive shared state through typed contexts;
+- directory expansion is held in a typed ID set and projected onto each
+  server-rendered fragment rather than reconstructed from DOM classes; the
+  complete adapter is isolated in `document-tree.ts`;
+- `viewer.ts` is reduced to composition; document search, layout, comparison,
+  diff-divider, environment, and storage behavior each have a focused module;
 - root-page document identity comes from typed catalog state rather than an
   active link, and visible annotation decisions come from typed statuses;
 - HTMX reports explicit create/reattach/other mutation kinds, so review logic

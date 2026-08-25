@@ -60,10 +60,17 @@ type Server struct {
 	reviewNavJS         []byte
 	reviewPanelJS       []byte
 	reviewSelectJS      []byte
+	browserStorageJS    []byte
+	comparisonControlJS []byte
 	documentCatalogJS   []byte
+	documentSearchJS    []byte
 	documentStateJS     []byte
+	documentTreeJS      []byte
+	diffDividerJS       []byte
 	comparisonStateJS   []byte
 	viewerJS            []byte
+	viewerEnvironmentJS []byte
+	viewerLayoutJS      []byte
 	viewerPreferencesJS []byte
 	viewerStateJS       []byte
 	htmxJS              []byte
@@ -298,6 +305,22 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
 	}
+	browserStorageJS, err := fs.ReadFile(web.Files, "generated/browser-storage.js")
+	if err != nil {
+		return nil, fmt.Errorf("read browser storage script: %w", err)
+	}
+	comparisonControlJS, err := fs.ReadFile(web.Files, "generated/comparison-control.js")
+	if err != nil {
+		return nil, fmt.Errorf("read comparison control script: %w", err)
+	}
+	diffDividerJS, err := fs.ReadFile(web.Files, "generated/diff-divider.js")
+	if err != nil {
+		return nil, fmt.Errorf("read diff divider script: %w", err)
+	}
+	documentSearchJS, err := fs.ReadFile(web.Files, "generated/document-search.js")
+	if err != nil {
+		return nil, fmt.Errorf("read document search script: %w", err)
+	}
 	viewerStateJS, err := fs.ReadFile(web.Files, "generated/viewer-state.js")
 	if err != nil {
 		return nil, fmt.Errorf("read viewer state script: %w", err)
@@ -306,6 +329,14 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer preferences script: %w", err)
 	}
+	viewerEnvironmentJS, err := fs.ReadFile(web.Files, "generated/viewer-environment.js")
+	if err != nil {
+		return nil, fmt.Errorf("read viewer environment script: %w", err)
+	}
+	viewerLayoutJS, err := fs.ReadFile(web.Files, "generated/viewer-layout.js")
+	if err != nil {
+		return nil, fmt.Errorf("read viewer layout script: %w", err)
+	}
 	documentCatalogJS, err := fs.ReadFile(web.Files, "generated/document-catalog.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document catalog script: %w", err)
@@ -313,6 +344,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	documentStateJS, err := fs.ReadFile(web.Files, "generated/document-state.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document state script: %w", err)
+	}
+	documentTreeJS, err := fs.ReadFile(web.Files, "generated/document-tree.js")
+	if err != nil {
+		return nil, fmt.Errorf("read document tree script: %w", err)
 	}
 	comparisonStateJS, err := fs.ReadFile(web.Files, "generated/comparison-state.js")
 	if err != nil {
@@ -343,10 +378,17 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewNavJS:         reviewNavJS,
 		reviewPanelJS:       reviewPanelJS,
 		reviewSelectJS:      reviewSelectJS,
+		browserStorageJS:    browserStorageJS,
+		comparisonControlJS: comparisonControlJS,
 		documentCatalogJS:   documentCatalogJS,
+		documentSearchJS:    documentSearchJS,
 		documentStateJS:     documentStateJS,
+		documentTreeJS:      documentTreeJS,
+		diffDividerJS:       diffDividerJS,
 		comparisonStateJS:   comparisonStateJS,
 		viewerJS:            viewerJS,
+		viewerEnvironmentJS: viewerEnvironmentJS,
+		viewerLayoutJS:      viewerLayoutJS,
 		viewerPreferencesJS: viewerPreferencesJS,
 		viewerStateJS:       viewerStateJS,
 		htmxJS:              htmxJS,
@@ -374,10 +416,17 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-panel.js", server.handleReviewPanelScript)
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
+	mux.HandleFunc("GET /static/browser-storage.js", server.handleBrowserStorageScript)
+	mux.HandleFunc("GET /static/comparison-control.js", server.handleComparisonControlScript)
+	mux.HandleFunc("GET /static/diff-divider.js", server.handleDiffDividerScript)
+	mux.HandleFunc("GET /static/document-search.js", server.handleDocumentSearchScript)
+	mux.HandleFunc("GET /static/viewer-environment.js", server.handleViewerEnvironmentScript)
+	mux.HandleFunc("GET /static/viewer-layout.js", server.handleViewerLayoutScript)
 	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
 	mux.HandleFunc("GET /static/viewer-preferences.js", server.handleViewerPreferencesScript)
 	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
 	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
+	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/comparison-state.js", server.handleComparisonStateScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
@@ -459,6 +508,36 @@ func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Reques
 	_, _ = response.Write(s.viewerJS)
 }
 
+func (s *Server) handleBrowserStorageScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.browserStorageJS)
+}
+
+func (s *Server) handleComparisonControlScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.comparisonControlJS)
+}
+
+func (s *Server) handleDiffDividerScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.diffDividerJS)
+}
+
+func (s *Server) handleDocumentSearchScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.documentSearchJS)
+}
+
+func (s *Server) handleViewerEnvironmentScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.viewerEnvironmentJS)
+}
+
+func (s *Server) handleViewerLayoutScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.viewerLayoutJS)
+}
+
 func (s *Server) handleViewerStateScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerStateJS)
@@ -477,6 +556,11 @@ func (s *Server) handleDocumentCatalogScript(response http.ResponseWriter, _ *ht
 func (s *Server) handleDocumentStateScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.documentStateJS)
+}
+
+func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.documentTreeJS)
 }
 
 func (s *Server) handleComparisonStateScript(response http.ResponseWriter, _ *http.Request) {

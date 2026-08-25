@@ -62,6 +62,10 @@ unit tested without DOM inputs; browser adapters use semantic IDs, explicit
 interaction values, and narrow injected ports. Viewer interfaces and helpers
 remain at module scope; its initializer only wires dependencies, and handlers
 receive any shared mutable state through explicit typed context parameters.
+`web/src/viewer.ts` is a composition root. Layout, document search, document
+tree, comparison, diff-divider, environment, and safe-storage concerns live in
+focused modules. The document-tree module keeps a typed expansion set across
+server-rendered HTMX swaps.
 
 ## Usage
 
