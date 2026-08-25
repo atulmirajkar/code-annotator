@@ -839,14 +839,14 @@ Exit gate: syntax highlighting is enabled by default for approved grammars,
 works entirely offline, and the refreshed six-platform artifacts pass the
 release checklist.
 
-Verification update (2026-08-25): the frontend suite (38 tests), targeted Go
-tests, vet, race tests, six CGO-disabled builds, and SHA-256 verification pass.
+Verification update (2026-08-25): the frontend suite (38 tests), full 41-test
+Playwright browser suite, targeted Go tests, vet, race tests, six CGO-disabled
+builds, and SHA-256 verification pass.
 The isolated Apple M1 benchmarks measured 7.68 ms/op for the typical fixture
 and 104.75 ms/op for the maximum admitted fixture. The refreshed binaries are
 16.33–17.89% larger than the pre-highlighting artifacts, above the original
-12.1 budget, and the Edge Playwright suite remains unavailable because the
-browser aborts during launch. The release gate remains open pending those two
-maintainer decisions.
+12.1 budget. The release gate remains open pending maintainer review of the
+size budget.
 
 ## Deferred follow-ups
 
