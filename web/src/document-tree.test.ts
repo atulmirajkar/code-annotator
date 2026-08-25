@@ -43,6 +43,12 @@ describe("document tree", () => {
       directory("document-directory-new", "new");
     testDocument.dispatchEvent(new Event("htmx:afterSwap"));
 
+    // HTMX restores the server-rendered class during its settle phase.
+    testDocument
+      .querySelector("#document-directory-guides")
+      ?.classList.remove("collapsed");
+    testDocument.dispatchEvent(new Event("htmx:afterSettle"));
+
     expect(
       testDocument
         .querySelector("#document-directory-guides")

@@ -144,23 +144,29 @@ test.describe("viewer navigation", () => {
     const changedOnly = page.getByRole("checkbox", { name: "Changed only" });
     await expect(changedOnly).toBeChecked();
     const changedToggle = page.locator(".document-directory-toggle", { hasText: "expansion-changed" });
+    const changedFile = page.getByRole("link", { name: /changed\.go/ });
     await expect(changedToggle).toHaveAttribute("aria-expanded", "true");
-    await changedToggle.click();
-    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
-
-    await page.reload();
-    await expect(changedOnly).toBeChecked();
-    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(changedFile).toBeVisible();
 
     const newDirectory = path.join(viewer.contentRoot, "expansion-new");
     await mkdir(newDirectory, { recursive: true });
     await writeFile(path.join(newDirectory, "new.go"), "package new\n");
     await changedOnly.uncheck();
 
+    const newToggle = page.locator(".document-directory-toggle", { hasText: "expansion-new" });
+    await expect(newToggle).toHaveAttribute("aria-expanded", "true");
+    await changedToggle.click();
     await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
-    await expect(
-      page.locator(".document-directory-toggle", { hasText: "expansion-new" }),
-    ).toHaveAttribute("aria-expanded", "true");
+    await expect(changedFile).toBeHidden();
+
+    await changedOnly.check();
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(changedFile).toBeHidden();
+
+    await page.reload();
+    await expect(changedOnly).toBeChecked();
+    await expect(changedToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(changedFile).toBeHidden();
   });
 
   test("preserves diff mode and collapsed annotations across code navigation", async ({ page, viewerURL }) => {

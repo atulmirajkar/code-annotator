@@ -14,6 +14,9 @@ export function bindDocumentTree(document, storage) {
     };
     document.addEventListener("click", (event) => handleDirectoryClick(context, event));
     document.addEventListener("htmx:afterSwap", () => renderTree(context));
+    // HTMX settles classes for same-ID elements after the swap event. Reapply
+    // presentation state afterward so its class and ARIA state cannot diverge.
+    document.addEventListener("htmx:afterSettle", () => renderTree(context));
     renderTree(context);
 }
 function handleDirectoryClick(context, event) {

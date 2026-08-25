@@ -54,7 +54,8 @@ Directory expansion now has one typed set of explicitly collapsed IDs rendered
 onto initial and HTMX-replaced directory elements. Newly revealed directories
 default to expanded, while user collapses persist within the tab. Its listener,
 persistence, migration, and render lifecycle are isolated and directly tested
-in `document-tree.ts`.
+in `document-tree.ts`. State is projected after HTMX class settlement so the
+disclosure icon and child visibility remain synchronized across filter swaps.
 The remaining viewer behavior is split by responsibility into document-search,
 layout, comparison-control, diff-divider, environment, and storage modules;
 `viewer.ts` now contains only security configuration and composition.

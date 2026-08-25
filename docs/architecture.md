@@ -136,8 +136,10 @@ callbacks use idiomatic arrow adapters while behavior remains in named,
 module-scoped helpers. Explicit directory collapses live in a typed set keyed
 by semantic directory IDs; HTMX swaps receive that state through a one-way
 render step instead of having classes or ARIA attributes read back as state.
-Unknown directories default to expanded. This adapter lives independently in
-`document-tree.ts`. `viewer.ts` composes it
+The adapter projects state after both swap and class settlement so HTMX cannot
+restore a server default over the tab-local preference. Unknown directories
+default to expanded. This adapter lives independently in `document-tree.ts`.
+`viewer.ts` composes it
 with focused document-search, layout, comparison-control, diff-divider,
 environment, and browser-storage modules; it owns no feature implementation.
 
