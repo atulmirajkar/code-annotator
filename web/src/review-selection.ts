@@ -44,6 +44,8 @@ class SelectionController {
   constructor(private readonly options: SelectionControllerOptions) {}
 
   start(): void {
+    // Bind at the controller boundary: `.markdown` owns source selection and
+    // `.panel` owns the form interaction that must preserve a pending range.
     const { document, markdown, panel } = this.options;
     panel.addEventListener("pointerdown", this.handlePanelPointerDown);
     document.addEventListener("pointerup", this.handleDocumentPointerUp);
@@ -56,10 +58,14 @@ class SelectionController {
   }
 
   currentSelection(): SelectionPayload | null {
+    // The review form reads this typed payload; it never reads DOM IDs or
+    // `data-*` attributes to reconstruct source bytes.
     return this.state.pendingSelection;
   }
 
   forceClearSelectionPreview(): void {
+    // Used when a new non-diagram pointer interaction invalidates the synthetic
+    // `.mermaid-diagram.annotation-selection` presentation marker.
     clearSelectionState(this.options, this.state);
   }
 
@@ -118,6 +124,8 @@ class SelectionController {
   };
 
   private captureDiagramSelection(diagram: HTMLElement | null): void {
+    // Mermaid SVG text has no source mapping, so selecting its `.mermaid-diagram`
+    // element uses the complete fenced definition from typed viewer state.
     const {
       documentSHA256,
       diagrams,
@@ -167,6 +175,8 @@ function updateSelectionPreview(
   options: SelectionControllerOptions,
   state: SelectionState,
 ): void {
+  // Native selection endpoints may be inside nested `.source-text` descendants;
+  // convert them to bytes while excluding line numbers and diff markers.
   const {
     document,
     documentSHA256,
@@ -254,6 +264,8 @@ function updateSelectionPreview(
 }
 
 function findSourceSpan(node: Node): HTMLElement | null {
+  // Normal source selection lands in `#source-* .source-text`. Empty lines have
+  // no text node, so their row fallback finds the row's empty source span.
   const element = node instanceof HTMLElement ? node : node.parentElement;
   if (!element) return null;
   const direct = element.closest<HTMLElement>(".source-text");
@@ -272,6 +284,8 @@ function selectionPreviewText(
   startOffset: number,
   endOffset: number,
 ): string {
+  // Rebuild line-oriented markup from `.source-line`/`.diff-current` rows so
+  // `<span class="source-line-number">` and `.diff-marker` never enter quotes.
   const startRow = startSpan.closest<HTMLElement>(
     ".source-line, .diff-current",
   );
@@ -335,6 +349,8 @@ function textOffset(
   boundaryNode: Node,
   boundaryOffset: number,
 ): number {
+  // Range text measures through nested token elements while ignoring their
+  // presentation classes, yielding a UTF-16 offset within `.source-text`.
   if (
     !(span.textContent || "") &&
     span.closest(".source-line, .diff-current")?.contains(boundaryNode)
@@ -358,6 +374,8 @@ function clearSelectionPreview(
   options: SelectionControllerOptions,
   state: SelectionState,
 ): void {
+  // Preserve the preview while the annotation panel owns focus during a form
+  // submission; otherwise remove the transient selection presentation.
   if (
     (state.preserveSelection ||
       options.panel.contains(options.document.activeElement)) &&
@@ -371,6 +389,7 @@ function clearSelectionState(
   options: SelectionControllerOptions,
   state: SelectionState,
 ): void {
+  // Reset both typed selection state and its visible preview/selection classes.
   state.pendingSelection = null;
   state.diagramSelectionActive = false;
   options.markdown

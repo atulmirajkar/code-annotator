@@ -12,6 +12,8 @@ class SelectionController {
         this.options = options;
     }
     start() {
+        // Bind at the controller boundary: `.markdown` owns source selection and
+        // `.panel` owns the form interaction that must preserve a pending range.
         const { document, markdown, panel } = this.options;
         panel.addEventListener("pointerdown", this.handlePanelPointerDown);
         document.addEventListener("pointerup", this.handleDocumentPointerUp);
@@ -23,9 +25,13 @@ class SelectionController {
         this.updateSelectionPreview();
     }
     currentSelection() {
+        // The review form reads this typed payload; it never reads DOM IDs or
+        // `data-*` attributes to reconstruct source bytes.
         return this.state.pendingSelection;
     }
     forceClearSelectionPreview() {
+        // Used when a new non-diagram pointer interaction invalidates the synthetic
+        // `.mermaid-diagram.annotation-selection` presentation marker.
         clearSelectionState(this.options, this.state);
     }
     sourceSpan(node) {
@@ -71,6 +77,8 @@ class SelectionController {
         this.captureDiagramSelection(output.closest(".mermaid-diagram"));
     };
     captureDiagramSelection(diagram) {
+        // Mermaid SVG text has no source mapping, so selecting its `.mermaid-diagram`
+        // element uses the complete fenced definition from typed viewer state.
         const { documentSHA256, diagrams, markdown, onSelectionChanged, preview, previewQuote, previewRange, selectionScope, window, } = this.options;
         if (!diagram)
             return;
@@ -104,6 +112,8 @@ class SelectionController {
     }
 }
 function updateSelectionPreview(options, state) {
+    // Native selection endpoints may be inside nested `.source-text` descendants;
+    // convert them to bytes while excluding line numbers and diff markers.
     const { document, documentSHA256, markdown, onSelectionChanged, preview, previewQuote, previewRange, selectionScope, window, } = options;
     const selection = window.getSelection();
     if (!selection || selection.rangeCount !== 1 || selection.isCollapsed) {
@@ -159,6 +169,8 @@ function updateSelectionPreview(options, state) {
     onSelectionChanged();
 }
 function findSourceSpan(node) {
+    // Normal source selection lands in `#source-* .source-text`. Empty lines have
+    // no text node, so their row fallback finds the row's empty source span.
     const element = node instanceof HTMLElement ? node : node.parentElement;
     if (!element)
         return null;
@@ -170,6 +182,8 @@ function findSourceSpan(node) {
         ?.querySelector(".source-text") || null);
 }
 function selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset) {
+    // Rebuild line-oriented markup from `.source-line`/`.diff-current` rows so
+    // `<span class="source-line-number">` and `.diff-marker` never enter quotes.
     const startRow = startSpan.closest(".source-line, .diff-current");
     const endRow = endSpan.closest(".source-line, .diff-current");
     if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement)
@@ -218,6 +232,8 @@ function codeBlock(span) {
     return code && code.parentElement?.tagName === "PRE" ? code : null;
 }
 function textOffset(document, span, boundaryNode, boundaryOffset) {
+    // Range text measures through nested token elements while ignoring their
+    // presentation classes, yielding a UTF-16 offset within `.source-text`.
     if (!(span.textContent || "") &&
         span.closest(".source-line, .diff-current")?.contains(boundaryNode))
         return 0;
@@ -235,6 +251,8 @@ function utf8Length(value) {
     return new TextEncoder().encode(value).length;
 }
 function clearSelectionPreview(options, state) {
+    // Preserve the preview while the annotation panel owns focus during a form
+    // submission; otherwise remove the transient selection presentation.
     if ((state.preserveSelection ||
         options.panel.contains(options.document.activeElement)) &&
         state.pendingSelection)
@@ -242,6 +260,7 @@ function clearSelectionPreview(options, state) {
     clearSelectionState(options, state);
 }
 function clearSelectionState(options, state) {
+    // Reset both typed selection state and its visible preview/selection classes.
     state.pendingSelection = null;
     state.diagramSelectionActive = false;
     options.markdown
