@@ -69,6 +69,8 @@ server-rendered HTMX swaps.
 The review entrypoint follows the same convention: its initializer composes a
 typed context, while event handlers and state transitions remain module-level.
 Review controllers receive document, window, storage, and HTMX ports explicitly.
+Repository-wide TypeScript readability and testing conventions are documented
+in [`CLAUDE.md`](CLAUDE.md).
 
 ## Usage
 

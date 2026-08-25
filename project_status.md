@@ -60,6 +60,8 @@ layout, comparison-control, diff-divider, environment, and storage modules;
 The review initializer is flattened around a typed context, all review browser
 ports are explicit, and callback adapters consistently use arrow functions
 without `.bind(...)`.
+`CLAUDE.md` is the repository-level source of truth for readable TypeScript,
+state ownership, browser dependency injection, testing, and generated assets.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
