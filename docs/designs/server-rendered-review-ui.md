@@ -4,8 +4,9 @@
 
 Implementation in progress. Commit gates 0 through 7, commit 7 review
 follow-ups A and B, the commit 4 review follow-up, and the intervening role-only
-compatibility slice are approved. Commit 7 review follow-up C is implemented
-as a planning and architecture gate and awaits maintainer review.
+compatibility slice are approved. Commit 7 review follow-up C is approved.
+Commit 8A is implemented; the maintainer approved continuing through commits
+8B, 9, and 10 before the next combined review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -712,8 +713,7 @@ Playwright tests.
 
 ### Commit 7 review follow-up C: codify the DOM/state boundary
 
-Status: implemented in the current documentation review commit; awaiting
-maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -730,6 +730,9 @@ Checks: documentation consistency and diff checks.
 
 ### Commit 8A: establish typed document catalog state
 
+Status: implemented. The maintainer approved continuing to 8B as part of the
+combined commits 8–10 review sequence.
+
 Scope:
 
 - add a versioned, runtime-validated document catalog boundary containing
@@ -743,6 +746,18 @@ Scope:
 
 Checks: parser and pure-state unit tests, catalog handler tests, `check:web`,
 full Go/race, vet, and diff checks.
+
+Implementation notes:
+
+- inactive `GET /ui/document-state` returns a versioned ordered catalog and
+  defaults an omitted document to the same index selection as `/`;
+- `document-state.ts` validates unknown wire data, cross-field capability
+  invariants, unique paths, and selected identity before building its path map;
+- `document-catalog.ts` contains only typed tree/filter/count/status rules and
+  has no DOM dependency;
+- Go and TypeScript tests cover endpoint behavior, parser rejection, nested
+  tree construction, combined scopes, stable ordering, summaries, and the
+  pure-module architecture guard.
 
 ### Commit 8B: server-render the document tree and benchmark filtering
 

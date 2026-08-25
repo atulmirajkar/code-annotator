@@ -52,6 +52,10 @@ The same migration rule applies when no custom attribute is involved: rendered
 nodes, classes, text, links, and visibility are presentation rather than an
 application-state store. Remaining document-tree, comparison, and smaller view
 adapter violations are explicitly tracked in the milestone design.
+An inactive `/ui/document-state` foundation now exposes the complete catalog,
+selected document, File/Changes mode, changed state, navigation URLs, and open
+comment counts as runtime-validated TypeScript state. Pure DOM-free functions
+build and filter that catalog; commit 8B will activate them in the viewer.
 
 ## Usage
 

@@ -58,6 +58,15 @@ adapters may query elements to bind events and project typed state. Commit 8A
 will add an automated architecture check for this module boundary before the
 document catalog migration is activated.
 
+Commit 8A adds that check in `web/state_modules_test.go`; its reviewed module
+list currently contains `web/src/document-catalog.ts`. The catalog parser and
+pure rules have co-located Vitest coverage, while
+`internal/server/document_state_test.go` covers the inactive Go endpoint,
+default selection, validation failures, URL mode, changed input, and active
+annotation counts. `/static/document-state.js` and
+`/static/document-catalog.js` remain embedded even though no page imports them
+until commit 8B.
+
 ## Run from source
 
 From the repository root:

@@ -4,9 +4,8 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit 7 review follow-up C documents the
-DOM/state boundary and revised implementation gates and is awaiting maintainer
-review. Commit 8A must not begin without explicit approval.
+**Phase:** Server-rendered review UI commit 8A is implemented. The maintainer
+approved continuing through commits 8B, 9, and 10 before a combined review.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
@@ -34,6 +33,9 @@ or dataset consumers; only document-tree/filter and comparison state remains.
 Follow-up C records that DOM structure is not an acceptable replacement state
 channel, inventories remaining violations, and splits typed document state from
 document-tree activation.
+Commit 8A adds inactive `/ui/document-state`, runtime validation, pure DOM-free
+tree/filter/count rules, focused tests, and an architecture guard. No viewer
+entrypoint imports the new modules yet.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
@@ -359,7 +361,7 @@ for explicit approval before starting the next item.
   attributes to semantic IDs and typed in-memory state.
 - [x] Commit 7 review follow-up C: define and inventory the DOM/state boundary,
   revise the remaining gates, and stop before implementation.
-- [ ] Commit 8A: add runtime-validated document catalog state and pure DOM-free
+- [x] Commit 8A: add runtime-validated document catalog state and pure DOM-free
   tree/filter/count logic without activating it.
 - [ ] Commit 8B: server-render the document tree and counts; activate server
   filtering only if the documented 5,000-path benchmark passes.
@@ -415,10 +417,10 @@ activates the versioned viewer-state endpoint and validates its unknown JSON
 payload into strongly typed TypeScript maps, and removes annotation/source/Mermaid/lifecycle
 application state from HTML. Follow-up C is the current documentation review
 gate and broadens the invariant from custom attributes to all DOM-derived
-application state. The next allowed slice is commit 8A, adding the inactive
-typed document catalog and pure tree/filter/count rules; it must not begin
-until the maintainer explicitly approves. Commit 8B activates document-tree
-rendering and filtering only after 8A is approved.
+application state. Commit 8A implements the inactive typed document catalog and
+pure tree/filter/count rules. The maintainer approved continuing directly
+through commit 8B, commit 9, and commit 10 for one combined review. Commit 8B
+is next and activates document-tree rendering and filtering.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

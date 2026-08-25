@@ -60,6 +60,8 @@ type Server struct {
 	reviewNavJS       []byte
 	reviewPanelJS     []byte
 	reviewSelectJS    []byte
+	documentCatalogJS []byte
+	documentStateJS   []byte
 	documentTreeJS    []byte
 	viewerJS          []byte
 	viewerStateJS     []byte
@@ -314,6 +316,14 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read document tree script: %w", err)
 	}
+	documentCatalogJS, err := fs.ReadFile(web.Files, "generated/document-catalog.js")
+	if err != nil {
+		return nil, fmt.Errorf("read document catalog script: %w", err)
+	}
+	documentStateJS, err := fs.ReadFile(web.Files, "generated/document-state.js")
+	if err != nil {
+		return nil, fmt.Errorf("read document state script: %w", err)
+	}
 	mermaidJS, err := fs.ReadFile(web.Files, "generated/mermaid.js")
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
@@ -339,6 +349,8 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewNavJS:       reviewNavJS,
 		reviewPanelJS:     reviewPanelJS,
 		reviewSelectJS:    reviewSelectJS,
+		documentCatalogJS: documentCatalogJS,
+		documentStateJS:   documentStateJS,
 		documentTreeJS:    documentTreeJS,
 		viewerJS:          viewerJS,
 		viewerStateJS:     viewerStateJS,
@@ -368,12 +380,15 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
 	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
+	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
+	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
 	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
 	mux.HandleFunc("GET /ui/viewer-state", server.handleViewerState)
+	mux.HandleFunc("GET /ui/document-state", server.handleDocumentState)
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
@@ -449,6 +464,16 @@ func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Reques
 func (s *Server) handleViewerStateScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerStateJS)
+}
+
+func (s *Server) handleDocumentCatalogScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.documentCatalogJS)
+}
+
+func (s *Server) handleDocumentStateScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.documentStateJS)
 }
 
 func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
