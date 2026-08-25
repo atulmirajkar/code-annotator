@@ -87,7 +87,8 @@
     max-width: none;
   }
 }
-.source-view {
+.source-view,
+.diff-view {
   .syntax-keyword {
     color: var(--syntax-keyword);
   }

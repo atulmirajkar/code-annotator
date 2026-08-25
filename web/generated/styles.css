@@ -411,43 +411,56 @@ a {
   max-width: none;
 }
 
-.source-view .syntax-keyword {
+.source-view .syntax-keyword,
+.diff-view .syntax-keyword {
   color: var(--syntax-keyword);
 }
-.source-view .syntax-string {
+.source-view .syntax-string,
+.diff-view .syntax-string {
   color: var(--syntax-string);
 }
-.source-view .syntax-comment {
+.source-view .syntax-comment,
+.diff-view .syntax-comment {
   color: var(--syntax-comment);
 }
-.source-view .syntax-number {
+.source-view .syntax-number,
+.diff-view .syntax-number {
   color: var(--syntax-number);
 }
-.source-view .syntax-type {
+.source-view .syntax-type,
+.diff-view .syntax-type {
   color: var(--syntax-type);
 }
-.source-view .syntax-function {
+.source-view .syntax-function,
+.diff-view .syntax-function {
   color: var(--syntax-function);
 }
-.source-view .syntax-property {
+.source-view .syntax-property,
+.diff-view .syntax-property {
   color: var(--syntax-property);
 }
-.source-view .syntax-constant {
+.source-view .syntax-constant,
+.diff-view .syntax-constant {
   color: var(--syntax-constant);
 }
-.source-view .syntax-operator {
+.source-view .syntax-operator,
+.diff-view .syntax-operator {
   color: var(--syntax-operator);
 }
-.source-view .syntax-attribute {
+.source-view .syntax-attribute,
+.diff-view .syntax-attribute {
   color: var(--syntax-attribute);
 }
-.source-view .syntax-tag {
+.source-view .syntax-tag,
+.diff-view .syntax-tag {
   color: var(--syntax-tag);
 }
-.source-view .syntax-punctuation {
+.source-view .syntax-punctuation,
+.diff-view .syntax-punctuation {
   color: var(--syntax-punctuation);
 }
-.source-view .syntax-variable {
+.source-view .syntax-variable,
+.diff-view .syntax-variable {
   color: var(--syntax-variable);
 }
 
