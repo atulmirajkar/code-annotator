@@ -706,7 +706,14 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 			fragment, err = s.renderer.RenderDiff(source, diff, s.review != nil)
 		}
 	} else if document.Kind == content.KindCode {
-		fragment, err = s.renderer.RenderCode(source, s.review != nil)
+		var syntax *highlight.HighlightResult
+		extension := filepath.Ext(document.Path)
+		if s.highlighter != nil && highlight.IsCoreExtension(extension) {
+			if result, highlightErr := s.highlighter.Highlight(ctx, extension, source); highlightErr == nil {
+				syntax = &result
+			}
+		}
+		fragment, err = s.renderer.RenderCodeWithHighlights(source, s.review != nil, syntax)
 	} else if s.review != nil {
 		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
 	} else {

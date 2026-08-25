@@ -64,8 +64,10 @@ state. Highlight work admits at most 128 KiB per pane, has a 500 ms deadline,
 and rejects excessive or invalid output; larger supported source files retain
 the existing escaped plain rendering. The server owns a runtime instance, and
 submilestone 12.2 maps restored annotation ranges through descendant text nodes
-while preserving nested token elements in the fallback highlighter. Production
-token rendering remains a separate review gate in
+while preserving nested token elements in the fallback highlighter. Submilestone
+12.3 feeds validated core-language ranges into File-view `RenderCode`; the
+renderer owns escaping and fixed capture-class mapping, while Changes view and
+the remaining catalog stay on later review gates.
 [`docs/designs/source-syntax-highlighting.md`](designs/source-syntax-highlighting.md).
 
 The browser source is authored under `web/src/` and compiled into the checked-in

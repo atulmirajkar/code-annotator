@@ -281,7 +281,11 @@ Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-synta
   pass. The Playwright browser matrix remains environment-blocked because
   Microsoft Edge aborts during launch in this workspace; no assertion failures
   were observed.
-- [ ] Complete submilestone 12.3: core language highlighting in File view.
+- [x] Complete submilestone 12.3: core language highlighting in File view.
+  File view now highlights Go, C#, JavaScript/JSX, and TypeScript/TSX through
+  bounded Tree-sitter ranges, fixed semantic classes, escaped token output,
+  and plain-render fallback. Existing source IDs and line-ending gaps remain
+  stable; Changes view and the remaining catalog are deferred to later gates.
 - [ ] Complete submilestone 12.4: remaining default source catalog.
 - [ ] Complete submilestone 12.5: Changes-view highlighting.
 - [ ] Complete submilestone 12.6: hardening and release.

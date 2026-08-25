@@ -87,6 +87,21 @@
     max-width: none;
   }
 }
+.source-view {
+  .syntax-keyword { color: var(--syntax-keyword); }
+  .syntax-string { color: var(--syntax-string); }
+  .syntax-comment { color: var(--syntax-comment); }
+  .syntax-number { color: var(--syntax-number); }
+  .syntax-type { color: var(--syntax-type); }
+  .syntax-function { color: var(--syntax-function); }
+  .syntax-property { color: var(--syntax-property); }
+  .syntax-constant { color: var(--syntax-constant); }
+  .syntax-operator { color: var(--syntax-operator); }
+  .syntax-attribute { color: var(--syntax-attribute); }
+  .syntax-tag { color: var(--syntax-tag); }
+  .syntax-punctuation { color: var(--syntax-punctuation); }
+  .syntax-variable { color: var(--syntax-variable); }
+}
 .source-mode-tabs {
   position: sticky;
   top: var(--topbar-height);

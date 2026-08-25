@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"atulm/code-annotator/internal/gitdiff"
+	"atulm/code-annotator/internal/highlight"
 )
 
 func TestRenderCode(t *testing.T) {
@@ -43,6 +44,36 @@ func TestRenderCode(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestRenderCodeWithHighlights(t *testing.T) {
+	t.Parallel()
+	source := []byte("const value = 1 < 2\n")
+	result := &highlight.HighlightResult{Grammar: "go", Ranges: []highlight.Range{
+		{StartByte: 0, EndByte: 5, Capture: "keyword"},
+		{StartByte: 14, EndByte: 15, Capture: "number"},
+		{StartByte: 16, EndByte: 17, Capture: "operator"},
+	}}
+	output, err := New().RenderCodeWithHighlights(source, true, result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{
+		`id="source-0-19" class="source-text"><span class="syntax-keyword">const</span> value = <span class="syntax-number">1</span> <span class="syntax-operator">&lt;</span> 2`,
+	} {
+		if !strings.Contains(string(output), want) {
+			t.Fatalf("highlighted output missing %q:\n%s", want, output)
+		}
+	}
+
+	invalid := &highlight.HighlightResult{Ranges: []highlight.Range{{StartByte: 1, EndByte: 1, Capture: "keyword"}}}
+	plain, err := New().RenderCodeWithHighlights(source, true, invalid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(plain), "syntax-") || strings.Contains(string(plain), "<span class=\"syntax") {
+		t.Fatalf("invalid highlight result was not plain fallback:\n%s", plain)
 	}
 }
 

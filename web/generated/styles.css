@@ -14,6 +14,19 @@
   --code: #eef1f5;
   --diff-added: #e8f5e9;
   --diff-deleted: #fdebec;
+  --syntax-keyword: #7c3aed;
+  --syntax-string: #0f766e;
+  --syntax-comment: #667085;
+  --syntax-number: #b45309;
+  --syntax-type: #1d4ed8;
+  --syntax-function: #0369a1;
+  --syntax-property: #9d174d;
+  --syntax-constant: #a16207;
+  --syntax-operator: #475569;
+  --syntax-attribute: #be123c;
+  --syntax-tag: #047857;
+  --syntax-punctuation: #64748b;
+  --syntax-variable: #334155;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -30,6 +43,19 @@
     --code: #252b34;
     --diff-added: #183b2a;
     --diff-deleted: #482428;
+    --syntax-keyword: #c4b5fd;
+    --syntax-string: #5eead4;
+    --syntax-comment: #9da7b5;
+    --syntax-number: #fbbf24;
+    --syntax-type: #93c5fd;
+    --syntax-function: #7dd3fc;
+    --syntax-property: #f9a8d4;
+    --syntax-constant: #fcd34d;
+    --syntax-operator: #cbd5e1;
+    --syntax-attribute: #fda4af;
+    --syntax-tag: #6ee7b7;
+    --syntax-punctuation: #cbd5e1;
+    --syntax-variable: #e2e8f0;
   }
 }
 * {
@@ -383,6 +409,46 @@ a {
 
 .code-document .markdown-body {
   max-width: none;
+}
+
+.source-view .syntax-keyword {
+  color: var(--syntax-keyword);
+}
+.source-view .syntax-string {
+  color: var(--syntax-string);
+}
+.source-view .syntax-comment {
+  color: var(--syntax-comment);
+}
+.source-view .syntax-number {
+  color: var(--syntax-number);
+}
+.source-view .syntax-type {
+  color: var(--syntax-type);
+}
+.source-view .syntax-function {
+  color: var(--syntax-function);
+}
+.source-view .syntax-property {
+  color: var(--syntax-property);
+}
+.source-view .syntax-constant {
+  color: var(--syntax-constant);
+}
+.source-view .syntax-operator {
+  color: var(--syntax-operator);
+}
+.source-view .syntax-attribute {
+  color: var(--syntax-attribute);
+}
+.source-view .syntax-tag {
+  color: var(--syntax-tag);
+}
+.source-view .syntax-punctuation {
+  color: var(--syntax-punctuation);
+}
+.source-view .syntax-variable {
+  color: var(--syntax-variable);
 }
 
 .source-mode-tabs {

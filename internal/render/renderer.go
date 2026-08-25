@@ -12,6 +12,7 @@ import (
 	"unicode/utf8"
 
 	"atulm/code-annotator/internal/gitdiff"
+	"atulm/code-annotator/internal/highlight"
 
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/ast"
@@ -316,8 +317,18 @@ func (r *Renderer) RenderWithSourcePositions(source []byte, documentPath string)
 // RenderCode converts UTF-8 source into escaped, line-oriented HTML. Review
 // mode adds semantic IDs only to visible content; line terminators remain gaps.
 func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
+	return r.RenderCodeWithHighlights(source, review, nil)
+}
+
+// RenderCodeWithHighlights renders optional validated syntax ranges inside the
+// existing source-line spans. Invalid or absent ranges fall back to escaped
+// plain source without changing source IDs or line-ending gaps.
+func (r *Renderer) RenderCodeWithHighlights(source []byte, review bool, result *highlight.HighlightResult) ([]byte, error) {
 	if !utf8.Valid(source) || bytes.IndexByte(source, 0) >= 0 {
 		return nil, ErrUnsupportedText
+	}
+	if !validHighlightResult(source, result) {
+		result = nil
 	}
 	var output strings.Builder
 	output.WriteString(`<div class="source-view"><ol class="source-lines">`)
@@ -338,7 +349,7 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 		if review {
 			fmt.Fprintf(&output, `<span id="%s" class="source-text">`, sourceElementID(start, contentEnd))
 		}
-		output.WriteString(html.EscapeString(string(source[start:contentEnd])))
+		renderCodeLine(&output, source, start, contentEnd, result)
 		if review {
 			output.WriteString(`</span>`)
 		}
@@ -355,6 +366,51 @@ func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
 	}
 	output.WriteString(`</ol></div>`)
 	return []byte(output.String()), nil
+}
+
+func renderCodeLine(output *strings.Builder, source []byte, start, end int, result *highlight.HighlightResult) {
+	if result == nil {
+		output.WriteString(html.EscapeString(string(source[start:end])))
+		return
+	}
+	cursor := start
+	for _, token := range result.Ranges {
+		if token.EndByte <= start {
+			continue
+		}
+		if token.StartByte >= end {
+			break
+		}
+		tokenStart := maxInt(start, token.StartByte)
+		tokenEnd := minInt(end, token.EndByte)
+		if tokenStart > cursor {
+			output.WriteString(html.EscapeString(string(source[cursor:tokenStart])))
+		}
+		class, known := SyntaxClass(token.Capture)
+		if known {
+			fmt.Fprintf(output, `<span class="syntax-%s">%s</span>`, class, html.EscapeString(string(source[tokenStart:tokenEnd])))
+		} else {
+			output.WriteString(html.EscapeString(string(source[tokenStart:tokenEnd])))
+		}
+		cursor = tokenEnd
+	}
+	if cursor < end {
+		output.WriteString(html.EscapeString(string(source[cursor:end])))
+	}
+}
+
+func maxInt(left, right int) int {
+	if left > right {
+		return left
+	}
+	return right
+}
+
+func minInt(left, right int) int {
+	if left < right {
+		return left
+	}
+	return right
 }
 
 // CodeSourceMap derives selectable line identities for the plain source view.

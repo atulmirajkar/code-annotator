@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved; submilestones 12.1 and 12.2 are implemented and awaiting review. This document defines milestone 12 in
+Approved; submilestones 12.1, 12.2, and 12.3 are implemented and awaiting review. This document defines milestone 12 in
 [`../../project_status.md`](../../project_status.md). Implementation is split
 into separately reviewable submilestones. The pure-Go runtime described below
 is the selected implementation; submilestone 12.1 integrates and measures it
@@ -29,8 +29,9 @@ can be reconsidered in a follow-up design without blocking this implementation.
 
 Submilestone 12.1 pins `github.com/odvcencio/gotreesitter` v0.51.0 and embeds
 the 11 approved grammars with selective build tags. The runtime is linked into
-the server but produces no user-visible token markup until the later rendering
-slices are approved.
+the server. Submilestone 12.3 now consumes its validated ranges for File-view
+Go, C#, JavaScript/JSX, and TypeScript/TSX documents; Changes view and the
+remaining default catalog remain on later gates.
 
 The outer source contract does not change:
 
@@ -764,6 +765,14 @@ Exit gate: all annotation behavior is demonstrably invariant when arbitrary
 presentation spans are nested beneath `.source-text`.
 
 ### 12.3 Core language highlighting in File view
+
+Implemented in the next review commit. File-view rendering now requests
+bounded highlights for the core language extensions, maps captures through a
+fixed `syntax-*` class allowlist, escapes every token through the existing HTML
+writer, and falls back to plain source for invalid, stopped, unsupported, or
+over-limit results. Existing `.source-text` IDs and CRLF gaps are unchanged.
+The initial light/dark semantic palette is defined in `web/src/styles/_base.scss`
+and `web/src/styles/_content.scss`.
 
 - Add `internal/highlight`, fixed capture classes, normalization, bounds, and
   provenance.

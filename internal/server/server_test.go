@@ -79,7 +79,7 @@ func TestCodeDocumentRoute(t *testing.T) {
 		wantStatus int
 		contains   []string
 	}{
-		{name: "escaped Go source", path: "main.go", body: []byte("package main\nvar less = 1 < 2\n"), wantStatus: http.StatusOK, contains: []string{`class="source-view"`, `var less = 1 &lt; 2`, `class="document-kind">code`}},
+		{name: "escaped and highlighted Go source", path: "main.go", body: []byte("package main\nvar less = 1 < 2\n"), wantStatus: http.StatusOK, contains: []string{`class="source-view"`, `var`, `less`, `&lt;`, `class="syntax-number"`, `class="syntax-operator"`, `class="document-kind">code`}},
 		{name: "invalid UTF-8", path: "bad.go", body: []byte{0xff}, wantStatus: http.StatusUnsupportedMediaType},
 	}
 

@@ -75,6 +75,17 @@ func GrammarForExtension(extension string) (string, bool) {
 	return grammar, ok
 }
 
+// IsCoreExtension limits milestone 12.3 highlighting to the approved File
+// view languages; the remaining catalog grammars enter in later slices.
+func IsCoreExtension(extension string) bool {
+	switch strings.ToLower(strings.TrimSpace(extension)) {
+	case ".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx":
+		return true
+	default:
+		return false
+	}
+}
+
 // Highlight parses one bounded document and returns data only. The renderer
 // remains responsible for capture classes, source escaping, and HTML.
 func (r *Runtime) Highlight(ctx context.Context, extension string, source []byte) (HighlightResult, error) {
