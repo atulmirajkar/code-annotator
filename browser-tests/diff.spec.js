@@ -7,10 +7,22 @@ const { test, expect, openAnnotations } = require("./viewer");
 async function selectCurrentText(page, text) {
   await page.locator(".diff-current-pane .source-text", { hasText: text }).evaluate((span, selectedText) => {
     const start = span.textContent.indexOf(selectedText);
-    if (start < 0 || !span.firstChild) throw new Error(`text not found: ${selectedText}`);
+    if (start < 0) throw new Error(`text not found: ${selectedText}`);
+    const point = (offset) => {
+      const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+      let node;
+      let remaining = offset;
+      let last = null;
+      while ((node = walker.nextNode())) {
+        last = node;
+        if (remaining <= node.data.length) return [node, remaining];
+        remaining -= node.data.length;
+      }
+      return last ? [last, last.data.length] : [span, 0];
+    };
     const range = document.createRange();
-    range.setStart(span.firstChild, start);
-    range.setEnd(span.firstChild, start + selectedText.length);
+    range.setStart(...point(start));
+    range.setEnd(...point(start + selectedText.length));
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
@@ -24,12 +36,24 @@ async function selectBetween(page, startSelector, startText, endSelector, endTex
   await page.evaluate(({ startSelector, startText, endSelector, endText }) => {
     const startNode = Array.from(document.querySelectorAll(startSelector)).find((node) => node.textContent.includes(startText));
     const endNode = Array.from(document.querySelectorAll(endSelector)).find((node) => node.textContent.includes(endText));
-    if (!startNode?.firstChild || !endNode?.firstChild) throw new Error("selection endpoint not found");
+    if (!startNode || !endNode) throw new Error("selection endpoint not found");
+    const point = (root, offset) => {
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let node;
+      let remaining = offset;
+      let last = null;
+      while ((node = walker.nextNode())) {
+        last = node;
+        if (remaining <= node.data.length) return [node, remaining];
+        remaining -= node.data.length;
+      }
+      return last ? [last, last.data.length] : [root, 0];
+    };
     const start = startNode.textContent.indexOf(startText);
     const end = endNode.textContent.indexOf(endText) + endText.length;
     const range = document.createRange();
-    range.setStart(startNode.firstChild, start);
-    range.setEnd(endNode.firstChild, end);
+    range.setStart(...point(startNode, start));
+    range.setEnd(...point(endNode, end));
     const selection = window.getSelection();
     selection.removeAllRanges();
     selection.addRange(range);
@@ -193,11 +217,23 @@ test.describe("side-by-side diff", () => {
       const emptyRow = startRow?.nextElementSibling;
       const emptySpan = emptyRow?.querySelector(".source-text");
       const emptyCode = emptyRow?.querySelector("code");
-      if (!startSpan?.firstChild || start < 0 || !emptySpan || emptySpan.textContent !== "" || !emptyCode) {
+      if (!startSpan || start < 0 || !emptySpan || emptySpan.textContent !== "" || !emptyCode) {
         throw new Error("empty-line selection endpoints not found");
       }
+      const point = (root, offset) => {
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+        let node;
+        let remaining = offset;
+        let last = null;
+        while ((node = walker.nextNode())) {
+          last = node;
+          if (remaining <= node.data.length) return [node, remaining];
+          remaining -= node.data.length;
+        }
+        return last ? [last, last.data.length] : [root, 0];
+      };
       const range = document.createRange();
-      range.setStart(startSpan.firstChild, start);
+      range.setStart(...point(startSpan, start));
       range.setEnd(emptyCode, 0);
       const selection = window.getSelection();
       selection.removeAllRanges();
