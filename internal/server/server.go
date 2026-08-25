@@ -713,7 +713,7 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 				syntax = &result
 			}
 		}
-		fragment, err = s.renderer.RenderCodeWithHighlights(source, s.review != nil, syntax)
+		fragment, err = s.renderer.RenderCodeWithSyntaxHighLight(source, s.review != nil, syntax)
 	} else if s.review != nil {
 		fragment, err = s.renderer.RenderWithSourcePositions(source, documentPath)
 	} else {

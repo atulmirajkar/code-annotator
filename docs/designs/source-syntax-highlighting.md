@@ -460,11 +460,16 @@ type Highlighter interface {
 }
 ```
 
-Only a fixed `Class` allowlist crosses into rendering, for example `keyword`,
-`string`, `comment`, `number`, `type`, `function`, `property`, `constant`,
-`operator`, `attribute`, `tag`, `punctuation`, and `escape`. Specific captures
-such as `function.method` or `constant.builtin` map to an approved class or
-approved modifier. Raw capture names are never copied into HTML class values.
+Only this fixed capture allowlist crosses into rendering:
+
+`attribute`, `comment`, `constant`, `constructor`, `escape`, `function`,
+`keyword`, `number`, `operator`, `property`, `punctuation`, `string`, `tag`,
+`type`, and `variable`.
+
+Capture names are trimmed, lowercased, and normalized to the segment before
+the first dot, so `function.method` and `constant.builtin` map to `function`
+and `constant`. Unknown captures are ignored and their source remains escaped
+plain text. Raw capture names are never copied into HTML class values.
 
 The renderer owns HTML escaping. The highlighter must never return markup.
 

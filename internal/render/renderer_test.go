@@ -55,7 +55,7 @@ func TestRenderCodeWithHighlights(t *testing.T) {
 		{StartByte: 14, EndByte: 15, Capture: "number"},
 		{StartByte: 16, EndByte: 17, Capture: "operator"},
 	}}
-	output, err := New().RenderCodeWithHighlights(source, true, result)
+	output, err := New().RenderCodeWithSyntaxHighLight(source, true, result)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestRenderCodeWithHighlights(t *testing.T) {
 	}
 
 	invalid := &highlight.HighlightResult{Ranges: []highlight.Range{{StartByte: 1, EndByte: 1, Capture: "keyword"}}}
-	plain, err := New().RenderCodeWithHighlights(source, true, invalid)
+	plain, err := New().RenderCodeWithSyntaxHighLight(source, true, invalid)
 	if err != nil {
 		t.Fatal(err)
 	}

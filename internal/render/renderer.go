@@ -317,18 +317,18 @@ func (r *Renderer) RenderWithSourcePositions(source []byte, documentPath string)
 // RenderCode converts UTF-8 source into escaped, line-oriented HTML. Review
 // mode adds semantic IDs only to visible content; line terminators remain gaps.
 func (r *Renderer) RenderCode(source []byte, review bool) ([]byte, error) {
-	return r.RenderCodeWithHighlights(source, review, nil)
+	return r.RenderCodeWithSyntaxHighLight(source, review, nil)
 }
 
-// RenderCodeWithHighlights renders optional validated syntax ranges inside the
+// RenderCodeWithSyntaxHighLight renders optional validated syntax ranges inside the
 // existing source-line spans. Invalid or absent ranges fall back to escaped
 // plain source without changing source IDs or line-ending gaps.
-func (r *Renderer) RenderCodeWithHighlights(source []byte, review bool, result *highlight.HighlightResult) ([]byte, error) {
+func (r *Renderer) RenderCodeWithSyntaxHighLight(source []byte, review bool, syntaxHighLightResult *highlight.HighlightResult) ([]byte, error) {
 	if !utf8.Valid(source) || bytes.IndexByte(source, 0) >= 0 {
 		return nil, ErrUnsupportedText
 	}
-	if !validHighlightResult(source, result) {
-		result = nil
+	if !validHighlightResult(source, syntaxHighLightResult) {
+		syntaxHighLightResult = nil
 	}
 	var output strings.Builder
 	output.WriteString(`<div class="source-view"><ol class="source-lines">`)
@@ -349,7 +349,7 @@ func (r *Renderer) RenderCodeWithHighlights(source []byte, review bool, result *
 		if review {
 			fmt.Fprintf(&output, `<span id="%s" class="source-text">`, sourceElementID(start, contentEnd))
 		}
-		renderCodeLine(&output, source, start, contentEnd, result)
+		renderCodeLine(&output, source, start, contentEnd, syntaxHighLightResult)
 		if review {
 			output.WriteString(`</span>`)
 		}
@@ -368,13 +368,17 @@ func (r *Renderer) RenderCodeWithHighlights(source []byte, review bool, result *
 	return []byte(output.String()), nil
 }
 
-func renderCodeLine(output *strings.Builder, source []byte, start, end int, result *highlight.HighlightResult) {
-	if result == nil {
+func renderCodeLine(output *strings.Builder, source []byte, start, end int, syntaxHighLightResult *highlight.HighlightResult) {
+	// Render one line from normalized, non-overlapping byte ranges. For
+	// example, `const value = 1` becomes
+	// `<span class="syntax-keyword">const</span> value = <span class="syntax-number">1</span>`;
+	// bytes outside known captures stay escaped plain text.
+	if syntaxHighLightResult == nil {
 		output.WriteString(html.EscapeString(string(source[start:end])))
 		return
 	}
 	cursor := start
-	for _, token := range result.Ranges {
+	for _, token := range syntaxHighLightResult.Ranges {
 		if token.EndByte <= start {
 			continue
 		}

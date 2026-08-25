@@ -21,12 +21,16 @@ func SyntaxClass(capture string) (string, bool) {
 	}
 }
 
-func validHighlightResult(source []byte, result *highlight.HighlightResult) bool {
-	if result == nil || len(result.Ranges) == 0 {
-		return result == nil || len(result.Ranges) == 0
+// validHighlightResult verifies the renderer's safety contract at the HTML
+// boundary: ranges must be ordered, non-empty, inside source, and aligned to
+// UTF-8 code-point boundaries. Invalid results are rendered as plain escaped
+// source instead of allowing malformed spans to affect adjacent lines.
+func validHighlightResult(source []byte, syntaxHighLightResult *highlight.HighlightResult) bool {
+	if syntaxHighLightResult == nil || len(syntaxHighLightResult.Ranges) == 0 {
+		return syntaxHighLightResult == nil || len(syntaxHighLightResult.Ranges) == 0
 	}
 	previousEnd := 0
-	for _, value := range result.Ranges {
+	for _, value := range syntaxHighLightResult.Ranges {
 		if value.StartByte < previousEnd || value.StartByte < 0 || value.StartByte >= value.EndByte || value.EndByte > len(source) ||
 			!utf8Boundary(source, value.StartByte) || !utf8Boundary(source, value.EndByte) {
 			return false
