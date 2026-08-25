@@ -95,6 +95,8 @@ export function createAnnotationHighlighter({
     });
   }
 
+  // Convert an annotation's source bytes into a DOM Range. The endpoint spans
+  // are selected from typed viewer state, never inferred from token classes.
   function sourceRange(startByte: number, endByte: number): Range | null {
     const spans = Array.from(sourceNodes.keys())
       .map((elementId) => document.getElementById(elementId))
@@ -130,6 +132,8 @@ export function createAnnotationHighlighter({
     offset: number,
     endBoundary: boolean,
   ): boolean {
+    // Start and end boundaries use opposite affinity at a span edge so a
+    // cross-line range remains owned by the adjacent visible source span.
     const position = sourceNodes.get(span.id);
     return (
       Boolean(position) &&
@@ -144,6 +148,8 @@ export function createAnnotationHighlighter({
     sourceOffset: number,
     endBoundary: boolean,
   ): TextPoint | null {
+    // A source span may contain several token elements. Walk its text leaves
+    // in document order and translate UTF-8 bytes to a UTF-16 DOM offset.
     const position = sourceNodes.get(span.id);
     if (!position) return null;
     const target = sourceOffset - position.startByte;
@@ -168,6 +174,7 @@ export function createAnnotationHighlighter({
   }
 
   function descendantTextNodes(span: HTMLElement): Text[] {
+    // TreeWalker preserves rendered order while ignoring token element nodes.
     const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
     const nodes: Text[] = [];
     let node = walker.nextNode();
@@ -179,6 +186,8 @@ export function createAnnotationHighlighter({
   }
 
   function utf16OffsetAtByte(value: string, target: number): number {
+    // Reject a byte boundary in the middle of a multi-byte code point; DOM
+    // offsets must identify complete UTF-16 character boundaries.
     if (target === 0) return 0;
     let bytes = 0;
     let offset = 0;
@@ -192,7 +201,8 @@ export function createAnnotationHighlighter({
   }
 
   // The fallback merges overlapping intervals within each source span before
-  // wrapping them, avoiding invalid nested or crossing mark elements.
+  // splitting individual text leaves. Wrapping leaves independently avoids
+  // invalid nested/crossing marks and preserves token element ownership.
   function renderFallbackHighlights(ranges: Range[]): void {
     const intervals = new Map<HTMLElement, Array<[number, number]>>();
     ranges.forEach((range) => {
@@ -254,6 +264,8 @@ export function createAnnotationHighlighter({
     boundaryNode: Node,
     boundaryOffset: number,
   ): number {
+    // Range.toString() measures the prefix across arbitrary descendant nodes,
+    // which keeps fallback offsets independent of token-element boundaries.
     const range = document.createRange();
     range.selectNodeContents(span);
     try {
