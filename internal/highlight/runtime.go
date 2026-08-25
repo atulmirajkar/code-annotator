@@ -75,11 +75,12 @@ func GrammarForExtension(extension string) (string, bool) {
 	return grammar, ok
 }
 
-// IsCoreExtension limits milestone 12.3 highlighting to the approved File
-// view languages; the remaining catalog grammars enter in later slices.
+// IsCoreExtension reports whether a default code-catalog extension is eligible
+// for File-view highlighting. Markdown remains Goldmark-rendered; Changes-view
+// highlighting is added in a later milestone.
 func IsCoreExtension(extension string) bool {
 	switch strings.ToLower(strings.TrimSpace(extension)) {
-	case ".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx":
+	case ".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj", ".html", ".css", ".scss":
 		return true
 	default:
 		return false

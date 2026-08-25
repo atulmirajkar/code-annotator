@@ -36,12 +36,12 @@ func TestGrammarForExtension(t *testing.T) {
 
 func TestIsCoreExtension(t *testing.T) {
 	t.Parallel()
-	for _, extension := range []string{".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx"} {
+	for _, extension := range []string{".go", ".cs", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".json", ".csproj", ".html", ".css", ".scss"} {
 		if !IsCoreExtension(extension) {
 			t.Errorf("IsCoreExtension(%q) = false", extension)
 		}
 	}
-	for _, extension := range []string{".json", ".html", ".css", ".scss", ".xml", ".md", ".py"} {
+	for _, extension := range []string{".xml", ".md", ".py"} {
 		if IsCoreExtension(extension) {
 			t.Errorf("IsCoreExtension(%q) = true", extension)
 		}

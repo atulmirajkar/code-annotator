@@ -2,7 +2,7 @@
 
 ## Status
 
-Approved; submilestones 12.1, 12.2, and 12.3 are implemented and awaiting review. This document defines milestone 12 in
+Approved; submilestones 12.1 through 12.4 are implemented and awaiting review. This document defines milestone 12 in
 [`../../project_status.md`](../../project_status.md). Implementation is split
 into separately reviewable submilestones. The pure-Go runtime described below
 is the selected implementation; submilestone 12.1 integrates and measures it
@@ -801,6 +801,10 @@ no annotation, security, build, or offline regression.
 
 Exit gate: every `KindCode` extension in `DefaultCodeExtensions` has either an
 approved grammar or an explicit tested plain-text fallback.
+
+Status: implemented for File view. Every default code extension except Markdown
+now enters the bounded Tree-sitter path; Markdown continues through Goldmark,
+and unsupported custom extensions remain escaped plain text.
 
 ### 12.5 Changes-view highlighting
 

@@ -286,7 +286,10 @@ Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-synta
   bounded Tree-sitter ranges, fixed semantic classes, escaped token output,
   and plain-render fallback. Existing source IDs and line-ending gaps remain
   stable; Changes view and the remaining catalog are deferred to later gates.
-- [ ] Complete submilestone 12.4: remaining default source catalog.
+- [x] Complete submilestone 12.4: remaining default source catalog. File-view
+  highlighting now admits JSON, HTML, CSS, SCSS, and XML-backed `.csproj`
+  documents; JavaScript aliases remain explicitly covered, while Markdown and
+  unsupported custom extensions retain their existing plain/Goldmark paths.
 - [ ] Complete submilestone 12.5: Changes-view highlighting.
 - [ ] Complete submilestone 12.6: hardening and release.
 
