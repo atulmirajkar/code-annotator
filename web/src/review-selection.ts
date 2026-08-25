@@ -57,32 +57,32 @@ class SelectionController {
     this.updateSelectionPreview();
   }
 
-  currentSelection(): SelectionPayload | null {
+  readonly currentSelection = (): SelectionPayload | null => {
     // The review form reads this typed payload; it never reads DOM IDs or
     // `data-*` attributes to reconstruct source bytes.
     return this.state.pendingSelection;
-  }
+  };
 
-  forceClearSelectionPreview(): void {
+  readonly forceClearSelectionPreview = (): void => {
     // Used when a new non-diagram pointer interaction invalidates the synthetic
     // `.mermaid-diagram.annotation-selection` presentation marker.
     clearSelectionState(this.options, this.state);
-  }
+  };
 
-  sourceSpan(node: Node): HTMLElement | null {
+  readonly sourceSpan = (node: Node): HTMLElement | null => {
     return findSourceSpan(node);
-  }
+  };
 
-  sourceSpanRange(
+  readonly sourceSpanRange = (
     startSpan: HTMLElement,
     endSpan: HTMLElement,
-  ): HTMLElement[] | null {
+  ): HTMLElement[] | null => {
     return findSourceSpanRange(this.options, startSpan, endSpan);
-  }
+  };
 
-  utf8Length(value: string): number {
+  readonly utf8Length = (value: string): number => {
     return utf8Length(value);
-  }
+  };
 
   private readonly handlePanelPointerDown = (): void => {
     this.state.preserveSelection = true;

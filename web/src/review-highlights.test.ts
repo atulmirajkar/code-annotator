@@ -12,20 +12,28 @@ describe("mergeIntervals", () => {
   });
 
   it("sorts and merges overlapping, adjacent, and contained ranges", () => {
-    expect(mergeIntervals([
-      [12, 15],
-      [2, 5],
-      [4, 8],
-      [10, 12],
-      [3, 4],
-    ])).toEqual([
+    expect(
+      mergeIntervals([
+        [12, 15],
+        [2, 5],
+        [4, 8],
+        [10, 12],
+        [3, 4],
+      ]),
+    ).toEqual([
       [2, 8],
       [10, 15],
     ]);
   });
 
   it("keeps disjoint ranges separate", () => {
-    expect(mergeIntervals([[1, 3], [5, 7], [9, 11]])).toEqual([
+    expect(
+      mergeIntervals([
+        [1, 3],
+        [5, 7],
+        [9, 11],
+      ]),
+    ).toEqual([
       [1, 3],
       [5, 7],
       [9, 11],
@@ -33,11 +41,17 @@ describe("mergeIntervals", () => {
   });
 
   it("does not mutate caller-owned ranges", () => {
-    const ranges = [[8, 10], [2, 4]] as const;
+    const ranges = [
+      [8, 10],
+      [2, 4],
+    ] as const;
 
     mergeIntervals(ranges);
 
-    expect(ranges).toEqual([[8, 10], [2, 4]]);
+    expect(ranges).toEqual([
+      [8, 10],
+      [2, 4],
+    ]);
   });
 });
 
@@ -64,7 +78,10 @@ function fixture() {
   return { markdown, span, highlighter };
 }
 
-function annotation(startByte: number, endByte: number): AnnotationBrowserState {
+function annotation(
+  startByte: number,
+  endByte: number,
+): AnnotationBrowserState {
   return {
     id: "ann_test",
     status: "open",
@@ -101,7 +118,20 @@ describe("nested source ranges", () => {
     highlighter.renderAnnotationHighlights([annotation(0, 5)]);
 
     const token = span.querySelector(".syntax-keyword")!;
-    expect(token.querySelector("mark.annotation-highlight-fallback")?.textContent).toBe("const");
+    expect(
+      token.querySelector("mark.annotation-highlight-fallback")?.textContent,
+    ).toBe("const");
     expect(span.querySelector(".syntax-keyword")).toBe(token);
+  });
+
+  it("keeps the highlighter callback bound when passed as a callback", () => {
+    const { highlighter, span } = fixture();
+    const render = highlighter.renderAnnotationHighlights;
+
+    render([annotation(0, 5)]);
+
+    expect(
+      span.querySelector("mark.annotation-highlight-fallback")?.textContent,
+    ).toBe("const");
   });
 });

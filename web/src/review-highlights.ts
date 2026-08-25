@@ -52,15 +52,14 @@ export function createAnnotationHighlighter(
 class AnnotationHighlighterController implements AnnotationHighlighter {
   constructor(private readonly options: AnnotationHighlighterOptions) {}
 
-  renderAnnotationHighlights(
+  readonly renderAnnotationHighlights = (
     annotations: ReadonlyArray<AnnotationBrowserState>,
-  ): void {
+  ): void => {
     renderAnnotationHighlights(this.options, annotations);
-  }
+  };
 
-  sourceRange(startByte: number, endByte: number): Range | null {
-    return sourceRange(this.options, startByte, endByte);
-  }
+  readonly sourceRange = (startByte: number, endByte: number): Range | null =>
+    sourceRange(this.options, startByte, endByte);
 }
 
 // Highlight only anchors resolved against the current document.

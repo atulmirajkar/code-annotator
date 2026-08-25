@@ -24,25 +24,25 @@ class SelectionController {
         // Reconcile a native range created before the async viewer state loaded.
         this.updateSelectionPreview();
     }
-    currentSelection() {
+    currentSelection = () => {
         // The review form reads this typed payload; it never reads DOM IDs or
         // `data-*` attributes to reconstruct source bytes.
         return this.state.pendingSelection;
-    }
-    forceClearSelectionPreview() {
+    };
+    forceClearSelectionPreview = () => {
         // Used when a new non-diagram pointer interaction invalidates the synthetic
         // `.mermaid-diagram.annotation-selection` presentation marker.
         clearSelectionState(this.options, this.state);
-    }
-    sourceSpan(node) {
+    };
+    sourceSpan = (node) => {
         return findSourceSpan(node);
-    }
-    sourceSpanRange(startSpan, endSpan) {
+    };
+    sourceSpanRange = (startSpan, endSpan) => {
         return findSourceSpanRange(this.options, startSpan, endSpan);
-    }
-    utf8Length(value) {
+    };
+    utf8Length = (value) => {
         return utf8Length(value);
-    }
+    };
     handlePanelPointerDown = () => {
         this.state.preserveSelection = true;
     };

@@ -19,12 +19,10 @@ class AnnotationHighlighterController {
     constructor(options) {
         this.options = options;
     }
-    renderAnnotationHighlights(annotations) {
+    renderAnnotationHighlights = (annotations) => {
         renderAnnotationHighlights(this.options, annotations);
-    }
-    sourceRange(startByte, endByte) {
-        return sourceRange(this.options, startByte, endByte);
-    }
+    };
+    sourceRange = (startByte, endByte) => sourceRange(this.options, startByte, endByte);
 }
 // Highlight only anchors resolved against the current document.
 function renderAnnotationHighlights(options, annotations) {
