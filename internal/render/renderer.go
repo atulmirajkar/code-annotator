@@ -447,15 +447,8 @@ func (r *Renderer) RenderDiffWithSyntax(current []byte, diff gitdiff.FileDiff, r
 	}
 
 	baseRanges := sourceRanges(diff.BaseSource)
-	overviewHunks := deriveDiffOverviewHunks(diff.Rows)
-	overviewTargetByRow := make(map[int]string, len(overviewHunks)*2)
-	for hunkIndex, hunk := range overviewHunks {
-		identifier := fmt.Sprintf("diff-change-%d", hunkIndex+1)
-		overviewTargetByRow[hunk.StartRow] = identifier
-		if hunk.EndRow > hunk.StartRow+1 {
-			overviewTargetByRow[hunk.EndRow-1] = identifier + "-end"
-		}
-	}
+	overviewItems := buildDiffOverviewItems(diff.Rows)
+	overviewTargetByRow := diffOverviewTargets(overviewItems)
 	var basePane, currentPane strings.Builder
 	for rowIndex, row := range diff.Rows {
 		baseStart, baseEnd := 0, 0
@@ -476,7 +469,7 @@ func (r *Renderer) RenderDiffWithSyntax(current []byte, diff gitdiff.FileDiff, r
 	output.WriteString(`</div><div class="diff-divider" role="separator" aria-orientation="vertical" aria-label="Resize base and current panes" aria-valuemin="20" aria-valuemax="80" aria-valuenow="50" tabindex="0"></div><div class="diff-pane diff-current-pane">`)
 	output.WriteString(currentPane.String())
 	output.WriteString(`</div>`)
-	writeDiffOverview(&output, overviewHunks, diff.Rows)
+	writeDiffOverview(&output, overviewItems)
 	output.WriteString(`</div></div>`)
 	return []byte(output.String()), nil
 }
@@ -487,6 +480,13 @@ type diffOverviewHunk struct {
 	StartRow int
 	EndRow   int
 	Kind     gitdiff.RowKind
+}
+
+type diffOverviewItem struct {
+	Hunk        diffOverviewHunk
+	TargetID    string
+	EndTargetID string
+	Label       string
 }
 
 func deriveDiffOverviewHunks(rows []gitdiff.Row) []diffOverviewHunk {
@@ -509,19 +509,43 @@ func deriveDiffOverviewHunks(rows []gitdiff.Row) []diffOverviewHunk {
 	return hunks
 }
 
-func writeDiffOverview(output *strings.Builder, hunks []diffOverviewHunk, rows []gitdiff.Row) {
-	if len(hunks) == 0 {
+func buildDiffOverviewItems(rows []gitdiff.Row) []diffOverviewItem {
+	hunks := deriveDiffOverviewHunks(rows)
+	items := make([]diffOverviewItem, 0, len(hunks))
+	for index, hunk := range hunks {
+		targetID := fmt.Sprintf("diff-change-%d", index+1)
+		endTargetID := targetID
+		if hunk.EndRow > hunk.StartRow+1 {
+			endTargetID += "-end"
+		}
+		items = append(items, diffOverviewItem{
+			Hunk:        hunk,
+			TargetID:    targetID,
+			EndTargetID: endTargetID,
+			Label:       diffOverviewLabel(hunk, rows, index+1, len(hunks)),
+		})
+	}
+	return items
+}
+
+func diffOverviewTargets(items []diffOverviewItem) map[int]string {
+	targets := make(map[int]string, len(items)*2)
+	for _, item := range items {
+		targets[item.Hunk.StartRow] = item.TargetID
+		if item.EndTargetID != item.TargetID {
+			targets[item.Hunk.EndRow-1] = item.EndTargetID
+		}
+	}
+	return targets
+}
+
+func writeDiffOverview(output *strings.Builder, items []diffOverviewItem) {
+	if len(items) == 0 {
 		return
 	}
 	output.WriteString(`<nav class="diff-overview" aria-label="Changes in this file" hidden><span class="diff-overview-viewport" aria-hidden="true"></span>`)
-	for index, hunk := range hunks {
-		identifier := fmt.Sprintf("diff-change-%d", index+1)
-		endIdentifier := identifier
-		if hunk.EndRow > hunk.StartRow+1 {
-			endIdentifier += "-end"
-		}
-		label := diffOverviewLabel(hunk, rows, index+1, len(hunks))
-		fmt.Fprintf(output, `<span class="diff-overview-item"><a class="diff-overview-marker diff-overview-%s" href="#%s" aria-label="%s"></a><a class="diff-overview-end" href="#%s" tabindex="-1" aria-hidden="true"></a></span>`, hunk.Kind, identifier, html.EscapeString(label), endIdentifier)
+	for _, item := range items {
+		fmt.Fprintf(output, `<span class="diff-overview-item"><a class="diff-overview-marker diff-overview-%s" href="#%s" aria-label="%s"></a><a class="diff-overview-end" href="#%s" tabindex="-1" aria-hidden="true"></a></span>`, item.Hunk.Kind, item.TargetID, html.EscapeString(item.Label), item.EndTargetID)
 	}
 	output.WriteString(`</nav>`)
 }
@@ -534,11 +558,15 @@ func diffOverviewLabel(hunk diffOverviewHunk, rows []gitdiff.Row, ordinal, total
 			}
 		}
 	}
+	// Deleted rows have no current line number. Prefer the closest surviving
+	// line before the deletion so the label can say "after" that line.
 	for rowIndex := hunk.StartRow - 1; rowIndex >= 0; rowIndex-- {
 		if rows[rowIndex].NewLine > 0 {
 			return fmt.Sprintf("Change %d of %d, deletion after current line %d", ordinal, total, rows[rowIndex].NewLine)
 		}
 	}
+	// A deletion at the beginning has no preceding current line. In that case,
+	// use the first surviving line after it and describe the deletion as before.
 	for rowIndex := hunk.EndRow; rowIndex < len(rows); rowIndex++ {
 		if rows[rowIndex].NewLine > 0 {
 			return fmt.Sprintf("Change %d of %d, deletion before current line %d", ordinal, total, rows[rowIndex].NewLine)

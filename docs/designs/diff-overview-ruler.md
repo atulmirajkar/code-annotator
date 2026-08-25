@@ -249,11 +249,20 @@ type diffOverviewHunk struct {
     EndRow   int             // exclusive index into FileDiff.Rows
     Kind     gitdiff.RowKind // added, deleted, or modified
 }
+
+type diffOverviewItem struct {
+    Hunk        diffOverviewHunk
+    TargetID    string
+    EndTargetID string
+    Label       string
+}
 ```
 
-This structure is request-local and is never written to disk. `StartRow` and
-`EndRow` refer to the existing aligned rows instead of copying line text or
-byte ranges. `Kind` is:
+These structures are request-local and are never written to disk. `StartRow`
+and `EndRow` refer to the existing aligned rows instead of copying line text or
+byte ranges. Each item computes its semantic target IDs and accessible label
+once, then supplies them to both cell rendering and overview-link rendering.
+`Kind` is:
 
 - `added` when every row in the range is added;
 - `deleted` when every row in the range is deleted; and

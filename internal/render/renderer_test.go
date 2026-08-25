@@ -263,6 +263,38 @@ func TestDiffOverviewLabelBeforeFirstCurrentLine(t *testing.T) {
 	}
 }
 
+func TestBuildDiffOverviewItemsAndTargets(t *testing.T) {
+	t.Parallel()
+	rows := []gitdiff.Row{
+		{Kind: gitdiff.RowAdded, NewLine: 1},
+		{Kind: gitdiff.RowDeleted},
+		{Kind: gitdiff.RowUnchanged, NewLine: 2},
+		{Kind: gitdiff.RowAdded, NewLine: 3},
+	}
+	want := []diffOverviewItem{
+		{
+			Hunk:        diffOverviewHunk{StartRow: 0, EndRow: 2, Kind: gitdiff.RowModified},
+			TargetID:    "diff-change-1",
+			EndTargetID: "diff-change-1-end",
+			Label:       "Change 1 of 2, modified near current line 1",
+		},
+		{
+			Hunk:        diffOverviewHunk{StartRow: 3, EndRow: 4, Kind: gitdiff.RowAdded},
+			TargetID:    "diff-change-2",
+			EndTargetID: "diff-change-2",
+			Label:       "Change 2 of 2, added near current line 3",
+		},
+	}
+	items := buildDiffOverviewItems(rows)
+	if !slices.Equal(items, want) {
+		t.Fatalf("buildDiffOverviewItems() = %#v, want %#v", items, want)
+	}
+	targets := diffOverviewTargets(items)
+	if len(targets) != 3 || targets[0] != "diff-change-1" || targets[1] != "diff-change-1-end" || targets[3] != "diff-change-2" {
+		t.Fatalf("diffOverviewTargets() = %#v, want start/end targets", targets)
+	}
+}
+
 func TestRenderDiffWithSyntaxHighlightsBothPanes(t *testing.T) {
 	base := []byte("const before = 1\n")
 	current := []byte("const after = 2\n")
