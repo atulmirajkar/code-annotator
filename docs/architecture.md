@@ -127,6 +127,13 @@ filter, result-order, status-label, and summary rules.
 inputs; the viewer replaces filtered fragments through HTMX after a 150 ms
 debounce.
 
+`viewer.ts`, `review.ts`, and `mermaid.ts` expose named initialization
+functions. Browser entrypoints are thin composition roots; pure preference
+rules live in `viewer-preferences.ts`. Typed annotation statuses determine the
+display/highlight set, HTMX supplies an explicit mutation kind, and typed
+diagram definitions plus ordered source maps replace node text/order as
+application inputs.
+
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production
 TypeScript configuration excludes test files from `web/generated/`, while

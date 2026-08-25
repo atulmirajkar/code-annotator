@@ -14,6 +14,7 @@ function validState(): unknown {
       revision: "revision-1",
       annotations: [{
         id: "ann_1",
+        status: "open",
         elementId: "annotation-ann_1",
         lifecycleFormId: "annotation-lifecycle-ann_1",
         documentLevel: false,

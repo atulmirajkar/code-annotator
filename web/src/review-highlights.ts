@@ -54,7 +54,9 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
   }
 
   function sourceRange(startByte: number, endByte: number): Range | null {
-    const spans = Array.from(markdown.querySelectorAll<HTMLElement>(".source-text"));
+    const spans = Array.from(sourceNodes.keys())
+      .map((elementId) => document.getElementById(elementId))
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && markdown.contains(element));
     const startSpan = spans.find((span) => containsSourceOffset(span, startByte, false));
     const endSpan = spans.slice().reverse().find((span) => containsSourceOffset(span, endByte, true));
     if (!startSpan || !endSpan) return null;

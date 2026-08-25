@@ -103,7 +103,7 @@
   <script src="/static/htmx.min.js" defer></script>
   <script type="module" src="/static/viewer.js"></script>
   {{if .HasMermaid}}<script src="/static/mermaid.tiny.js" defer></script>
-  <script src="/static/mermaid.js" defer></script>{{end}}
+  <script type="module" src="/static/mermaid.js"></script>{{end}}
   {{if .ReviewToken}}<script type="module" src="/static/review.js"></script>{{end}}
 </body>
 </html>

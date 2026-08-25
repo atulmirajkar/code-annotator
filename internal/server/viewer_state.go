@@ -34,6 +34,7 @@ type viewerSourcePosition struct {
 	ElementID string `json:"elementId"`
 	StartByte int    `json:"startByte"`
 	EndByte   int    `json:"endByte"`
+	Text      string `json:"text,omitempty"`
 }
 
 type viewerReviewState struct {
@@ -43,6 +44,7 @@ type viewerReviewState struct {
 
 type viewerAnnotationState struct {
 	ID                string                     `json:"id"`
+	Status            annotation.Status          `json:"status"`
 	ElementID         string                     `json:"elementId"`
 	LifecycleFormID   string                     `json:"lifecycleFormId"`
 	DocumentLevel     bool                       `json:"documentLevel"`
@@ -87,7 +89,7 @@ func (s *Server) handleViewerState(response http.ResponseWriter, request *http.R
 		return
 	}
 	state.Document.SourceNodes = viewerSourcePositions(sourceMap.Nodes)
-	state.Document.Diagrams = viewerSourcePositions(sourceMap.Diagrams)
+	state.Document.Diagrams = viewerDiagramPositions(sourceMap.Diagrams, document)
 	if s.annotations != nil {
 		result, operationErr := s.readAnnotationDocumentOperation(documentPath)
 		if operationErr != nil {
@@ -135,6 +137,17 @@ func viewerSourcePositions(values []mdrender.SourcePosition) []viewerSourcePosit
 	return result
 }
 
+func viewerDiagramPositions(values []mdrender.SourcePosition, document []byte) []viewerSourcePosition {
+	result := viewerSourcePositions(values)
+	for index := range result {
+		position := &result[index]
+		if position.StartByte >= 0 && position.EndByte >= position.StartByte && position.EndByte <= len(document) {
+			position.Text = string(document[position.StartByte:position.EndByte])
+		}
+	}
+	return result
+}
+
 func newViewerReviewState(result annotationDocumentResult) *viewerReviewState {
 	state := &viewerReviewState{
 		Revision:    string(result.Revision),
@@ -143,6 +156,7 @@ func newViewerReviewState(result annotationDocumentResult) *viewerReviewState {
 	for _, item := range result.Annotations {
 		view := viewerAnnotationState{
 			ID:                item.ID,
+			Status:            item.Status,
 			ElementID:         annotationElementID(item.ID),
 			LifecycleFormID:   lifecycleFormElementID(item.ID),
 			DocumentLevel:     item.Source == nil && !item.NeedsReattachment,

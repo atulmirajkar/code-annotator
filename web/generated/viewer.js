@@ -1,7 +1,16 @@
-import { filterDocuments, hasChangedDocuments } from "./document-catalog.js";
+import { filterDocuments } from "./document-catalog.js";
 import { fetchDocumentCatalogState } from "./document-state.js";
-(() => {
-    "use strict";
+import { clampInteger, resolveDocumentScope } from "./viewer-preferences.js";
+export function initializeViewer(environment = {
+    document,
+    window,
+    location,
+    storage: sessionStorage,
+    resizeObserver: ResizeObserver,
+}) {
+    const { document, window, location } = environment;
+    const sessionStorage = environment.storage;
+    const ResizeObserver = environment.resizeObserver;
     const changedOnlyStorageKey = "code-annotator.changed-only";
     const documentScopeStorageKey = "code-annotator.document-scope";
     const documentTreeStorageKey = "code-annotator.document-tree-expanded";
@@ -238,12 +247,7 @@ import { fetchDocumentCatalogState } from "./document-state.js";
         }
     }
     function readDocumentScope(state) {
-        const stored = readPreference(documentScopeStorageKey);
-        if (stored === "all" || stored === "changed" || stored === "open-comments")
-            return stored;
-        if (readPreference(changedOnlyStorageKey) === "true")
-            return "changed";
-        return hasChangedDocuments(state.documents) ? "changed" : "all";
+        return resolveDocumentScope(readPreference(documentScopeStorageKey), readPreference(changedOnlyStorageKey), state.documents);
     }
     function readStringSet(value) {
         try {
@@ -339,7 +343,7 @@ import { fetchDocumentCatalogState } from "./document-state.js";
         divider.setAttribute("aria-valuenow", String(percent));
     }
     function clampDiffSplit(value) {
-        return Math.min(diffSplitMax, Math.max(diffSplitMin, Math.round(value)));
+        return clampInteger(value, diffSplitMin, diffSplitMax);
     }
     function readDiffSplitPreference() {
         const stored = Number.parseFloat(readPreference(diffSplitStorageKey) || "");
@@ -377,4 +381,5 @@ import { fetchDocumentCatalogState } from "./document-state.js";
             // The current-page interaction still works when storage is unavailable.
         }
     }
-})();
+}
+initializeViewer();

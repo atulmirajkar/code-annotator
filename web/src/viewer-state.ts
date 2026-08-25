@@ -13,8 +13,13 @@ export interface SourcePosition extends SourceRange {
   elementId: string;
 }
 
+export interface DiagramPosition extends SourcePosition {
+  text: string;
+}
+
 export interface AnnotationBrowserState {
   id: string;
+  status: AnnotationStatus;
   elementId: string;
   lifecycleFormId: string;
   documentLevel: boolean;
@@ -38,7 +43,7 @@ export interface ViewerState {
     kind: DocumentKind;
     sha256: string;
     sourceNodes: ReadonlyMap<string, SourcePosition>;
-    diagrams: ReadonlyMap<string, SourcePosition>;
+    diagrams: ReadonlyMap<string, DiagramPosition>;
   };
   review: {
     revision: string;
@@ -59,6 +64,17 @@ function parseSourcePositions(value: unknown, label: string): ReadonlyMap<string
     if (!elementId || result.has(elementId)) throw new Error(`${label} element IDs must be non-empty and unique`);
     if (endByte < startByte) throw new Error(`${label}[${index}] range is reversed`);
     result.set(elementId, { elementId, startByte, endByte });
+  });
+  return result;
+}
+
+function parseDiagramPositions(value: unknown): ReadonlyMap<string, DiagramPosition> {
+  const positions = parseSourcePositions(value, "document.diagrams");
+  const raw = value as unknown[];
+  const result = new Map<string, DiagramPosition>();
+  Array.from(positions.values()).forEach((position, index) => {
+    const item = requireRecord(raw[index], `document.diagrams[${index}]`);
+    result.set(position.elementId, { ...position, text: requireString(item.text, `document.diagrams[${index}].text`) });
   });
   return result;
 }
@@ -121,6 +137,7 @@ function parseAnnotation(value: unknown, index: number): AnnotationBrowserState 
   if (!Array.isArray(item.transitions)) throw new Error("annotation.transitions must be an array");
   return {
     id: requireString(item.id, "annotation.id"),
+    status: requireMember(item.status, ["open", "acknowledged", "applied", "needs_changes", "closed", "rejected"], "annotation.status"),
     elementId: requireString(item.elementId, "annotation.elementId"),
     lifecycleFormId: requireString(item.lifecycleFormId, "annotation.lifecycleFormId"),
     documentLevel: requireBoolean(item.documentLevel, "annotation.documentLevel"),
@@ -171,7 +188,7 @@ export function parseViewerState(value: unknown): ViewerState {
       kind: requireMember(documentValue.kind, ["markdown", "code"], "document.kind"),
       sha256,
       sourceNodes: parseSourcePositions(documentValue.sourceNodes, "document.sourceNodes"),
-      diagrams: parseSourcePositions(documentValue.diagrams, "document.diagrams"),
+      diagrams: parseDiagramPositions(documentValue.diagrams),
     },
     review,
   };

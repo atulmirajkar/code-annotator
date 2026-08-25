@@ -45,30 +45,31 @@ const (
 
 // Server serves an index and rendered documents from a content root.
 type Server struct {
-	root              *content.Root
-	indexOptions      content.IndexOptions
-	renderer          *mdrender.Renderer
-	annotations       *annotationstore.Store
-	review            *reviewSession
-	comparison        *comparisonController
-	page              *template.Template
-	styles            []byte
-	reviewJS          []byte
-	reviewFragmentsJS []byte
-	reviewHTMXJS      []byte
-	reviewHLJS        []byte
-	reviewNavJS       []byte
-	reviewPanelJS     []byte
-	reviewSelectJS    []byte
-	documentCatalogJS []byte
-	documentStateJS   []byte
-	comparisonStateJS []byte
-	viewerJS          []byte
-	viewerStateJS     []byte
-	htmxJS            []byte
-	mermaidJS         []byte
-	mermaidTiny       []byte
-	handler           http.Handler
+	root                *content.Root
+	indexOptions        content.IndexOptions
+	renderer            *mdrender.Renderer
+	annotations         *annotationstore.Store
+	review              *reviewSession
+	comparison          *comparisonController
+	page                *template.Template
+	styles              []byte
+	reviewJS            []byte
+	reviewFragmentsJS   []byte
+	reviewHTMXJS        []byte
+	reviewHLJS          []byte
+	reviewNavJS         []byte
+	reviewPanelJS       []byte
+	reviewSelectJS      []byte
+	documentCatalogJS   []byte
+	documentStateJS     []byte
+	comparisonStateJS   []byte
+	viewerJS            []byte
+	viewerPreferencesJS []byte
+	viewerStateJS       []byte
+	htmxJS              []byte
+	mermaidJS           []byte
+	mermaidTiny         []byte
+	handler             http.Handler
 }
 
 // reviewSession contains the browser-bound authority required for annotation
@@ -301,6 +302,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer state script: %w", err)
 	}
+	viewerPreferencesJS, err := fs.ReadFile(web.Files, "generated/viewer-preferences.js")
+	if err != nil {
+		return nil, fmt.Errorf("read viewer preferences script: %w", err)
+	}
 	documentCatalogJS, err := fs.ReadFile(web.Files, "generated/document-catalog.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document catalog script: %w", err)
@@ -327,25 +332,26 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	}
 
 	server := &Server{
-		root:              root,
-		renderer:          renderer,
-		page:              page,
-		styles:            styles,
-		reviewJS:          reviewJS,
-		reviewFragmentsJS: reviewFragmentsJS,
-		reviewHTMXJS:      reviewHTMXJS,
-		reviewHLJS:        reviewHLJS,
-		reviewNavJS:       reviewNavJS,
-		reviewPanelJS:     reviewPanelJS,
-		reviewSelectJS:    reviewSelectJS,
-		documentCatalogJS: documentCatalogJS,
-		documentStateJS:   documentStateJS,
-		comparisonStateJS: comparisonStateJS,
-		viewerJS:          viewerJS,
-		viewerStateJS:     viewerStateJS,
-		htmxJS:            htmxJS,
-		mermaidJS:         mermaidJS,
-		mermaidTiny:       mermaidTiny,
+		root:                root,
+		renderer:            renderer,
+		page:                page,
+		styles:              styles,
+		reviewJS:            reviewJS,
+		reviewFragmentsJS:   reviewFragmentsJS,
+		reviewHTMXJS:        reviewHTMXJS,
+		reviewHLJS:          reviewHLJS,
+		reviewNavJS:         reviewNavJS,
+		reviewPanelJS:       reviewPanelJS,
+		reviewSelectJS:      reviewSelectJS,
+		documentCatalogJS:   documentCatalogJS,
+		documentStateJS:     documentStateJS,
+		comparisonStateJS:   comparisonStateJS,
+		viewerJS:            viewerJS,
+		viewerPreferencesJS: viewerPreferencesJS,
+		viewerStateJS:       viewerStateJS,
+		htmxJS:              htmxJS,
+		mermaidJS:           mermaidJS,
+		mermaidTiny:         mermaidTiny,
 	}
 	for _, option := range options {
 		if option == nil {
@@ -369,6 +375,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
 	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
+	mux.HandleFunc("GET /static/viewer-preferences.js", server.handleViewerPreferencesScript)
 	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
 	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
 	mux.HandleFunc("GET /static/comparison-state.js", server.handleComparisonStateScript)
@@ -455,6 +462,11 @@ func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Reques
 func (s *Server) handleViewerStateScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerStateJS)
+}
+
+func (s *Server) handleViewerPreferencesScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.viewerPreferencesJS)
 }
 
 func (s *Server) handleDocumentCatalogScript(response http.ResponseWriter, _ *http.Request) {

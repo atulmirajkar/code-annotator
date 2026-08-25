@@ -1,5 +1,5 @@
 import type { SelectionPayload } from "./types.js";
-import type { SourcePosition } from "./viewer-state.js";
+import type { DiagramPosition, SourcePosition } from "./viewer-state.js";
 
 interface SelectionControllerOptions {
   panel: HTMLElement;
@@ -11,7 +11,7 @@ interface SelectionControllerOptions {
   documentScope: HTMLInputElement;
   documentSHA256: string;
   sourceNodes: ReadonlyMap<string, SourcePosition>;
-  diagrams: ReadonlyMap<string, SourcePosition>;
+  diagrams: ReadonlyMap<string, DiagramPosition>;
   onSelectionChanged: () => void;
 }
 
@@ -78,7 +78,7 @@ export function createSelectionController({
   function captureDiagramSelection(diagram: HTMLElement | null): void {
     if (!diagram) return;
     const position = diagrams.get(diagram.id);
-    const exact = diagram?.querySelector(".mermaid-source code")?.textContent || "";
+    const exact = position?.text || "";
     if (!position || position.endByte <= position.startByte || !documentSHA256 || !exact) return;
     const { startByte, endByte } = position;
 
@@ -184,7 +184,9 @@ export function createSelectionController({
 
   // Confirm that the selection endpoints occur in document source order.
   function sourceSpanRange(startSpan: HTMLElement, endSpan: HTMLElement): HTMLElement[] | null {
-    const spans = Array.from(markdown.querySelectorAll<HTMLElement>(".source-text"));
+    const spans = Array.from(sourceNodes.keys())
+      .map((elementId) => document.getElementById(elementId))
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && markdown.contains(element));
     const startIndex = spans.indexOf(startSpan);
     const endIndex = spans.indexOf(endSpan);
     if (startIndex < 0 || endIndex < startIndex) return null;

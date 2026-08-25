@@ -1,9 +1,27 @@
-import { filterDocuments, hasChangedDocuments } from "./document-catalog.js";
+import { filterDocuments } from "./document-catalog.js";
+import type { DocumentScope } from "./document-catalog.js";
 import { fetchDocumentCatalogState } from "./document-state.js";
 import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
+import { clampInteger, resolveDocumentScope } from "./viewer-preferences.js";
 
-(() => {
-  "use strict";
+export interface ViewerEnvironment {
+  document: Document;
+  window: Window;
+  location: Location;
+  storage: Storage;
+  resizeObserver: typeof ResizeObserver;
+}
+
+export function initializeViewer(environment: ViewerEnvironment = {
+  document,
+  window,
+  location,
+  storage: sessionStorage,
+  resizeObserver: ResizeObserver,
+}): void {
+  const { document, window, location } = environment;
+  const sessionStorage = environment.storage;
+  const ResizeObserver = environment.resizeObserver;
 
   interface PanelToggleOptions {
     button: HTMLButtonElement | null;
@@ -121,8 +139,6 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
     }
 
   }
-
-  type DocumentScope = "all" | "changed" | "open-comments";
 
   // The server owns tree construction, filtering, counts, and links. This
   // adapter retains only keyboard behavior and tab-local view preferences,
@@ -265,10 +281,7 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
   }
 
   function readDocumentScope(state: DocumentCatalogState): DocumentScope {
-    const stored = readPreference(documentScopeStorageKey);
-    if (stored === "all" || stored === "changed" || stored === "open-comments") return stored;
-    if (readPreference(changedOnlyStorageKey) === "true") return "changed";
-    return hasChangedDocuments(state.documents) ? "changed" : "all";
+    return resolveDocumentScope(readPreference(documentScopeStorageKey), readPreference(changedOnlyStorageKey), state.documents);
   }
 
   function readStringSet(value: string): Set<string> {
@@ -357,7 +370,7 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
   }
 
   function clampDiffSplit(value: number): number {
-    return Math.min(diffSplitMax, Math.max(diffSplitMin, Math.round(value)));
+    return clampInteger(value, diffSplitMin, diffSplitMax);
   }
 
   function readDiffSplitPreference() {
@@ -400,4 +413,6 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
       // The current-page interaction still works when storage is unavailable.
     }
   }
-})();
+}
+
+initializeViewer();

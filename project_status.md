@@ -4,8 +4,8 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commits 8A, 8B, and 9 are implemented. The
-maintainer approved continuing through commit 10 before a combined review.
+**Phase:** Server-rendered review UI commits 8A, 8B, 9, and 10 are implemented
+and ready for the requested combined review.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
 HTMX 2.0.10 is now pinned, licensed, embedded, and served from
@@ -41,6 +41,10 @@ reconstructs catalog state from list nodes. The 5,000-path benchmark measured
 4.08 ms/op against a 50 ms threshold. Commit 9 server-renders the bounded
 comparison selector and form mutation, keeps the JSON API plus a runtime
 validator, and removes the final custom-data state attribute.
+Commit 10 replaces import-time IIFEs with named initializers, adds injected
+entrypoint and pure-preference tests, and replaces active-link, visible-card,
+mutation-class, conflict-text, Mermaid-source, and source-order inference with
+typed state or explicit interaction inputs.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
@@ -372,7 +376,7 @@ for explicit approval before starting the next item.
   filtering only if the documented 5,000-path benchmark passes.
 - [x] Commit 9: server-render comparison selection while retaining the JSON
   comparison API.
-- [ ] Commit 10: replace remaining import-time IIFEs with explicit,
+- [x] Commit 10: replace remaining import-time IIFEs with explicit,
   dependency-injected initializers and finish TypeScript unit/lint coverage.
 - [ ] Commit 11: run the complete verification matrix, reconcile all docs,
   remove dead assets/tests, and refresh distributions after source approval.
@@ -424,9 +428,8 @@ application state from HTML. Follow-up C is the current documentation review
 gate and broadens the invariant from custom attributes to all DOM-derived
 application state. Commits 8A and 8B implement and activate the typed document
 catalog, recursive server-rendered tree, counts, and server filtering. The
-maintainer approved continuing directly through commit 10 for one combined
-review. Commit 10 is next and makes the remaining TypeScript explicitly
-instantiable while removing residual node-as-state inference.
+commits 8A, 8B, 9, and 10 are implemented and ready for the maintainer's
+combined review. Commit 11 remains gated on that source review.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

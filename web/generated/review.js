@@ -1,4 +1,5 @@
 import { configureLifecycleForm } from "./review-fragments.js";
+import { fetchDocumentCatalogState } from "./document-state.js";
 import { createAnnotationHighlighter } from "./review-highlights.js";
 import { configureReviewHTMX } from "./review-htmx.js";
 import { createAnnotationNavigator } from "./review-navigation.js";
@@ -26,23 +27,23 @@ function writeSelection(form, selection) {
             input.value = value;
     });
 }
-function currentDocumentPath() {
+async function currentDocumentPath(location) {
     const prefix = "/view/";
-    if (window.location.pathname.startsWith(prefix)) {
-        return decodeURIComponent(window.location.pathname.slice(prefix.length));
+    if (location.pathname.startsWith(prefix)) {
+        return decodeURIComponent(location.pathname.slice(prefix.length));
     }
-    const activeDocument = document.querySelector('.documents a[aria-current="page"]');
-    const activePath = activeDocument ? new URL(activeDocument.href).pathname : "";
-    if (!activePath.startsWith(prefix))
-        throw new Error("Review page URL is invalid");
-    return decodeURIComponent(activePath.slice(prefix.length));
+    const state = await fetchDocumentCatalogState();
+    if (!state.selectedPath)
+        throw new Error("Review page has no selected document");
+    return state.selectedPath;
 }
-void (async () => {
+export async function initializeReview(environment = { document, window }) {
+    const { document, window } = environment;
     const panel = document.querySelector(".review-panel");
     if (!panel)
         return;
     const reviewPanel = panel;
-    const documentPath = currentDocumentPath();
+    const documentPath = await currentDocumentPath(window.location);
     const mode = new URLSearchParams(window.location.search).get("mode") === "diff" ? "diff" : "file";
     const markdown = requiredElement(document.querySelector(".markdown-body"), "markdown body");
     const preview = requiredElement(panel.querySelector(".selection-preview"), "selection preview");
@@ -141,23 +142,24 @@ void (async () => {
     function annotationByElementId(elementId) {
         return viewerState.review?.annotationsByElementId.get(elementId);
     }
-    function visibleAnnotations(content) {
-        return Array.from(content.querySelectorAll(".annotation-card"))
-            .map((card) => annotationByElementId(card.id))
-            .filter((annotation) => annotation !== undefined);
+    function displayedAnnotations() {
+        const annotations = Array.from(viewerState.review?.annotations.values() || []);
+        return showInactive.checked
+            ? annotations
+            : annotations.filter((annotation) => annotation.status !== "closed" && annotation.status !== "rejected");
     }
     function initializePanel() {
         const content = reviewPanel.querySelector("#annotation-panel-content");
         if (!content)
             return;
-        visibleAnnotations(content).forEach((annotation) => {
+        displayedAnnotations().forEach((annotation) => {
             const lifecycleForm = document.getElementById(annotation.lifecycleFormId);
             if (lifecycleForm instanceof HTMLFormElement && content.contains(lifecycleForm)) {
                 configureLifecycleForm(lifecycleForm, annotation.transitions, true);
             }
         });
         updateReattachForms();
-        renderAnnotationHighlights(visibleAnnotations(content));
+        renderAnnotationHighlights(displayedAnnotations());
     }
     reviewPanel.addEventListener("click", (event) => {
         const target = event.target instanceof Element ? event.target : null;
@@ -185,7 +187,7 @@ void (async () => {
         panel: reviewPanel,
         token: reviewToken,
         getRevision: () => viewerState.review?.revision || "",
-        onPanelChanged: async (source, mutation, successful) => {
+        onPanelChanged: async (mutationKind, mutation, successful) => {
             if (mutation) {
                 try {
                     viewerState = await fetchViewerState(documentPath, mode);
@@ -200,12 +202,10 @@ void (async () => {
             if (!mutation)
                 return;
             if (!successful) {
-                const feedback = reviewPanel.querySelector(".annotation-panel-feedback");
-                if (feedback?.textContent)
-                    panelController.setFormStatus(feedback.textContent, true);
+                panelController.setFormStatus("Annotations changed elsewhere. Review the refreshed panel and retry.", true);
                 return;
             }
-            if (source?.classList.contains("annotation-form")) {
+            if (mutationKind === "create") {
                 const comment = form.elements.namedItem("comment");
                 if (comment instanceof HTMLTextAreaElement)
                     comment.value = "";
@@ -214,7 +214,7 @@ void (async () => {
                 panelController.setAnnotationFormVisible(false);
                 panelController.setFormStatus("Annotation added.");
             }
-            else if (source?.classList.contains("annotation-reattach")) {
+            else if (mutationKind === "reattach") {
                 window.getSelection()?.removeAllRanges();
                 forceClearSelectionPreview();
             }
@@ -226,4 +226,5 @@ void (async () => {
     });
     selectionController.bind();
     initializePanel();
-})();
+}
+void initializeReview();

@@ -1,3 +1,13 @@
+function reviewMutationKind(source) {
+    const form = source instanceof HTMLFormElement ? source : source?.closest("form") || null;
+    if (!form)
+        return null;
+    if (form.id === "annotation-form")
+        return "create";
+    if (new URL(form.action).pathname.endsWith("/reattach"))
+        return "reattach";
+    return "other";
+}
 function detail(event) {
     if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null)
         return null;
@@ -30,13 +40,14 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
     htmx.config.allowScriptTags = false;
     htmx.config.historyCacheSize = 0;
     htmx.config.selfRequestsOnly = true;
-    let requestSource = null;
+    let requestMutationKind = null;
     let requestMethod = "";
     document.body.addEventListener("htmx:configRequest", (event) => {
         const value = detail(event);
         if (!value)
             return;
-        requestSource = value.elt instanceof Element ? value.elt : null;
+        const requestSource = value.elt instanceof Element ? value.elt : null;
+        requestMutationKind = reviewMutationKind(requestSource);
         requestMethod = requestVerb(value);
         if (requestMethod !== "post" || typeof value.headers !== "object" || value.headers === null)
             return;
@@ -55,8 +66,8 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
         if (!value || !targetsPanel(event, value))
             return;
         const responseStatus = status(value);
-        void onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
-        requestSource = null;
+        void onPanelChanged(requestMutationKind, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
+        requestMutationKind = null;
         requestMethod = "";
     });
     document.body.addEventListener("htmx:responseError", (event) => {

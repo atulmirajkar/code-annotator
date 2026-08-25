@@ -65,8 +65,21 @@ func TestViewerState(t *testing.T) {
 		t.Fatalf("review state = %#v", state.Review)
 	}
 	item := state.Review.Annotations[0]
-	if item.ID != "ann_transition_test" || item.ElementID != "annotation-ann_transition_test" || item.LifecycleFormID != "annotation-lifecycle-ann_transition_test" || !item.DocumentLevel || item.Anchor != nil || item.SourceStartByte != nil || len(item.Transitions) != 1 || item.Transitions[0].Status != annotation.StatusOpen {
+	if item.ID != "ann_transition_test" || item.Status != annotation.StatusClosed || item.ElementID != "annotation-ann_transition_test" || item.LifecycleFormID != "annotation-lifecycle-ann_transition_test" || !item.DocumentLevel || item.Anchor != nil || item.SourceStartByte != nil || len(item.Transitions) != 1 || item.Transitions[0].Status != annotation.StatusOpen {
 		t.Fatalf("annotation state = %#v", item)
+	}
+}
+
+func TestViewerStateCarriesTypedMermaidDefinition(t *testing.T) {
+	t.Parallel()
+	viewer := newTestHandler(t, map[string]string{"README.md": "```mermaid\ngraph TD\n  A-->B\n```\n"})
+	response := getResponse(t, viewer, "/ui/viewer-state?document=README.md")
+	var state viewerStateResponse
+	if err := json.NewDecoder(response.Body).Decode(&state); err != nil {
+		t.Fatal(err)
+	}
+	if len(state.Document.Diagrams) != 1 || state.Document.Diagrams[0].Text != "graph TD\n  A-->B\n" {
+		t.Fatalf("diagram state = %#v", state.Document.Diagrams)
 	}
 }
 

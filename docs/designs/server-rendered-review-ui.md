@@ -5,8 +5,7 @@
 Implementation in progress. Commit gates 0 through 7, commit 7 review
 follow-ups A and B, the commit 4 review follow-up, and the intervening role-only
 compatibility slice are approved. Commit 7 review follow-up C is approved.
-Commits 8A, 8B, and 9 are implemented; the maintainer approved continuing
-through commit 10 before the next combined review.
+Commits 8A, 8B, 9, and 10 are implemented and ready for combined review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -816,6 +815,8 @@ Implementation notes:
 
 ### Commit 10: make the remaining TypeScript explicitly instantiable
 
+Status: implemented.
+
 Scope:
 
 - replace whole-file IIFEs with small entrypoints and exported initializers;
@@ -830,6 +831,18 @@ Scope:
 - update generated assets and frontend architecture documentation.
 
 Checks: unit/lint/typecheck/build, full Go/race, complete Playwright suite.
+
+Implementation notes:
+
+- viewer, review, and Mermaid entrypoints are named initializers; viewer and
+  Mermaid accept explicit browser/service ports for isolated tests;
+- root-page document identity comes from typed catalog state rather than an
+  active link, and visible annotation decisions come from typed statuses;
+- HTMX reports explicit create/reattach/other mutation kinds, so review logic
+  does not infer operations from presentation classes or conflict text;
+- Mermaid definitions and source ordering come from typed viewer-state maps;
+- pure preference resolution and clamping are extracted into a DOM-free module
+  covered by unit tests and the state-module architecture guard.
 
 ### Commit 11: close the milestone and refresh release artifacts
 

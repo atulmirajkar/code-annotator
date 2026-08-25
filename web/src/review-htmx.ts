@@ -16,8 +16,18 @@ interface ReviewHTMXOptions {
   panel: HTMLElement;
   token: string;
   getRevision: () => string;
-  onPanelChanged: (source: Element | null, mutation: boolean, successful: boolean) => void | Promise<void>;
+  onPanelChanged: (mutationKind: ReviewMutationKind, mutation: boolean, successful: boolean) => void | Promise<void>;
   onRequestError: () => void;
+}
+
+export type ReviewMutationKind = "create" | "reattach" | "other" | null;
+
+function reviewMutationKind(source: Element | null): ReviewMutationKind {
+  const form = source instanceof HTMLFormElement ? source : source?.closest<HTMLFormElement>("form") || null;
+  if (!form) return null;
+  if (form.id === "annotation-form") return "create";
+  if (new URL(form.action).pathname.endsWith("/reattach")) return "reattach";
+  return "other";
 }
 
 interface HtmxRequestDetail {
@@ -62,13 +72,14 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
   htmx.config.allowScriptTags = false;
   htmx.config.historyCacheSize = 0;
   htmx.config.selfRequestsOnly = true;
-  let requestSource: Element | null = null;
+  let requestMutationKind: ReviewMutationKind = null;
   let requestMethod = "";
 
   document.body.addEventListener("htmx:configRequest", (event) => {
     const value = detail(event);
     if (!value) return;
-    requestSource = value.elt instanceof Element ? value.elt : null;
+    const requestSource = value.elt instanceof Element ? value.elt : null;
+    requestMutationKind = reviewMutationKind(requestSource);
     requestMethod = requestVerb(value);
     if (requestMethod !== "post" || typeof value.headers !== "object" || value.headers === null) return;
     Reflect.set(value.headers, "X-Code-Annotator-Token", token);
@@ -86,8 +97,8 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
     const value = detail(event);
     if (!value || !targetsPanel(event, value)) return;
     const responseStatus = status(value);
-    void onPanelChanged(requestSource, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
-    requestSource = null;
+    void onPanelChanged(requestMutationKind, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
+    requestMutationKind = null;
     requestMethod = "";
   });
 

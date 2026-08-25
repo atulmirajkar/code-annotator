@@ -71,6 +71,11 @@ Document filtering is server-rendered by `GET /ui/review/documents`. Run its
 The activation measurement on Apple M1 was 4.08 ms/op, below the 50 ms
 server-render threshold used with the 150 ms browser debounce.
 
+Browser entrypoints export named initializers. `entrypoints.test.ts` exercises
+viewer and Mermaid initialization with injected roots and services;
+`viewer-preferences.test.ts` covers DOM-free preference derivation. The latter
+is included in `web/state_modules_test.go`'s no-DOM architecture guard.
+
 ## Run from source
 
 From the repository root:

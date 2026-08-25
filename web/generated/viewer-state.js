@@ -15,6 +15,16 @@ function parseSourcePositions(value, label) {
     });
     return result;
 }
+function parseDiagramPositions(value) {
+    const positions = parseSourcePositions(value, "document.diagrams");
+    const raw = value;
+    const result = new Map();
+    Array.from(positions.values()).forEach((position, index) => {
+        const item = requireRecord(raw[index], `document.diagrams[${index}]`);
+        result.set(position.elementId, { ...position, text: requireString(item.text, `document.diagrams[${index}].text`) });
+    });
+    return result;
+}
 function requireRecord(value, label) {
     if (typeof value !== "object" || value === null || Array.isArray(value))
         throw new Error(`${label} must be an object`);
@@ -71,6 +81,7 @@ function parseAnnotation(value, index) {
         throw new Error("annotation.transitions must be an array");
     return {
         id: requireString(item.id, "annotation.id"),
+        status: requireMember(item.status, ["open", "acknowledged", "applied", "needs_changes", "closed", "rejected"], "annotation.status"),
         elementId: requireString(item.elementId, "annotation.elementId"),
         lifecycleFormId: requireString(item.lifecycleFormId, "annotation.lifecycleFormId"),
         documentLevel: requireBoolean(item.documentLevel, "annotation.documentLevel"),
@@ -125,7 +136,7 @@ export function parseViewerState(value) {
             kind: requireMember(documentValue.kind, ["markdown", "code"], "document.kind"),
             sha256,
             sourceNodes: parseSourcePositions(documentValue.sourceNodes, "document.sourceNodes"),
-            diagrams: parseSourcePositions(documentValue.diagrams, "document.diagrams"),
+            diagrams: parseDiagramPositions(documentValue.diagrams),
         },
         review,
     };

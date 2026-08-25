@@ -56,6 +56,10 @@ selected document, File/Changes mode, changed state, navigation URLs, and open
 comment counts as runtime-validated TypeScript state. The server renders the
 recursive tree, paths, counts, and filtered fragments; TypeScript uses the
 validated catalog only for keyboard navigation and tab-local preferences.
+Viewer, review, and Mermaid browser entrypoints are named initializers rather
+than whole-file IIFEs. Pure preference rules and all typed state derivation are
+unit tested without DOM inputs; browser adapters use semantic IDs, explicit
+interaction values, and narrow injected ports.
 
 ## Usage
 
