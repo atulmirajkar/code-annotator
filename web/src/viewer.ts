@@ -4,6 +4,8 @@ import { fetchDocumentCatalogState } from "./document-state.js";
 import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
 import { clampInteger, resolveDocumentScope } from "./viewer-preferences.js";
 
+// Keep third-party browser globals behind the smallest contract this module
+// needs. Tests can provide this port without installing HTMX on globalThis.
 interface HtmxConfig {
   allowEval: boolean;
   allowNestedOobSwaps: boolean;
@@ -21,6 +23,8 @@ interface HtmxAPI {
   ): Promise<void>;
 }
 
+// Event handlers receive explicit contexts instead of closing over values from
+// initializeViewer. These contexts document which state each interaction owns.
 interface PanelToggleContext {
   button: HTMLButtonElement;
   panel: HTMLElement;
@@ -50,8 +54,12 @@ interface DocumentSearchContext {
   htmx: HtmxAPI | null;
   path: string;
   mode: DocumentMode;
+  // The typed catalog is the source for keyboard navigation; rendered list
+  // nodes are never inspected to reconstruct document state.
   state: DocumentCatalogState | null;
   scope: DocumentScope;
+  // Search requests are coalesced so a slow response cannot start multiple
+  // concurrent HTMX swaps for the same panel.
   searchTimer: number;
   requestRunning: boolean;
   queuedRequest: DocumentPanelRequest | null;
@@ -70,9 +78,12 @@ interface DiffDividerContext {
   divider: HTMLElement;
   percent: number;
   dragRect: DOMRect | null;
+  // removeEventListener requires the same function identity that was added.
   pointerMoveHandler: ((event: PointerEvent) => void) | null;
 }
 
+// ViewerEnvironment is the composition boundary for browser-owned services.
+// Keeping it explicit makes initialization independently unit testable.
 export interface ViewerEnvironment {
   document: Document;
   window: Window;
@@ -82,6 +93,7 @@ export interface ViewerEnvironment {
   htmx: HtmxAPI | null;
 }
 
+// All preferences are tab-scoped through the injected Storage instance.
 const changedOnlyStorageKey = "code-annotator.changed-only";
 const documentScopeStorageKey = "code-annotator.document-scope";
 const documentTreeStorageKey = "code-annotator.document-tree-expanded";
@@ -92,6 +104,8 @@ const diffSplitMin = 20;
 const diffSplitMax = 80;
 const diffSplitStep = 2;
 
+// Production initialization reads the optional HTMX global once, then passes
+// the resulting port through the same path used by tests.
 function browserHTMX(): HtmxAPI | null {
   return (Reflect.get(globalThis, "htmx") as HtmxAPI | undefined) ?? null;
 }
@@ -107,6 +121,8 @@ function defaultViewerEnvironment(): ViewerEnvironment {
   };
 }
 
+// initializeViewer is intentionally limited to element lookup and dependency
+// wiring. Interaction behavior belongs to the module-level helpers below.
 export function initializeViewer(
   environment: ViewerEnvironment = defaultViewerEnvironment(),
 ): void {
@@ -137,6 +153,7 @@ export function initializeViewer(
   bindDiffDivider(environment.document, environment.storage);
 }
 
+// Harden the HTMX defaults before any viewer interaction can issue a request.
 function configureHTMX(api: HtmxAPI | null): void {
   if (!api) return;
   api.config.allowEval = false;
@@ -146,6 +163,8 @@ function configureHTMX(api: HtmxAPI | null): void {
   api.config.selfRequestsOnly = true;
 }
 
+// CSS uses the measured topbar height to keep sticky content below a topbar
+// whose height can change with viewport width or wrapped controls.
 function bindTopbarHeight(
   document: Document,
   ResizeObserver: typeof globalThis.ResizeObserver,
@@ -165,6 +184,8 @@ function updateTopbarHeight(document: Document, topbar: HTMLElement): void {
   );
 }
 
+// One panel context keeps the DOM's hidden state, layout class, accessible
+// state, button label, and stored preference synchronized.
 function bindPanelToggle(options: PanelToggleOptions): void {
   if (!options.button || !options.panel) return;
   const context: PanelToggleContext = {
@@ -209,6 +230,8 @@ function setPanelCollapsed(
   context.button.textContent = `${collapsed ? "Show" : "Hide"} ${context.name}`;
 }
 
+// Source links are already rendered in the correct mode by Go. The browser
+// remembers only an explicit user choice for subsequent navigation.
 function bindSourceModePreference(document: Document, storage: Storage): void {
   const tabs = document.querySelector<HTMLElement>(".source-mode-tabs");
   const activeTab = tabs?.querySelector<HTMLAnchorElement>(
@@ -229,6 +252,8 @@ function persistSourceMode(storage: Storage, tab: HTMLAnchorElement): void {
   );
 }
 
+// The server owns catalog rendering and filtering. This adapter adds tab-local
+// preferences, keyboard behavior, debouncing, and HTMX fragment replacement.
 function bindDocumentSearch(environment: ViewerEnvironment): void {
   if (!environment.document.querySelector("#document-panel-content")) return;
   const context: DocumentSearchContext = {
@@ -291,6 +316,8 @@ function bindDocumentSearch(environment: ViewerEnvironment): void {
   restoreExpandedDirectories(context);
 }
 
+// Catalog state is fetched separately from rendered HTML and runtime-validated
+// by document-state.ts before it reaches this module.
 async function refreshDocumentCatalog(
   context: DocumentSearchContext,
   restoreScope: boolean,
@@ -316,6 +343,8 @@ async function refreshDocumentCatalog(
   }
 }
 
+// Scope checkboxes behave as an exclusive filter even though the server sends
+// checkboxes to allow an active option to be toggled back to "all".
 function handleDocumentScopeChange(
   context: DocumentSearchContext,
   event: Event,
@@ -349,6 +378,8 @@ function isFilteredDocumentScope(
   return value === "changed" || value === "open-comments";
 }
 
+// Input events are delegated because HTMX replaces the complete panel,
+// including the search input, after each server-rendered result.
 function handleDocumentSearchInput(
   context: DocumentSearchContext,
   event: Event,
@@ -380,6 +411,8 @@ function handleDocumentSearch(
   requestDocumentPanel(context, input.value, context.scope);
 }
 
+// Directory expansion is presentation state keyed by semantic element IDs;
+// document identity and filtering continue to come from typed catalog state.
 function handleDocumentDirectoryClick(
   context: DocumentSearchContext,
   event: MouseEvent,
@@ -396,6 +429,8 @@ function handleDocumentDirectoryClick(
   writeExpandedDirectories(context);
 }
 
+// Reapply expansion after every HTMX swap because the replacement fragment is
+// authoritative server HTML and starts with its default tree state.
 function restoreExpandedDirectories(context: DocumentSearchContext): void {
   const stored = readPreference(context.storage, documentTreeStorageKey);
   if (stored === null) return;
@@ -439,6 +474,8 @@ function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
+// Annotation mutations can change open-comment counts and scope membership, so
+// refresh typed state before asking the server to rerender the active filter.
 function handleAnnotationsUpdated(context: DocumentSearchContext): void {
   void refreshDocumentCatalog(context, false).then(
     dispatchDocumentSearch.bind(null, context),
@@ -451,6 +488,8 @@ function dispatchDocumentSearch(context: DocumentSearchContext): void {
     ?.dispatchEvent(new Event("search", { bubbles: true }));
 }
 
+// Search-field keys use typed catalog order for navigation and DOM references
+// only for focus management and dispatching the normal search interaction.
 function handleDocumentSearchKeydown(
   context: DocumentSearchContext,
   event: KeyboardEvent,
@@ -502,6 +541,8 @@ function handleDocumentShortcutKeydown(
     ?.focus();
 }
 
+// Keep only the newest requested query while a prior HTMX request is running.
+// sendNextDocumentRequest drains that single-slot queue after each response.
 function requestDocumentPanel(
   context: DocumentSearchContext,
   query: string,
@@ -535,6 +576,8 @@ async function sendNextDocumentRequest(
   }
 }
 
+// Comparison choices are server-rendered and server-validated. The browser is
+// responsible only for submission feedback and the loopback request token.
 function bindComparisonControl(document: Document): void {
   const control = document.querySelector<HTMLFormElement>(
     ".diff-comparison-control",
@@ -591,6 +634,8 @@ function handleComparisonResponseError(
   context.status.classList.add("error");
 }
 
+// HTMX event detail is untyped external input, so narrow it before reading the
+// request source or headers object.
 function customEventDetail(event: Event): object | null {
   return event instanceof CustomEvent &&
     typeof event.detail === "object" &&
@@ -610,6 +655,8 @@ function comparisonEventTargetsControl(
   );
 }
 
+// The divider context owns one drag gesture and the persisted split. Both the
+// headings and panes consume the same CSS custom property set by render.
 function bindDiffDivider(document: Document, storage: Storage): void {
   const view = document.querySelector<HTMLElement>(".diff-view");
   const divider = view?.querySelector<HTMLElement>(".diff-divider");
@@ -649,6 +696,8 @@ function handleDiffDividerKeydown(
   setDiffSplit(context, next);
 }
 
+// Capture the view bounds once per gesture. A stable bound move handler is
+// stored in the context so pointerup can reliably unregister it.
 function handleDiffPointerDown(
   context: DiffDividerContext,
   event: PointerEvent,
@@ -688,6 +737,8 @@ function handleDiffPointerUp(context: DiffDividerContext): void {
     );
 }
 
+// Centralizing the clamp, render, and persistence prevents keyboard and
+// pointer interactions from drifting into different behavior.
 function setDiffSplit(context: DiffDividerContext, value: number): void {
   context.percent = clampDiffSplit(value);
   renderDiffSplit(context);
@@ -723,6 +774,8 @@ function readPanelCollapsedPreference(
   return stored === null ? defaultCollapsed : stored === "true";
 }
 
+// Storage can be unavailable in privacy-restricted browser contexts. Viewer
+// interactions must remain functional even when preferences cannot persist.
 function readPreference(storage: Storage, key: string): string | null {
   try {
     return storage.getItem(key);

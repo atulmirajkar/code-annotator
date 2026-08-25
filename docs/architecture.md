@@ -134,7 +134,9 @@ display/highlight set, HTMX supplies an explicit mutation kind, and typed
 diagram definitions plus ordered source maps replace node text/order as
 application inputs. `viewer.ts` declares interfaces and helpers at module
 scope. Its initializer performs wiring only, with storage, browser services,
-and mutable interaction contexts passed explicitly to handlers.
+and mutable interaction contexts passed explicitly to handlers. Inline
+comments in the adapter document state ownership, delegated-event reasons,
+request-serialization guarantees, and drag-lifecycle invariants.
 
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production
