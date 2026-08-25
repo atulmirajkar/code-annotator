@@ -21,6 +21,7 @@ import (
 	annotationstore "atulm/code-annotator/internal/annotation/store"
 	"atulm/code-annotator/internal/content"
 	"atulm/code-annotator/internal/gitdiff"
+	"atulm/code-annotator/internal/highlight"
 	mdrender "atulm/code-annotator/internal/render"
 	"atulm/code-annotator/web"
 )
@@ -48,6 +49,7 @@ type Server struct {
 	root                *content.Root
 	indexOptions        content.IndexOptions
 	renderer            *mdrender.Renderer
+	highlighter         *highlight.Runtime
 	annotations         *annotationstore.Store
 	review              *reviewSession
 	comparison          *comparisonController
@@ -369,6 +371,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	server := &Server{
 		root:                root,
 		renderer:            renderer,
+		highlighter:         highlight.NewRuntime(),
 		page:                page,
 		styles:              styles,
 		reviewJS:            reviewJS,

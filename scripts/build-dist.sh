@@ -5,6 +5,7 @@ set -eu
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH='' cd -- "$script_dir/.." && pwd)
 staging_dir=$(mktemp -d "${TMPDIR:-/tmp}/code-annotator-dist.XXXXXX")
+grammar_tags="grammar_subset grammar_subset_go grammar_subset_c_sharp grammar_subset_javascript grammar_subset_typescript grammar_subset_tsx grammar_subset_json grammar_subset_html grammar_subset_css grammar_subset_scss grammar_subset_xml grammar_subset_markdown"
 
 cleanup() {
   rm -rf -- "$staging_dir"
@@ -27,7 +28,7 @@ echo "Checking and compiling the TypeScript/Sass frontend..."
 npm run check:web
 
 echo "Running tests..."
-go test ./...
+go test -tags "$grammar_tags" ./...
 
 build_target() {
   target_os=$1
@@ -37,8 +38,8 @@ build_target() {
 
   mkdir -p "$output_dir"
   echo "Building $target_os/$target_arch..."
-  GOOS=$target_os GOARCH=$target_arch \
-    go build -trimpath -buildvcs=false -ldflags="-s -w" \
+  CGO_ENABLED=0 GOOS=$target_os GOARCH=$target_arch \
+    go build -tags "$grammar_tags" -trimpath -buildvcs=false -ldflags="-s -w" \
     -o "$output_dir/$output_name" ./cmd/code-annotator
 }
 

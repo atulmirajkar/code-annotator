@@ -46,6 +46,7 @@ internal/annotation/        annotation schema, lifecycle, and anchor resolution
 internal/annotation/store/  constrained atomic JSON sidecar persistence
 internal/render/            goldmark configuration and page rendering
 internal/gitdiff/           bounded Git commands, aligned diffs, revision state
+internal/highlight/         bounded Tree-sitter grammar selection and syntax ranges
 internal/server/            routes, handlers, HTTP server, graceful shutdown
 internal/launch/            thin, testable wrapper around pkg/browser
 internal/commands/          offline annotation tools and live HTTP agent client
@@ -55,6 +56,17 @@ web/                        authored TypeScript/Sass, generated browser assets, 
 Package boundaries should remain small. In particular, `internal/content`
 owns filesystem safety, while HTTP handlers consume its API rather than joining
 untrusted URL paths themselves.
+
+`internal/highlight` pins the pure-Go `gotreesitter` runtime and maps exact
+normalized default extensions to 11 selectively embedded grammars. It returns
+validated, presentation-neutral UTF-8 byte ranges and owns no mutable parser
+state. Highlight work admits at most 128 KiB per pane, has a 500 ms deadline,
+and rejects excessive or invalid output; larger supported source files retain
+the existing escaped plain rendering. The server owns a runtime instance, and
+submilestone 12.2 maps restored annotation ranges through descendant text nodes
+while preserving nested token elements in the fallback highlighter. Production
+token rendering remains a separate review gate in
+[`docs/designs/source-syntax-highlighting.md`](designs/source-syntax-highlighting.md).
 
 The browser source is authored under `web/src/` and compiled into the checked-in
 `web/generated/` directory with `npm run build:web`. Sass is organized under

@@ -56,16 +56,14 @@ export function createAnnotationHighlighter({ document, markdown, sourceSpan, so
             .find((span) => containsSourceOffset(span, endByte, true));
         if (!startSpan || !endSpan)
             return null;
-        const startNode = sourceTextNode(startSpan);
-        const endNode = sourceTextNode(endSpan);
-        const startOffset = byteOffsetToTextOffset(startSpan, startByte);
-        const endOffset = byteOffsetToTextOffset(endSpan, endByte);
-        if (!startNode || !endNode || startOffset < 0 || endOffset < 0)
+        const startPoint = sourceByteToTextPoint(startSpan, startByte, false);
+        const endPoint = sourceByteToTextPoint(endSpan, endByte, true);
+        if (!startPoint || !endPoint)
             return null;
         const range = document.createRange();
         try {
-            range.setStart(startNode, startOffset);
-            range.setEnd(endNode, endOffset);
+            range.setStart(startPoint.node, startPoint.offset);
+            range.setEnd(endPoint.node, endPoint.offset);
         }
         catch (_) {
             return null;
@@ -79,26 +77,55 @@ export function createAnnotationHighlighter({ document, markdown, sourceSpan, so
                 ? position.startByte < offset && offset <= position.endByte
                 : position.startByte <= offset && offset < position.endByte));
     }
-    function byteOffsetToTextOffset(span, sourceOffset) {
+    function sourceByteToTextPoint(span, sourceOffset, endBoundary) {
         const position = sourceNodes.get(span.id);
         if (!position)
-            return -1;
+            return null;
         const target = sourceOffset - position.startByte;
+        const nodes = descendantTextNodes(span);
         let bytes = 0;
-        let textOffset = 0;
-        for (const character of span.textContent || "") {
-            if (bytes === target)
-                return textOffset;
+        for (let index = 0; index < nodes.length; index += 1) {
+            const node = nodes[index];
+            const length = utf8Length(node.data);
+            if (target < bytes + length) {
+                const offset = utf16OffsetAtByte(node.data, target - bytes);
+                return offset < 0 ? null : { node, offset };
+            }
+            if (target === bytes + length) {
+                const next = nodes[index + 1];
+                if (!endBoundary && next)
+                    return { node: next, offset: 0 };
+                return { node, offset: node.length };
+            }
+            bytes += length;
+        }
+        return null;
+    }
+    function descendantTextNodes(span) {
+        const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+        const nodes = [];
+        let node = walker.nextNode();
+        while (node) {
+            if (node instanceof Text)
+                nodes.push(node);
+            node = walker.nextNode();
+        }
+        return nodes;
+    }
+    function utf16OffsetAtByte(value, target) {
+        if (target === 0)
+            return 0;
+        let bytes = 0;
+        let offset = 0;
+        for (const character of value) {
             bytes += utf8Length(character);
-            textOffset += character.length;
+            offset += character.length;
+            if (bytes === target)
+                return offset;
             if (bytes > target)
                 return -1;
         }
-        return bytes === target ? textOffset : -1;
-    }
-    function sourceTextNode(span) {
-        span.normalize();
-        return span.firstChild instanceof Text ? span.firstChild : null;
+        return -1;
     }
     // The fallback merges overlapping intervals within each source span before
     // wrapping them, avoiding invalid nested or crossing mark elements.
@@ -112,26 +139,55 @@ export function createAnnotationHighlighter({ document, markdown, sourceSpan, so
             const spans = sourceSpanRange(startSpan, endSpan) || [];
             spans.forEach((span) => {
                 const length = (span.textContent || "").length;
-                const start = span === startSpan ? range.startOffset : 0;
-                const end = span === endSpan ? range.endOffset : length;
-                if (end > start)
+                const start = span === startSpan
+                    ? textOffsetWithinSpan(span, range.startContainer, range.startOffset)
+                    : 0;
+                const end = span === endSpan
+                    ? textOffsetWithinSpan(span, range.endContainer, range.endOffset)
+                    : length;
+                if (start >= 0 && end >= 0 && end > start)
                     intervals.set(span, [...(intervals.get(span) || []), [start, end]]);
             });
         });
         intervals.forEach((values, span) => {
             const merged = mergeIntervals(values);
-            const textNode = sourceTextNode(span);
-            if (!textNode)
-                return;
-            merged.reverse().forEach(([start, end]) => {
-                const range = document.createRange();
-                range.setStart(textNode, start);
-                range.setEnd(textNode, end);
+            const nodes = descendantTextNodes(span);
+            const nodeIntervals = [];
+            let textOffset = 0;
+            nodes.forEach((node) => {
+                const nodeEnd = textOffset + node.length;
+                merged.forEach(([start, end]) => {
+                    const overlapStart = Math.max(start, textOffset);
+                    const overlapEnd = Math.min(end, nodeEnd);
+                    if (overlapEnd > overlapStart)
+                        nodeIntervals.push([
+                            node,
+                            overlapStart - textOffset,
+                            overlapEnd - textOffset,
+                        ]);
+                });
+                textOffset = nodeEnd;
+            });
+            nodeIntervals.reverse().forEach(([node, start, end]) => {
+                node.splitText(end);
+                const target = start === 0 ? node : node.splitText(start);
                 const mark = document.createElement("mark");
                 mark.className = "annotation-highlight-fallback";
-                range.surroundContents(mark);
+                target.parentNode?.replaceChild(mark, target);
+                mark.appendChild(target);
             });
         });
+    }
+    function textOffsetWithinSpan(span, boundaryNode, boundaryOffset) {
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        try {
+            range.setEnd(boundaryNode, boundaryOffset);
+        }
+        catch (_) {
+            return -1;
+        }
+        return range.toString().length;
     }
     function clearFallbackHighlights() {
         markdown

@@ -11,6 +11,44 @@ are not runtime dependencies of `code-annotator`.
 
 The Go toolchain downloads declared module dependencies during the first build.
 
+## Syntax grammar build set
+
+Source syntax highlighting uses the pure-Go `gotreesitter` runtime. The runtime
+ships a broad grammar registry, but code-annotator release binaries embed only
+the grammars approved for the default catalog. `scripts/build-dist.sh` owns the
+authoritative build-tag set:
+
+```text
+go c_sharp javascript typescript tsx json html css scss xml markdown
+```
+
+Ordinary Go builds without grammar tags remain functional but may link the
+dependency's complete registry. Use the approved subset when measuring or
+building a production-shaped binary:
+
+```sh
+CGO_ENABLED=0 go build -tags 'grammar_subset grammar_subset_go grammar_subset_c_sharp grammar_subset_javascript grammar_subset_typescript grammar_subset_tsx grammar_subset_json grammar_subset_html grammar_subset_css grammar_subset_scss grammar_subset_xml grammar_subset_markdown' \
+  -o bin/code-annotator ./cmd/code-annotator
+```
+
+Run the grammar conformance tests and benchmarks with the same subset:
+
+```sh
+go test -tags 'grammar_subset grammar_subset_go grammar_subset_c_sharp grammar_subset_javascript grammar_subset_typescript grammar_subset_tsx grammar_subset_json grammar_subset_html grammar_subset_css grammar_subset_scss grammar_subset_xml grammar_subset_markdown' \
+  ./internal/highlight
+
+go test -tags 'grammar_subset grammar_subset_go grammar_subset_c_sharp grammar_subset_javascript grammar_subset_typescript grammar_subset_tsx grammar_subset_json grammar_subset_html grammar_subset_css grammar_subset_scss grammar_subset_xml grammar_subset_markdown' \
+  -run '^$' -bench '^BenchmarkHighlight' -benchmem ./internal/highlight
+```
+
+Grammar origins, immutable upstream revisions, and the dependency update
+procedure are recorded in
+[`../internal/highlight/PROVENANCE.md`](../internal/highlight/PROVENANCE.md).
+Highlighting admits at most 128 KiB per pane and gives parsing/query work a
+500 ms deadline; larger files continue through escaped plain rendering under
+the existing 4 MiB application source limit. The submilestone 12.1 measurements
+and binary-size budget are recorded in the design document.
+
 ## Frontend architecture
 
 The approved server-rendered review UI migration is defined in

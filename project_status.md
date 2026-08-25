@@ -1,6 +1,6 @@
 # Project status
 
-Last updated: 2026-08-24
+Last updated: 2026-08-25
 
 ## Current state
 
@@ -262,12 +262,29 @@ verification is reviewed.
 
 ### 12. Source syntax highlighting
 
-- [ ] Select an offline, embedded highlighter with Go, C#, JavaScript, and
+Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-syntax-highlighting.md).
+
+- [x] Select an offline, embedded highlighter with Go, C#, JavaScript, and
   TypeScript support.
 - [ ] Preserve source-backed outer spans and exact annotation byte ranges.
 - [ ] Support nested token elements in selection and annotation highlights.
 - [ ] Add light/dark themes without runtime network dependencies.
 - [ ] Add rendering, selection, CSP, and browser regression coverage.
+- [x] Complete submilestone 12.1: runtime and grammar integration. The pinned
+  pure-Go runtime loads all 11 approved grammars from the selective offline
+  build, applies a 128 KiB admission cap plus 500 ms parse deadline, passes the
+  full Go/vet/race matrix, and cross-builds all six CGO-disabled targets within
+  the approved binary-size budget. Awaiting maintainer review before 12.2.
+- [x] Complete submilestone 12.2: nested source-range support. Restored
+  annotation ranges now map through descendant text nodes, fallback marks split
+  safely inside token elements, and the focused plus full frontend unit suites
+  pass. The Playwright browser matrix remains environment-blocked because
+  Microsoft Edge aborts during launch in this workspace; no assertion failures
+  were observed.
+- [ ] Complete submilestone 12.3: core language highlighting in File view.
+- [ ] Complete submilestone 12.4: remaining default source catalog.
+- [ ] Complete submilestone 12.5: Changes-view highlighting.
+- [ ] Complete submilestone 12.6: hardening and release.
 
 ### 13. Agent server discovery
 

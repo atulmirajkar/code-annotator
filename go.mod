@@ -3,6 +3,7 @@ module atulm/code-annotator
 go 1.26.5
 
 require (
+	github.com/odvcencio/gotreesitter v0.51.0
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c
 	github.com/yuin/goldmark v1.7.17
 )
