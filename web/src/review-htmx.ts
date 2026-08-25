@@ -6,24 +6,31 @@ interface HtmxConfig {
   selfRequestsOnly: boolean;
 }
 
-interface HtmxAPI {
+export interface ReviewHtmxAPI {
   config: HtmxConfig;
 }
 
-declare const htmx: HtmxAPI;
-
 interface ReviewHTMXOptions {
+  document: Document;
+  api: ReviewHtmxAPI | null;
   panel: HTMLElement;
   token: string;
   getRevision: () => string;
-  onPanelChanged: (mutationKind: ReviewMutationKind, mutation: boolean, successful: boolean) => void | Promise<void>;
+  onPanelChanged: (
+    mutationKind: ReviewMutationKind,
+    mutation: boolean,
+    successful: boolean,
+  ) => void | Promise<void>;
   onRequestError: () => void;
 }
 
 export type ReviewMutationKind = "create" | "reattach" | "other" | null;
 
 function reviewMutationKind(source: Element | null): ReviewMutationKind {
-  const form = source instanceof HTMLFormElement ? source : source?.closest<HTMLFormElement>("form") || null;
+  const form =
+    source instanceof HTMLFormElement
+      ? source
+      : source?.closest<HTMLFormElement>("form") || null;
   if (!form) return null;
   if (form.id === "annotation-form") return "create";
   if (new URL(form.action).pathname.endsWith("/reattach")) return "reattach";
@@ -42,7 +49,12 @@ interface HtmxRequestDetail {
 }
 
 function detail(event: Event): HtmxRequestDetail | null {
-  if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null) return null;
+  if (
+    !(event instanceof CustomEvent) ||
+    typeof event.detail !== "object" ||
+    event.detail === null
+  )
+    return null;
   return event.detail as HtmxRequestDetail;
 }
 
@@ -53,25 +65,43 @@ function status(detailValue: HtmxRequestDetail): number {
 }
 
 function requestVerb(detailValue: HtmxRequestDetail): string {
-  if (typeof detailValue.verb === "string") return detailValue.verb.toLowerCase();
-  if (typeof detailValue.requestConfig !== "object" || detailValue.requestConfig === null) return "";
+  if (typeof detailValue.verb === "string")
+    return detailValue.verb.toLowerCase();
+  if (
+    typeof detailValue.requestConfig !== "object" ||
+    detailValue.requestConfig === null
+  )
+    return "";
   const value = Reflect.get(detailValue.requestConfig, "verb");
   return typeof value === "string" ? value.toLowerCase() : "";
 }
 
 function targetsPanel(event: Event, detailValue: HtmxRequestDetail): boolean {
-  return (detailValue.target instanceof HTMLElement && detailValue.target.id === "annotation-panel-content")
-    || (detailValue.elt instanceof HTMLElement && detailValue.elt.id === "annotation-panel-content")
-    || (event.target instanceof HTMLElement && event.target.id === "annotation-panel-content");
+  return (
+    (detailValue.target instanceof HTMLElement &&
+      detailValue.target.id === "annotation-panel-content") ||
+    (detailValue.elt instanceof HTMLElement &&
+      detailValue.elt.id === "annotation-panel-content") ||
+    (event.target instanceof HTMLElement &&
+      event.target.id === "annotation-panel-content")
+  );
 }
 
-export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged, onRequestError }: ReviewHTMXOptions): void {
-  if (typeof htmx === "undefined") throw new Error("HTMX is unavailable on a review page");
-  htmx.config.allowEval = false;
-  htmx.config.allowNestedOobSwaps = false;
-  htmx.config.allowScriptTags = false;
-  htmx.config.historyCacheSize = 0;
-  htmx.config.selfRequestsOnly = true;
+export function configureReviewHTMX({
+  document,
+  api,
+  panel,
+  token,
+  getRevision,
+  onPanelChanged,
+  onRequestError,
+}: ReviewHTMXOptions): void {
+  if (!api) throw new Error("HTMX is unavailable on a review page");
+  api.config.allowEval = false;
+  api.config.allowNestedOobSwaps = false;
+  api.config.allowScriptTags = false;
+  api.config.historyCacheSize = 0;
+  api.config.selfRequestsOnly = true;
   let requestMutationKind: ReviewMutationKind = null;
   let requestMethod = "";
 
@@ -81,14 +111,24 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
     const requestSource = value.elt instanceof Element ? value.elt : null;
     requestMutationKind = reviewMutationKind(requestSource);
     requestMethod = requestVerb(value);
-    if (requestMethod !== "post" || typeof value.headers !== "object" || value.headers === null) return;
+    if (
+      requestMethod !== "post" ||
+      typeof value.headers !== "object" ||
+      value.headers === null
+    )
+      return;
     Reflect.set(value.headers, "X-Code-Annotator-Token", token);
     Reflect.set(value.headers, "If-Match", JSON.stringify(getRevision()));
   });
 
   document.body.addEventListener("htmx:beforeSwap", (event) => {
     const value = detail(event);
-    if (!value || !targetsPanel(event, value) || (status(value) !== 409 && status(value) !== 422)) return;
+    if (
+      !value ||
+      !targetsPanel(event, value) ||
+      (status(value) !== 409 && status(value) !== 422)
+    )
+      return;
     value.shouldSwap = true;
     value.isError = false;
   });
@@ -97,7 +137,11 @@ export function configureReviewHTMX({ panel, token, getRevision, onPanelChanged,
     const value = detail(event);
     if (!value || !targetsPanel(event, value)) return;
     const responseStatus = status(value);
-    void onPanelChanged(requestMutationKind, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
+    void onPanelChanged(
+      requestMutationKind,
+      requestMethod === "post",
+      responseStatus >= 200 && responseStatus < 300,
+    );
     requestMutationKind = null;
     requestMethod = "";
   });

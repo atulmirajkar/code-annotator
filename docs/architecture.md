@@ -145,6 +145,11 @@ adapter lives independently in `document-tree.ts`. `viewer.ts` composes it
 with focused document-search, layout, comparison-control, diff-divider,
 environment, and browser-storage modules; it owns no feature implementation.
 
+`review.ts` uses a module-scoped `ReviewContext` rather than initializer-local
+helpers. Its panel, selection, highlight, navigation, and HTMX controllers
+receive browser services explicitly. Controller startup uses `start()`; browser
+callbacks use arrow adapters, and no TypeScript callback uses `.bind(...)`.
+
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production
 TypeScript configuration excludes test files from `web/generated/`, while

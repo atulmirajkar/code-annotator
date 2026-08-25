@@ -2,6 +2,8 @@ import type { SelectionPayload } from "./types.js";
 import type { DiagramPosition, SourcePosition } from "./viewer-state.js";
 
 interface SelectionControllerOptions {
+  document: Document;
+  window: Window;
   panel: HTMLElement;
   markdown: HTMLElement;
   preview: HTMLElement;
@@ -16,6 +18,8 @@ interface SelectionControllerOptions {
 }
 
 export function createSelectionController({
+  document,
+  window,
   panel,
   markdown,
   preview,
@@ -32,16 +36,23 @@ export function createSelectionController({
   let diagramSelectionActive = false;
   let preserveSelection = false;
 
-  function bind() {
-    panel.addEventListener("pointerdown", () => { preserveSelection = true; });
+  function start() {
+    panel.addEventListener("pointerdown", () => {
+      preserveSelection = true;
+    });
     document.addEventListener("pointerup", () => {
-      window.setTimeout(() => { preserveSelection = false; }, 0);
+      window.setTimeout(() => {
+        preserveSelection = false;
+      }, 0);
     });
 
     // selectionchange covers mouse, touch, and keyboard expansion regardless
     // of which element owns focus or where a drag gesture ends.
     document.addEventListener("selectionchange", updateSelectionPreview);
-    markdown.addEventListener("pointerdown", clearDiagramSelectionOnPointerdown);
+    markdown.addEventListener(
+      "pointerdown",
+      clearDiagramSelectionOnPointerdown,
+    );
     markdown.addEventListener("click", captureDiagramClick);
     markdown.addEventListener("keydown", captureDiagramKeydown);
     // Viewer state is loaded asynchronously. Reconcile a native range that a
@@ -79,7 +90,13 @@ export function createSelectionController({
     if (!diagram) return;
     const position = diagrams.get(diagram.id);
     const exact = position?.text || "";
-    if (!position || position.endByte <= position.startByte || !documentSHA256 || !exact) return;
+    if (
+      !position ||
+      position.endByte <= position.startByte ||
+      !documentSHA256 ||
+      !exact
+    )
+      return;
     const { startByte, endByte } = position;
 
     // Diagram selection is synthetic: the SVG has no DOM text range that maps
@@ -87,7 +104,9 @@ export function createSelectionController({
     // selectionchange events until the reviewer starts another interaction.
     diagramSelectionActive = true;
     window.getSelection()?.removeAllRanges();
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
+    markdown
+      .querySelectorAll(".mermaid-diagram.annotation-selection")
+      .forEach((item) => item.classList.remove("annotation-selection"));
     diagram.classList.add("annotation-selection");
     pendingSelection = { startByte, endByte, documentSHA256 };
     selectionScope.disabled = false;
@@ -109,11 +128,18 @@ export function createSelectionController({
       return;
     }
     diagramSelectionActive = false;
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
+    markdown
+      .querySelectorAll(".mermaid-diagram.annotation-selection")
+      .forEach((diagram) => diagram.classList.remove("annotation-selection"));
     const range = selection.getRangeAt(0);
     const startSpan = sourceSpan(range.startContainer);
     const endSpan = sourceSpan(range.endContainer);
-    if (!startSpan || !endSpan || !markdown.contains(startSpan) || !markdown.contains(endSpan)) {
+    if (
+      !startSpan ||
+      !endSpan ||
+      !markdown.contains(startSpan) ||
+      !markdown.contains(endSpan)
+    ) {
       clearSelectionPreview();
       return;
     }
@@ -121,16 +147,38 @@ export function createSelectionController({
     const startPosition = sourceNodes.get(startSpan.id);
     const endPosition = sourceNodes.get(endSpan.id);
     const spans = sourceSpanRange(startSpan, endSpan);
-    const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
+    const startOffset = textOffset(
+      startSpan,
+      range.startContainer,
+      range.startOffset,
+    );
     const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
-    const exact = selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset);
-    if (!startPosition || !endPosition || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
+    const exact = selectionPreviewText(
+      range,
+      startSpan,
+      endSpan,
+      startOffset,
+      endOffset,
+    );
+    if (
+      !startPosition ||
+      !endPosition ||
+      !spans ||
+      !documentSHA256 ||
+      startOffset < 0 ||
+      endOffset < 0 ||
+      !exact
+    ) {
       clearSelectionPreview();
       return;
     }
 
-    const startByte = startPosition.startByte + utf8Length((startSpan.textContent || "").slice(0, startOffset));
-    const endByte = endPosition.startByte + utf8Length((endSpan.textContent || "").slice(0, endOffset));
+    const startByte =
+      startPosition.startByte +
+      utf8Length((startSpan.textContent || "").slice(0, startOffset));
+    const endByte =
+      endPosition.startByte +
+      utf8Length((endSpan.textContent || "").slice(0, endOffset));
     if (endByte > endPosition.endByte) {
       clearSelectionPreview();
       return;
@@ -151,22 +199,42 @@ export function createSelectionController({
     if (direct) return direct;
     // Empty source lines have a zero-length span with no text node of their
     // own, so a native selection boundary lands on the surrounding row/code.
-    return element.closest<HTMLElement>(".source-line, .diff-current")?.querySelector<HTMLElement>(".source-text") || null;
+    return (
+      element
+        .closest<HTMLElement>(".source-line, .diff-current")
+        ?.querySelector<HTMLElement>(".source-text") || null
+    );
   }
 
   // Browser Range text includes line-number and diff-marker siblings between
   // endpoints. For line-oriented code, rebuild the preview from source spans
   // only while preserving visually empty intervening rows as newlines.
-  function selectionPreviewText(range: Range, startSpan: HTMLElement, endSpan: HTMLElement, startOffset: number, endOffset: number): string {
-    const startRow = startSpan.closest<HTMLElement>(".source-line, .diff-current");
+  function selectionPreviewText(
+    range: Range,
+    startSpan: HTMLElement,
+    endSpan: HTMLElement,
+    startOffset: number,
+    endOffset: number,
+  ): string {
+    const startRow = startSpan.closest<HTMLElement>(
+      ".source-line, .diff-current",
+    );
     const endRow = endSpan.closest<HTMLElement>(".source-line, .diff-current");
-    if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement) {
+    if (
+      !startRow ||
+      !endRow ||
+      startRow.parentElement !== endRow.parentElement
+    ) {
       return range.toString();
     }
 
     const parent = startRow.parentElement;
     if (!parent) return "";
-    const rows = Array.from(parent.children).filter((row): row is HTMLElement => row instanceof HTMLElement && row.matches(".source-line, .diff-current"));
+    const rows = Array.from(parent.children).filter(
+      (row): row is HTMLElement =>
+        row instanceof HTMLElement &&
+        row.matches(".source-line, .diff-current"),
+    );
     const startIndex = rows.indexOf(startRow);
     const endIndex = rows.indexOf(endRow);
     if (startIndex < 0 || endIndex < startIndex) return "";
@@ -174,19 +242,28 @@ export function createSelectionController({
       return (startSpan.textContent || "").slice(startOffset, endOffset);
     }
 
-    return rows.slice(startIndex, endIndex + 1).map((row, index, selectedRows) => {
-      const text = row.querySelector(".source-text")?.textContent || "";
-      if (index === 0) return text.slice(startOffset);
-      if (index === selectedRows.length - 1) return text.slice(0, endOffset);
-      return text;
-    }).join("\n");
+    return rows
+      .slice(startIndex, endIndex + 1)
+      .map((row, index, selectedRows) => {
+        const text = row.querySelector(".source-text")?.textContent || "";
+        if (index === 0) return text.slice(startOffset);
+        if (index === selectedRows.length - 1) return text.slice(0, endOffset);
+        return text;
+      })
+      .join("\n");
   }
 
   // Confirm that the selection endpoints occur in document source order.
-  function sourceSpanRange(startSpan: HTMLElement, endSpan: HTMLElement): HTMLElement[] | null {
+  function sourceSpanRange(
+    startSpan: HTMLElement,
+    endSpan: HTMLElement,
+  ): HTMLElement[] | null {
     const spans = Array.from(sourceNodes.keys())
       .map((elementId) => document.getElementById(elementId))
-      .filter((element): element is HTMLElement => element instanceof HTMLElement && markdown.contains(element));
+      .filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && markdown.contains(element),
+      );
     const startIndex = spans.indexOf(startSpan);
     const endIndex = spans.indexOf(endSpan);
     if (startIndex < 0 || endIndex < startIndex) return null;
@@ -204,12 +281,21 @@ export function createSelectionController({
 
   function codeBlock(span: HTMLElement): HTMLElement | null {
     const code = span.closest<HTMLElement>("code");
-    return code && code.parentElement && code.parentElement.tagName === "PRE" ? code : null;
+    return code && code.parentElement && code.parentElement.tagName === "PRE"
+      ? code
+      : null;
   }
 
   // Convert a DOM boundary into a UTF-16 text offset within its source span.
-  function textOffset(span: HTMLElement, boundaryNode: Node, boundaryOffset: number): number {
-    if (!(span.textContent || "") && span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
+  function textOffset(
+    span: HTMLElement,
+    boundaryNode: Node,
+    boundaryOffset: number,
+  ): number {
+    if (
+      !(span.textContent || "") &&
+      span.closest(".source-line, .diff-current")?.contains(boundaryNode)
+    ) {
       return 0;
     }
     const range = document.createRange();
@@ -227,7 +313,11 @@ export function createSelectionController({
   }
 
   function clearSelectionPreview() {
-    if ((preserveSelection || panel.contains(document.activeElement)) && pendingSelection) return;
+    if (
+      (preserveSelection || panel.contains(document.activeElement)) &&
+      pendingSelection
+    )
+      return;
     clearSelectionState();
   }
 
@@ -238,7 +328,9 @@ export function createSelectionController({
   function clearSelectionState() {
     pendingSelection = null;
     diagramSelectionActive = false;
-    markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
+    markdown
+      .querySelectorAll(".mermaid-diagram.annotation-selection")
+      .forEach((diagram) => diagram.classList.remove("annotation-selection"));
     preview.hidden = true;
     previewQuote.textContent = "";
     previewRange.textContent = "";
@@ -252,7 +344,7 @@ export function createSelectionController({
   }
 
   return {
-    bind,
+    start,
     currentSelection,
     forceClearSelectionPreview,
     sourceSpan,

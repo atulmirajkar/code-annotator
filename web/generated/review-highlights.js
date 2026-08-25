@@ -11,7 +11,7 @@ export function mergeIntervals(values) {
         return merged;
     }, []);
 }
-export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length, sourceNodes, diagrams }) {
+export function createAnnotationHighlighter({ document, markdown, sourceSpan, sourceSpanRange, utf8Length, sourceNodes, diagrams, }) {
     // Highlight only anchors resolved against the current document. Stale and
     // document-level annotations remain visible in the panel without a range.
     function renderAnnotationHighlights(annotations) {
@@ -34,7 +34,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     function renderDiagramHighlights(annotations) {
         const activeRanges = annotations
             .filter(hasResolvedAnchor)
-            .map((annotation) => [annotation.anchor.startByte, annotation.anchor.endByte]);
+            .map((annotation) => [
+            annotation.anchor.startByte,
+            annotation.anchor.endByte,
+        ]);
         diagrams.forEach((position) => {
             const diagram = document.getElementById(position.elementId);
             if (!diagram || !markdown.contains(diagram))
@@ -47,7 +50,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
             .map((elementId) => document.getElementById(elementId))
             .filter((element) => element instanceof HTMLElement && markdown.contains(element));
         const startSpan = spans.find((span) => containsSourceOffset(span, startByte, false));
-        const endSpan = spans.slice().reverse().find((span) => containsSourceOffset(span, endByte, true));
+        const endSpan = spans
+            .slice()
+            .reverse()
+            .find((span) => containsSourceOffset(span, endByte, true));
         if (!startSpan || !endSpan)
             return null;
         const startNode = sourceTextNode(startSpan);
@@ -68,9 +74,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     }
     function containsSourceOffset(span, offset, endBoundary) {
         const position = sourceNodes.get(span.id);
-        return Boolean(position) && (endBoundary
-            ? position.startByte < offset && offset <= position.endByte
-            : position.startByte <= offset && offset < position.endByte);
+        return (Boolean(position) &&
+            (endBoundary
+                ? position.startByte < offset && offset <= position.endByte
+                : position.startByte <= offset && offset < position.endByte));
     }
     function byteOffsetToTextOffset(span, sourceOffset) {
         const position = sourceNodes.get(span.id);
@@ -127,10 +134,14 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         });
     }
     function clearFallbackHighlights() {
-        markdown.querySelectorAll("mark.annotation-highlight-fallback").forEach((mark) => {
+        markdown
+            .querySelectorAll("mark.annotation-highlight-fallback")
+            .forEach((mark) => {
             mark.replaceWith(document.createTextNode(mark.textContent || ""));
         });
-        markdown.querySelectorAll(".source-text").forEach((span) => span.normalize());
+        markdown
+            .querySelectorAll(".source-text")
+            .forEach((span) => span.normalize());
     }
     return {
         renderAnnotationHighlights,

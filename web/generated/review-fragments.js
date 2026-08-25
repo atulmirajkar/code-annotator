@@ -1,12 +1,13 @@
 export function configureLifecycleForm(form, transitions, preserveValues) {
     const status = form.elements.namedItem("status");
     const role = form.elements.namedItem("role");
-    if (!(status instanceof HTMLSelectElement) || !(role instanceof HTMLSelectElement))
+    if (!(status instanceof HTMLSelectElement) ||
+        !(role instanceof HTMLSelectElement))
         return;
     const behavior = transitions.find((candidate) => candidate.status === status.value);
     if (!behavior)
         return;
-    const roleOption = document.createElement("option");
+    const roleOption = form.ownerDocument.createElement("option");
     roleOption.value = behavior.role;
     roleOption.textContent = behavior.role === "agent" ? "Agent" : "Reviewer";
     role.replaceChildren(roleOption);

@@ -78,6 +78,9 @@ the viewer's injected HTMX security configuration;
 is included in `web/state_modules_test.go`'s no-DOM architecture guard.
 `document-tree.test.ts` covers directory toggling, persistence, and restoration
 after an HTMX fragment replacement.
+`review-htmx.test.ts` verifies the injected HTMX security configuration and
+mutation headers; `entrypoints.test.ts` also covers an injected empty review
+root.
 
 The server explicitly embeds and serves each generated viewer component under
 `/static/`. When adding a browser module imported by `viewer.ts`, update

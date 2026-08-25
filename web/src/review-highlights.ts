@@ -1,40 +1,66 @@
 import type { AnnotationBrowserState, SourcePosition } from "./viewer-state.js";
 
 interface AnnotationHighlighterOptions {
+  document: Document;
   markdown: HTMLElement;
   sourceSpan: (node: Node) => HTMLElement | null;
-  sourceSpanRange: (startSpan: HTMLElement, endSpan: HTMLElement) => HTMLElement[] | null;
+  sourceSpanRange: (
+    startSpan: HTMLElement,
+    endSpan: HTMLElement,
+  ) => HTMLElement[] | null;
   utf8Length: (value: string) => number;
   sourceNodes: ReadonlyMap<string, SourcePosition>;
   diagrams: ReadonlyMap<string, SourcePosition>;
 }
 
-export function mergeIntervals(values: ReadonlyArray<readonly [number, number]>): Array<[number, number]> {
+export function mergeIntervals(
+  values: ReadonlyArray<readonly [number, number]>,
+): Array<[number, number]> {
   const sorted = values
     .map(([start, end]): [number, number] => [start, end])
     .sort((left, right) => left[0] - right[0]);
-  return sorted.reduce((merged, current) => {
-    const previous = merged[merged.length - 1];
-    if (previous && current[0] <= previous[1]) previous[1] = Math.max(previous[1], current[1]);
-    else merged.push(current);
-    return merged;
-  }, [] as Array<[number, number]>);
+  return sorted.reduce(
+    (merged, current) => {
+      const previous = merged[merged.length - 1];
+      if (previous && current[0] <= previous[1])
+        previous[1] = Math.max(previous[1], current[1]);
+      else merged.push(current);
+      return merged;
+    },
+    [] as Array<[number, number]>,
+  );
 }
 
-export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRange, utf8Length, sourceNodes, diagrams }: AnnotationHighlighterOptions) {
+export function createAnnotationHighlighter({
+  document,
+  markdown,
+  sourceSpan,
+  sourceSpanRange,
+  utf8Length,
+  sourceNodes,
+  diagrams,
+}: AnnotationHighlighterOptions) {
   // Highlight only anchors resolved against the current document. Stale and
   // document-level annotations remain visible in the panel without a range.
-  function renderAnnotationHighlights(annotations: ReadonlyArray<AnnotationBrowserState>): void {
+  function renderAnnotationHighlights(
+    annotations: ReadonlyArray<AnnotationBrowserState>,
+  ): void {
     clearFallbackHighlights();
     renderDiagramHighlights(annotations);
     const ranges = annotations
       .filter(hasResolvedAnchor)
-      .map((annotation) => sourceRange(annotation.anchor.startByte, annotation.anchor.endByte))
+      .map((annotation) =>
+        sourceRange(annotation.anchor.startByte, annotation.anchor.endByte),
+      )
       .filter((range): range is Range => range !== null);
 
     if (globalThis.CSS && CSS.highlights && typeof Highlight !== "undefined") {
       CSS.highlights.delete("code-annotator-annotations");
-      if (ranges.length > 0) CSS.highlights.set("code-annotator-annotations", new Highlight(...ranges));
+      if (ranges.length > 0)
+        CSS.highlights.set(
+          "code-annotator-annotations",
+          new Highlight(...ranges),
+        );
       return;
     }
     renderFallbackHighlights(ranges);
@@ -42,23 +68,42 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
 
   // Diagram annotations highlight the rendered region as a whole; their
   // hidden source ranges remain available for quote previews and fallback APIs.
-  function renderDiagramHighlights(annotations: ReadonlyArray<AnnotationBrowserState>): void {
+  function renderDiagramHighlights(
+    annotations: ReadonlyArray<AnnotationBrowserState>,
+  ): void {
     const activeRanges = annotations
       .filter(hasResolvedAnchor)
-      .map((annotation): [number, number] => [annotation.anchor.startByte, annotation.anchor.endByte]);
+      .map((annotation): [number, number] => [
+        annotation.anchor.startByte,
+        annotation.anchor.endByte,
+      ]);
     diagrams.forEach((position) => {
       const diagram = document.getElementById(position.elementId);
       if (!diagram || !markdown.contains(diagram)) return;
-      diagram.classList.toggle("annotation-highlight-region", activeRanges.some((range) => range[0] === position.startByte && range[1] === position.endByte));
+      diagram.classList.toggle(
+        "annotation-highlight-region",
+        activeRanges.some(
+          (range) =>
+            range[0] === position.startByte && range[1] === position.endByte,
+        ),
+      );
     });
   }
 
   function sourceRange(startByte: number, endByte: number): Range | null {
     const spans = Array.from(sourceNodes.keys())
       .map((elementId) => document.getElementById(elementId))
-      .filter((element): element is HTMLElement => element instanceof HTMLElement && markdown.contains(element));
-    const startSpan = spans.find((span) => containsSourceOffset(span, startByte, false));
-    const endSpan = spans.slice().reverse().find((span) => containsSourceOffset(span, endByte, true));
+      .filter(
+        (element): element is HTMLElement =>
+          element instanceof HTMLElement && markdown.contains(element),
+      );
+    const startSpan = spans.find((span) =>
+      containsSourceOffset(span, startByte, false),
+    );
+    const endSpan = spans
+      .slice()
+      .reverse()
+      .find((span) => containsSourceOffset(span, endByte, true));
     if (!startSpan || !endSpan) return null;
 
     const startNode = sourceTextNode(startSpan);
@@ -77,14 +122,24 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
     return range.collapsed ? null : range;
   }
 
-  function containsSourceOffset(span: HTMLElement, offset: number, endBoundary: boolean): boolean {
+  function containsSourceOffset(
+    span: HTMLElement,
+    offset: number,
+    endBoundary: boolean,
+  ): boolean {
     const position = sourceNodes.get(span.id);
-    return Boolean(position) && (endBoundary
-      ? position!.startByte < offset && offset <= position!.endByte
-      : position!.startByte <= offset && offset < position!.endByte);
+    return (
+      Boolean(position) &&
+      (endBoundary
+        ? position!.startByte < offset && offset <= position!.endByte
+        : position!.startByte <= offset && offset < position!.endByte)
+    );
   }
 
-  function byteOffsetToTextOffset(span: HTMLElement, sourceOffset: number): number {
+  function byteOffsetToTextOffset(
+    span: HTMLElement,
+    sourceOffset: number,
+  ): number {
     const position = sourceNodes.get(span.id);
     if (!position) return -1;
     const target = sourceOffset - position.startByte;
@@ -118,7 +173,8 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
         const length = (span.textContent || "").length;
         const start = span === startSpan ? range.startOffset : 0;
         const end = span === endSpan ? range.endOffset : length;
-        if (end > start) intervals.set(span, [...(intervals.get(span) || []), [start, end]]);
+        if (end > start)
+          intervals.set(span, [...(intervals.get(span) || []), [start, end]]);
       });
     });
 
@@ -138,10 +194,14 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
   }
 
   function clearFallbackHighlights() {
-    markdown.querySelectorAll("mark.annotation-highlight-fallback").forEach((mark) => {
-      mark.replaceWith(document.createTextNode(mark.textContent || ""));
-    });
-    markdown.querySelectorAll(".source-text").forEach((span) => span.normalize());
+    markdown
+      .querySelectorAll("mark.annotation-highlight-fallback")
+      .forEach((mark) => {
+        mark.replaceWith(document.createTextNode(mark.textContent || ""));
+      });
+    markdown
+      .querySelectorAll(".source-text")
+      .forEach((span) => span.normalize());
   }
 
   return {
@@ -150,6 +210,10 @@ export function createAnnotationHighlighter({ markdown, sourceSpan, sourceSpanRa
   };
 }
 
-function hasResolvedAnchor(annotation: AnnotationBrowserState): annotation is AnnotationBrowserState & { anchor: NonNullable<AnnotationBrowserState["anchor"]> } {
+function hasResolvedAnchor(
+  annotation: AnnotationBrowserState,
+): annotation is AnnotationBrowserState & {
+  anchor: NonNullable<AnnotationBrowserState["anchor"]>;
+} {
   return annotation.anchor !== null && annotation.anchor.state !== "stale";
 }

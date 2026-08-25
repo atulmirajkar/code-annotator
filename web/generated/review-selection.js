@@ -1,11 +1,15 @@
-export function createSelectionController({ panel, markdown, preview, previewQuote, previewRange, selectionScope, documentScope, documentSHA256, sourceNodes, diagrams, onSelectionChanged, }) {
+export function createSelectionController({ document, window, panel, markdown, preview, previewQuote, previewRange, selectionScope, documentScope, documentSHA256, sourceNodes, diagrams, onSelectionChanged, }) {
     let pendingSelection = null;
     let diagramSelectionActive = false;
     let preserveSelection = false;
-    function bind() {
-        panel.addEventListener("pointerdown", () => { preserveSelection = true; });
+    function start() {
+        panel.addEventListener("pointerdown", () => {
+            preserveSelection = true;
+        });
         document.addEventListener("pointerup", () => {
-            window.setTimeout(() => { preserveSelection = false; }, 0);
+            window.setTimeout(() => {
+                preserveSelection = false;
+            }, 0);
         });
         // selectionchange covers mouse, touch, and keyboard expansion regardless
         // of which element owns focus or where a drag gesture ends.
@@ -48,7 +52,10 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
             return;
         const position = diagrams.get(diagram.id);
         const exact = position?.text || "";
-        if (!position || position.endByte <= position.startByte || !documentSHA256 || !exact)
+        if (!position ||
+            position.endByte <= position.startByte ||
+            !documentSHA256 ||
+            !exact)
             return;
         const { startByte, endByte } = position;
         // Diagram selection is synthetic: the SVG has no DOM text range that maps
@@ -56,7 +63,9 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         // selectionchange events until the reviewer starts another interaction.
         diagramSelectionActive = true;
         window.getSelection()?.removeAllRanges();
-        markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((item) => item.classList.remove("annotation-selection"));
+        markdown
+            .querySelectorAll(".mermaid-diagram.annotation-selection")
+            .forEach((item) => item.classList.remove("annotation-selection"));
         diagram.classList.add("annotation-selection");
         pendingSelection = { startByte, endByte, documentSHA256 };
         selectionScope.disabled = false;
@@ -78,11 +87,16 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
             return;
         }
         diagramSelectionActive = false;
-        markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
+        markdown
+            .querySelectorAll(".mermaid-diagram.annotation-selection")
+            .forEach((diagram) => diagram.classList.remove("annotation-selection"));
         const range = selection.getRangeAt(0);
         const startSpan = sourceSpan(range.startContainer);
         const endSpan = sourceSpan(range.endContainer);
-        if (!startSpan || !endSpan || !markdown.contains(startSpan) || !markdown.contains(endSpan)) {
+        if (!startSpan ||
+            !endSpan ||
+            !markdown.contains(startSpan) ||
+            !markdown.contains(endSpan)) {
             clearSelectionPreview();
             return;
         }
@@ -92,12 +106,20 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         const startOffset = textOffset(startSpan, range.startContainer, range.startOffset);
         const endOffset = textOffset(endSpan, range.endContainer, range.endOffset);
         const exact = selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset);
-        if (!startPosition || !endPosition || !spans || !documentSHA256 || startOffset < 0 || endOffset < 0 || !exact) {
+        if (!startPosition ||
+            !endPosition ||
+            !spans ||
+            !documentSHA256 ||
+            startOffset < 0 ||
+            endOffset < 0 ||
+            !exact) {
             clearSelectionPreview();
             return;
         }
-        const startByte = startPosition.startByte + utf8Length((startSpan.textContent || "").slice(0, startOffset));
-        const endByte = endPosition.startByte + utf8Length((endSpan.textContent || "").slice(0, endOffset));
+        const startByte = startPosition.startByte +
+            utf8Length((startSpan.textContent || "").slice(0, startOffset));
+        const endByte = endPosition.startByte +
+            utf8Length((endSpan.textContent || "").slice(0, endOffset));
         if (endByte > endPosition.endByte) {
             clearSelectionPreview();
             return;
@@ -119,7 +141,9 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
             return direct;
         // Empty source lines have a zero-length span with no text node of their
         // own, so a native selection boundary lands on the surrounding row/code.
-        return element.closest(".source-line, .diff-current")?.querySelector(".source-text") || null;
+        return (element
+            .closest(".source-line, .diff-current")
+            ?.querySelector(".source-text") || null);
     }
     // Browser Range text includes line-number and diff-marker siblings between
     // endpoints. For line-oriented code, rebuild the preview from source spans
@@ -127,13 +151,16 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
     function selectionPreviewText(range, startSpan, endSpan, startOffset, endOffset) {
         const startRow = startSpan.closest(".source-line, .diff-current");
         const endRow = endSpan.closest(".source-line, .diff-current");
-        if (!startRow || !endRow || startRow.parentElement !== endRow.parentElement) {
+        if (!startRow ||
+            !endRow ||
+            startRow.parentElement !== endRow.parentElement) {
             return range.toString();
         }
         const parent = startRow.parentElement;
         if (!parent)
             return "";
-        const rows = Array.from(parent.children).filter((row) => row instanceof HTMLElement && row.matches(".source-line, .diff-current"));
+        const rows = Array.from(parent.children).filter((row) => row instanceof HTMLElement &&
+            row.matches(".source-line, .diff-current"));
         const startIndex = rows.indexOf(startRow);
         const endIndex = rows.indexOf(endRow);
         if (startIndex < 0 || endIndex < startIndex)
@@ -141,14 +168,17 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         if (startIndex === endIndex) {
             return (startSpan.textContent || "").slice(startOffset, endOffset);
         }
-        return rows.slice(startIndex, endIndex + 1).map((row, index, selectedRows) => {
+        return rows
+            .slice(startIndex, endIndex + 1)
+            .map((row, index, selectedRows) => {
             const text = row.querySelector(".source-text")?.textContent || "";
             if (index === 0)
                 return text.slice(startOffset);
             if (index === selectedRows.length - 1)
                 return text.slice(0, endOffset);
             return text;
-        }).join("\n");
+        })
+            .join("\n");
     }
     // Confirm that the selection endpoints occur in document source order.
     function sourceSpanRange(startSpan, endSpan) {
@@ -172,11 +202,14 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
     }
     function codeBlock(span) {
         const code = span.closest("code");
-        return code && code.parentElement && code.parentElement.tagName === "PRE" ? code : null;
+        return code && code.parentElement && code.parentElement.tagName === "PRE"
+            ? code
+            : null;
     }
     // Convert a DOM boundary into a UTF-16 text offset within its source span.
     function textOffset(span, boundaryNode, boundaryOffset) {
-        if (!(span.textContent || "") && span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
+        if (!(span.textContent || "") &&
+            span.closest(".source-line, .diff-current")?.contains(boundaryNode)) {
             return 0;
         }
         const range = document.createRange();
@@ -193,7 +226,8 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         return new TextEncoder().encode(value).length;
     }
     function clearSelectionPreview() {
-        if ((preserveSelection || panel.contains(document.activeElement)) && pendingSelection)
+        if ((preserveSelection || panel.contains(document.activeElement)) &&
+            pendingSelection)
             return;
         clearSelectionState();
     }
@@ -203,7 +237,9 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
     function clearSelectionState() {
         pendingSelection = null;
         diagramSelectionActive = false;
-        markdown.querySelectorAll(".mermaid-diagram.annotation-selection").forEach((diagram) => diagram.classList.remove("annotation-selection"));
+        markdown
+            .querySelectorAll(".mermaid-diagram.annotation-selection")
+            .forEach((diagram) => diagram.classList.remove("annotation-selection"));
         preview.hidden = true;
         previewQuote.textContent = "";
         previewRange.textContent = "";
@@ -215,7 +251,7 @@ export function createSelectionController({ panel, markdown, preview, previewQuo
         return pendingSelection;
     }
     return {
-        bind,
+        start,
         currentSelection,
         forceClearSelectionPreview,
         sourceSpan,

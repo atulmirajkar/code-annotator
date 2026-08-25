@@ -57,6 +57,9 @@ and render lifecycle is isolated and directly tested in `document-tree.ts`.
 The remaining viewer behavior is split by responsibility into document-search,
 layout, comparison-control, diff-divider, environment, and storage modules;
 `viewer.ts` now contains only security configuration and composition.
+The review initializer is flattened around a typed context, all review browser
+ports are explicit, and callback adapters consistently use arrow functions
+without `.bind(...)`.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.

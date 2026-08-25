@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { initializeMermaid } from "./mermaid.js";
+import { initializeReview } from "./review.js";
 import { initializeViewer } from "./viewer.js";
 
 describe("explicit browser initializers", () => {
@@ -46,6 +47,13 @@ describe("explicit browser initializers", () => {
       historyCacheSize: 0,
       selfRequestsOnly: true,
     });
+  });
+
+  it("lets review initialization use an injected empty root", async () => {
+    document.body.innerHTML = "";
+    await expect(
+      initializeReview({ document, window, htmx: null }),
+    ).resolves.toBeUndefined();
   });
 
   it("renders Mermaid through injected ports", async () => {

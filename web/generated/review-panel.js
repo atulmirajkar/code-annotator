@@ -1,7 +1,7 @@
 const reviewPanelMinWidth = 320;
 const reviewPanelMaxWidth = 640;
 const reviewPanelWidthStep = 24;
-export function createReviewPanelController({ panel, form, formStatus, addAnnotationButton, closeAnnotationButton, layout, resizeHandle, documentPath, }) {
+export function createReviewPanelController({ panel, form, formStatus, addAnnotationButton, closeAnnotationButton, layout, resizeHandle, documentPath, storage, }) {
     const reviewPanelWidthKey = `code-annotator-review-panel-width:${documentPath}`;
     let reviewPanelWidth = restoreReviewPanelWidth() || 368;
     applyReviewPanelWidth(reviewPanelWidth);
@@ -44,7 +44,7 @@ export function createReviewPanelController({ panel, form, formStatus, addAnnota
     }
     function restoreReviewPanelWidth() {
         try {
-            const stored = window.localStorage.getItem(reviewPanelWidthKey);
+            const stored = storage.getItem(reviewPanelWidthKey);
             const width = Number.parseInt(stored || "", 10);
             return Number.isInteger(width) ? clampReviewPanelWidth(width) : null;
         }
@@ -54,7 +54,7 @@ export function createReviewPanelController({ panel, form, formStatus, addAnnota
     }
     function persistReviewPanelWidth(width) {
         try {
-            window.localStorage.setItem(reviewPanelWidthKey, String(width));
+            storage.setItem(reviewPanelWidthKey, String(width));
         }
         catch (_) {
             // Ignore storage failures; the resize still applies for this session.
