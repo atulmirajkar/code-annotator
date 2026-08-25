@@ -100,6 +100,18 @@ comparison selector. HTML retains presentation, semantic IDs, accessibility
 attributes, links, and normal form semantics—not application state encoded in
 custom attributes.
 
+Custom attributes are not the only remaining state concern. The document
+sidebar currently enumerates rendered list items to reconstruct its catalog,
+tree, changed/open-comment filters, visible results, and badges. Review code
+also has smaller cases that infer visible annotations, mutation kind, conflict
+feedback, or a root-page document from nodes. These are documented migration
+debt, not the target architecture. DOM reads are valid for native selection,
+focus, form input, geometry, events, rendered selection text, and semantic-ID
+lookup; application decisions must instead consume runtime-validated state or
+explicit interaction values. The ordered remediation is commit 8A typed
+document state, commit 8B document activation, commit 9 comparison state, and
+commit 10 residual view-adapter cleanup.
+
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production
 TypeScript configuration excludes test files from `web/generated/`, while

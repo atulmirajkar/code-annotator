@@ -3,9 +3,9 @@
 ## Status
 
 Implementation in progress. Commit gates 0 through 7, commit 7 review
-follow-up A, the commit 4 review follow-up, and the intervening role-only
-compatibility slice are approved. Commit 7 review follow-up B is implemented
-and awaiting maintainer review.
+follow-ups A and B, the commit 4 review follow-up, and the intervening role-only
+compatibility slice are approved. Commit 7 review follow-up C is implemented
+as a planning and architecture gate and awaits maintainer review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -85,6 +85,46 @@ binary, and served from the viewer origin. The application will not use a CDN
 at runtime. HTMX 4 is pre-release and is not part of this design.
 
 No frontend framework, JSX renderer, hyperscript, or HTMX extension is planned.
+
+### DOM/state boundary
+
+Removing custom attributes is necessary but not sufficient. Rendered nodes,
+classes, text, links, `hidden`, and accessibility attributes must not become an
+alternative application-state store.
+
+The governing rule is:
+
+> TypeScript may read user interaction and browser layout from the DOM, but it
+> must not reconstruct document, annotation, comparison, or workflow state
+> from rendered nodes.
+
+Permitted DOM inputs are native `Selection` and `Range`, focus, pointer and
+keyboard events, form control values, measured geometry, rendered text needed
+to map a native selection, and semantic-ID lookup used to project typed state
+onto an element. Classes, visibility, labels, and accessibility attributes are
+outputs of that projection, not inputs to domain decisions.
+
+The remaining reviewed debt is:
+
+- `viewer.ts` enumerates document `<li>` nodes, derives paths, changed status,
+  filter matches, visible results, and open-comment badges from or into DOM;
+- `document-tree.ts` combines tree nodes with `HTMLLIElement` instances and
+  treats their visibility as filtering state;
+- source-mode initialization derives state from the active tab and rewrites
+  every document link;
+- comparison JSON is asserted into an interface without runtime validation;
+- `review.ts` derives visible annotations, mutation kind, and conflict feedback
+  from swapped card/form/feedback nodes, and its root-page document fallback
+  reads the active navigation link;
+- source-range ordering still enumerates rendered spans even though viewer
+  state already provides ordered semantic identities; and
+- Mermaid obtains diagram definitions by treating rendered source text as its
+  input model.
+
+Migration does not ban `querySelector`. Entry points and view adapters still
+need element lookup and event delegation. Pure state modules, however, must be
+DOM-free and protected by an architecture test that rejects browser globals,
+DOM element types, selectors, and datasets in those modules.
 
 ## Goals
 
@@ -642,7 +682,7 @@ Go/race tests, vet, and diff checks.
 
 ### Commit 7 review follow-up B: migrate annotation and source state
 
-Status: implemented in the current review commit; awaiting maintainer approval.
+Status: implemented and approved.
 
 Scope:
 
@@ -670,15 +710,52 @@ Implementation notes:
 Checks: unit, renderer/server, `check:web`, Go/race, annotation and Mermaid
 Playwright tests.
 
-### Commit 8: server-render the document tree and benchmark filtering
+### Commit 7 review follow-up C: codify the DOM/state boundary
+
+Status: implemented in the current documentation review commit; awaiting
+maintainer approval.
+
+Scope:
+
+- define legitimate browser DOM inputs separately from application state;
+- inventory remaining node-as-state logic across document, comparison, review,
+  source-range, and Mermaid modules;
+- split document state modeling from document-tree activation so each remains
+  independently reviewable;
+- require runtime validation at every JSON boundary and DOM-free pure state
+  modules;
+- update all handoff documentation and stop before implementation.
+
+Checks: documentation consistency and diff checks.
+
+### Commit 8A: establish typed document catalog state
+
+Scope:
+
+- add a versioned, runtime-validated document catalog boundary containing
+  identity, kind, selected state, changed state, navigation URL, and open-comment
+  count;
+- extract pure document tree construction, filtering, result ordering, counts,
+  and status-label derivation into DOM-free TypeScript with unit tests;
+- add an architecture test that keeps designated pure state modules free of
+  browser globals, DOM types, selectors, and datasets;
+- do not activate new rendering or filtering behavior in this commit.
+
+Checks: parser and pure-state unit tests, catalog handler tests, `check:web`,
+full Go/race, vet, and diff checks.
+
+### Commit 8B: server-render the document tree and benchmark filtering
 
 Scope:
 
 - add recursive document-tree and summary templates;
 - add the filtered document UI handler and 5,000-path benchmark;
 - activate debounced server filtering if the acceptance threshold is met;
-- retain the small keyboard/directory-preference adapter;
-- remove `document-tree.ts` and manual badge mutation when unused;
+- retain a small keyboard/directory-preference view adapter driven by typed
+  catalog/filter results;
+- remove flat `<li>` enumeration, DOM-derived visible-result logic,
+  `document-tree.ts`, manual badge mutation, source-mode link rewriting, and
+  the remaining document datasets when unused;
 - update generated assets and documentation with the measured decision.
 
 Checks: unit, benchmark, server, `check:web`, Go/race, navigation Playwright.
@@ -688,6 +765,7 @@ Checks: unit, benchmark, server, `check:web`, Go/race, navigation Playwright.
 Scope:
 
 - add the comparison template and form handler;
+- runtime-validate comparison JSON while both paths coexist;
 - activate HTML selection and preserve the current URL/mode;
 - remove the comparison JSON renderer from `viewer.ts` while retaining JSON
   API compatibility;
@@ -703,6 +781,9 @@ Scope:
 - replace whole-file IIFEs with small entrypoints and exported initializers;
 - inject roots, storage, location, observers, and narrow browser ports;
 - extract remaining pure selection/highlight/preference functions;
+- replace visible-card, mutation-class, conflict-text, active-link,
+  source-span-order, and Mermaid-source inference with typed state or explicit
+  interaction inputs;
 - add delegated listeners and lifecycle cleanup;
 - add typed lint rules only when the code is ready to pass them without broad
   suppressions;

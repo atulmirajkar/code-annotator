@@ -50,6 +50,14 @@ rendering, templates, TypeScript, and Sass against a shrinking per-file
 `data-*` allowlist. Only document-tree and comparison-selector attributes remain
 approved; new attributes and dataset consumers fail that test.
 
+Frontend state modules must remain independently unit testable and DOM-free.
+They accept primitives or validated interfaces and return state or render
+instructions; they do not use `document`, DOM element types, selectors,
+classes, visibility, labels, or datasets as inputs. Entry points and view
+adapters may query elements to bind events and project typed state. Commit 8A
+will add an automated architecture check for this module boundary before the
+document catalog migration is activated.
+
 ## Run from source
 
 From the repository root:

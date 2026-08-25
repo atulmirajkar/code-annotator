@@ -48,6 +48,10 @@ typed source, diagram, annotation, lifecycle, revision, and digest state.
 Rendered review content carries semantic IDs only; TypeScript joins those IDs
 to typed in-memory maps. The remaining allowlisted attributes belong only to
 the document tree and comparison selector, which have separate review gates.
+The same migration rule applies when no custom attribute is involved: rendered
+nodes, classes, text, links, and visibility are presentation rather than an
+application-state store. Remaining document-tree, comparison, and smaller view
+adapter violations are explicitly tracked in the milestone design.
 
 ## Usage
 
