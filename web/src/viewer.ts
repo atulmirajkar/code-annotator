@@ -172,9 +172,10 @@ function bindTopbarHeight(
   const topbar = document.querySelector<HTMLElement>(".topbar");
   if (!topbar) return;
   updateTopbarHeight(document, topbar);
-  new ResizeObserver(updateTopbarHeight.bind(null, document, topbar)).observe(
-    topbar,
+  const observer = new ResizeObserver(() =>
+    updateTopbarHeight(document, topbar),
   );
+  observer.observe(topbar);
 }
 
 function updateTopbarHeight(document: Document, topbar: HTMLElement): void {
