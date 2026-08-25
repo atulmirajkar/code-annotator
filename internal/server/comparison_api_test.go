@@ -120,6 +120,39 @@ func TestComparisonSelectEndpointPinsCommit(t *testing.T) {
 	}
 }
 
+func TestComparisonSelectFormPinsCommitAndRefreshesPage(t *testing.T) {
+	t.Parallel()
+	viewer, initial, _ := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
+	request := httptest.NewRequest(http.MethodPost, "/ui/review/git-comparison", strings.NewReader("commit="+initial))
+	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	request.Header.Set("Origin", testComparisonOrigin)
+	request.Header.Set(comparisonTokenHeader, testComparisonToken)
+	response := httptest.NewRecorder()
+	viewer.Handler().ServeHTTP(response, request)
+
+	if response.Code != http.StatusNoContent || response.Header().Get("HX-Refresh") != "true" {
+		t.Fatalf("form response = %d, HX-Refresh %q; body: %s", response.Code, response.Header().Get("HX-Refresh"), response.Body.String())
+	}
+	if got := getComparisonState(t, viewer.Handler()).ActiveCommit; got != initial {
+		t.Fatalf("active commit = %s, want %s", got, initial)
+	}
+}
+
+func TestComparisonControlIsServerRenderedWithoutCustomData(t *testing.T) {
+	t.Parallel()
+	viewer, initial, tip := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)
+	response := getResponse(t, viewer.Handler(), "/view/main.go?mode=diff")
+	body := response.Body.String()
+	for _, expected := range []string{`action="/ui/review/git-comparison"`, `name="commit"`, `value="` + initial + `"`, `value="` + tip + `"`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("comparison control missing %q:\n%s", expected, body)
+		}
+	}
+	if strings.Contains(body, "data-active-commit") {
+		t.Fatal("comparison state leaked into a custom data attribute")
+	}
+}
+
 func TestComparisonSelectRejections(t *testing.T) {
 	t.Parallel()
 	viewer, initial, _ := newComparisonAPIServer(t, testComparisonOrigin, testComparisonToken)

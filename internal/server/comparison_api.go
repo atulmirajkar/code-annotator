@@ -32,6 +32,13 @@ type comparisonStateView struct {
 	Options       []comparisonOptionView `json:"options"`
 }
 
+type comparisonControlView struct {
+	ActiveCommit string
+	ActiveShort  string
+	ActiveListed bool
+	Options      []comparisonOptionView
+}
+
 // comparisonSelection is the accepted selection request body.
 type comparisonSelection struct {
 	Commit string `json:"commit"`
@@ -62,6 +69,17 @@ func (s *Server) comparisonState(ctx context.Context) comparisonStateView {
 	return view
 }
 
+func newComparisonControlView(state comparisonStateView) comparisonControlView {
+	view := comparisonControlView{ActiveCommit: state.ActiveCommit, ActiveShort: state.ActiveShort, Options: state.Options}
+	for _, option := range state.Options {
+		if option.Commit == state.ActiveCommit {
+			view.ActiveListed = true
+			break
+		}
+	}
+	return view
+}
+
 // protectComparisonMutation enforces the loopback origin, control token, and
 // JSON content type before a selection handler runs. It mirrors the annotation
 // mutation boundary but uses the distinct comparison control token.
@@ -83,6 +101,30 @@ func (s *Server) protectComparisonMutation(next http.Handler) http.Handler {
 		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
 		if err != nil || mediaType != "application/json" {
 			http.Error(response, "Content-Type must be application/json", http.StatusUnsupportedMediaType)
+			return
+		}
+		request.Body = http.MaxBytesReader(response, request.Body, maxComparisonMutationBytes)
+		next.ServeHTTP(response, request)
+	})
+}
+
+func (s *Server) protectComparisonFormMutation(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
+		if s.comparison == nil || s.comparison.token == "" {
+			http.NotFound(response, request)
+			return
+		}
+		if request.Header.Get("Origin") != s.comparison.origin {
+			http.Error(response, "forbidden comparison origin", http.StatusForbidden)
+			return
+		}
+		if subtle.ConstantTimeCompare([]byte(request.Header.Get(comparisonTokenHeader)), []byte(s.comparison.token)) != 1 {
+			http.Error(response, "invalid comparison token", http.StatusForbidden)
+			return
+		}
+		mediaType, _, err := mime.ParseMediaType(request.Header.Get("Content-Type"))
+		if err != nil || mediaType != "application/x-www-form-urlencoded" {
+			http.Error(response, "Content-Type must be application/x-www-form-urlencoded", http.StatusUnsupportedMediaType)
 			return
 		}
 		request.Body = http.MaxBytesReader(response, request.Body, maxComparisonMutationBytes)
@@ -120,6 +162,24 @@ func (s *Server) handleComparisonSelect(response http.ResponseWriter, request *h
 		writeComparisonError(response, http.StatusBadRequest, "commit is not a selectable comparison option")
 	default:
 		writeComparisonError(response, http.StatusBadGateway, "the Git comparison could not be updated")
+	}
+}
+
+func (s *Server) handleComparisonSelectForm(response http.ResponseWriter, request *http.Request) {
+	if err := request.ParseForm(); err != nil {
+		http.Error(response, "invalid comparison selection", http.StatusBadRequest)
+		return
+	}
+	commit := strings.ToLower(strings.TrimSpace(request.Form.Get("commit")))
+	_, err := s.comparison.selectCommit(request.Context(), commit)
+	switch {
+	case err == nil:
+		response.Header().Set("HX-Refresh", "true")
+		response.WriteHeader(http.StatusNoContent)
+	case errors.Is(err, errUnknownCommit):
+		http.Error(response, "commit is not a selectable comparison option", http.StatusBadRequest)
+	default:
+		http.Error(response, "the Git comparison could not be updated", http.StatusBadGateway)
 	}
 }
 

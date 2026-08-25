@@ -5,8 +5,8 @@
 Implementation in progress. Commit gates 0 through 7, commit 7 review
 follow-ups A and B, the commit 4 review follow-up, and the intervening role-only
 compatibility slice are approved. Commit 7 review follow-up C is approved.
-Commits 8A and 8B are implemented; the maintainer approved continuing through commits
-8B, 9, and 10 before the next combined review.
+Commits 8A, 8B, and 9 are implemented; the maintainer approved continuing
+through commit 10 before the next combined review.
 
 This document defines milestone 17 in
 [`../../project_status.md`](../../project_status.md). It supersedes the
@@ -790,6 +790,8 @@ Implementation notes:
 
 ### Commit 9: server-render the comparison selector
 
+Status: implemented.
+
 Scope:
 
 - add the comparison template and form handler;
@@ -801,6 +803,16 @@ Scope:
 
 Checks: comparison unit/handler/concurrency tests, `check:web`, full Go/race,
 comparison Playwright.
+
+Implementation notes:
+
+- the initial page renders the bounded option list and selected commit;
+- `POST /ui/review/git-comparison` reuses the guarded comparison operation and
+  returns `HX-Refresh`, preserving the current document and mode;
+- TypeScript only supplies the comparison token header and submit-on-change;
+- the JSON API remains compatible, and `comparison-state.ts` provides a tested
+  validator for consumers of its unknown wire payload;
+- the final custom `data-*` state attribute is removed.
 
 ### Commit 10: make the remaining TypeScript explicitly instantiable
 

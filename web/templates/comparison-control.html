@@ -1,0 +1,10 @@
+{{define "comparison-control"}}
+<form class="diff-comparison-control" method="post" action="/ui/review/git-comparison"
+  hx-post="/ui/review/git-comparison" hx-swap="none">
+  <select class="revision-selector" name="commit" aria-label="Comparison base">
+    {{if not .ActiveListed}}<option value="{{.ActiveCommit}}" selected>{{.ActiveShort}}</option>{{end}}
+    {{range .Options}}<option value="{{.Commit}}" title="{{.Commit}} {{.Subject}}"{{if eq .Commit $.ActiveCommit}} selected{{end}}>{{.CommitShort}}{{if .Subject}} {{.Subject}}{{end}}</option>{{end}}
+  </select>
+  <span class="diff-comparison-status" role="status" aria-live="polite"></span>
+</form>
+{{end}}

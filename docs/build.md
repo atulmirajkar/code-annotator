@@ -47,8 +47,8 @@ response through `parseViewerState`; type assertions alone are not a wire
 validator. Renderer tests require every typed source-map identity to exist in
 the corresponding review HTML. `go test ./web` also scans production Go
 rendering, templates, TypeScript, and Sass against a shrinking per-file
-`data-*` allowlist. Only the comparison-selector attribute remains approved;
-new attributes and dataset consumers fail that test.
+`data-*` allowlist. It is now empty; new attributes and dataset consumers fail
+that test.
 
 Frontend state modules must remain independently unit testable and DOM-free.
 They accept primitives or validated interfaces and return state or render

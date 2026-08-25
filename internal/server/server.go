@@ -62,6 +62,7 @@ type Server struct {
 	reviewSelectJS    []byte
 	documentCatalogJS []byte
 	documentStateJS   []byte
+	comparisonStateJS []byte
 	viewerJS          []byte
 	viewerStateJS     []byte
 	htmxJS            []byte
@@ -130,6 +131,7 @@ type pageData struct {
 	FileURL         string
 	ChangesURL      string
 	AnnotationPanel *annotationPanelView
+	Comparison      *comparisonControlView
 }
 
 // WithIndexOptions configures the reviewable content catalog.
@@ -307,6 +309,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read document state script: %w", err)
 	}
+	comparisonStateJS, err := fs.ReadFile(web.Files, "generated/comparison-state.js")
+	if err != nil {
+		return nil, fmt.Errorf("read comparison state script: %w", err)
+	}
 	mermaidJS, err := fs.ReadFile(web.Files, "generated/mermaid.js")
 	if err != nil {
 		return nil, fmt.Errorf("read Mermaid integration script: %w", err)
@@ -334,6 +340,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewSelectJS:    reviewSelectJS,
 		documentCatalogJS: documentCatalogJS,
 		documentStateJS:   documentStateJS,
+		comparisonStateJS: comparisonStateJS,
 		viewerJS:          viewerJS,
 		viewerStateJS:     viewerStateJS,
 		htmxJS:            htmxJS,
@@ -364,6 +371,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
 	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
 	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
+	mux.HandleFunc("GET /static/comparison-state.js", server.handleComparisonStateScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
@@ -390,6 +398,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	}
 	if server.comparisonControlEnabled() {
 		mux.Handle("POST /api/git-comparison", server.protectComparisonMutation(http.HandlerFunc(server.handleComparisonSelect)))
+		mux.Handle("POST /ui/review/git-comparison", server.protectComparisonFormMutation(http.HandlerFunc(server.handleComparisonSelectForm)))
 	}
 	server.handler = securityHeaders(mux)
 
@@ -456,6 +465,11 @@ func (s *Server) handleDocumentCatalogScript(response http.ResponseWriter, _ *ht
 func (s *Server) handleDocumentStateScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.documentStateJS)
+}
+
+func (s *Server) handleComparisonStateScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.comparisonStateJS)
 }
 
 // handleStyles serves the embedded viewer stylesheet from the same origin so
@@ -674,6 +688,8 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 	}
 	if s.comparisonControlEnabled() {
 		data.ComparisonToken = s.comparison.token
+		comparison := newComparisonControlView(s.comparisonState(ctx))
+		data.Comparison = &comparison
 	}
 	if s.review != nil {
 		data.ReviewToken = s.review.token

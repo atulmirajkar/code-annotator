@@ -94,9 +94,9 @@ revision, resolved annotation locations, and lifecycle behavior.
 nested field and enum, rejects duplicate semantic IDs, and returns typed maps.
 Source spans, diagrams, annotation cards, and lifecycle forms expose only
 semantic IDs; selection, highlighting, navigation, Mermaid interaction, HTMX
-revision headers, and lifecycle fields join those IDs to typed state. The
-only remaining dataset use is temporarily allowlisted for the comparison
-selector. HTML retains presentation, semantic IDs, accessibility
+revision headers, and lifecycle fields join those IDs to typed state. Authored
+browser code has no remaining custom-data state allowlist. HTML retains
+presentation, semantic IDs, accessibility
 attributes, links, and normal form semantics—not application state encoded in
 custom attributes.
 
@@ -187,10 +187,10 @@ routes are not registered until their handlers use this guard.
 When `--diff-base` is configured, startup asks `internal/gitdiff` to discover
 the containing worktree and resolve the requested local revision to a full
 commit ID, and the server pins that commit as the initial active comparison
-base. The revision selector in the source toolbar lets a reviewer re-pin the
-base to another locally available commit through `POST /api/git-comparison`,
-guarded by the exact loopback `Origin`, a distinct comparison control token in
-`X-Code-Annotator-Comparison-Token`, and `application/json`; the endpoint accepts
+base. The server-rendered revision selector lets a reviewer re-pin the base
+through form `POST /ui/review/git-comparison`; compatible automation can use
+JSON `POST /api/git-comparison`. Both are guarded by the exact loopback
+`Origin` and a distinct token in `X-Code-Annotator-Comparison-Token`; each accepts
 only a commit present in a freshly listed bounded option set, never an
 arbitrary revision string. Each page render obtains one value copy of the
 active base, uses it for changed-path and file-diff operations, and exposes

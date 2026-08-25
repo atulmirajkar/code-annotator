@@ -13,18 +13,6 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
     defaultCollapsed?: boolean;
   }
 
-  interface ComparisonOption {
-    commit: string;
-    commitShort?: string;
-    subject?: string;
-  }
-
-  interface ComparisonState {
-    activeCommit: string;
-    activeShort?: string;
-    options: ComparisonOption[];
-  }
-
   interface HtmxConfig {
     allowEval: boolean;
     allowNestedOobSwaps: boolean;
@@ -36,11 +24,6 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
   interface HtmxAPI {
     config: HtmxConfig;
     ajax(verb: "GET", path: string, options: { target: string; swap: "outerHTML" }): Promise<void>;
-  }
-
-  function requiredElement<T extends Element>(value: T | null, label: string): T {
-    if (!value) throw new Error(`Missing ${label} in viewer template`);
-    return value;
   }
 
   const changedOnlyStorageKey = "code-annotator.changed-only";
@@ -297,88 +280,34 @@ import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
     }
   }
 
-  // bindComparisonControl turns the static base label into a bounded revision
-  // selector backed by the server comparison API. The base is always one
-  // explicit commit; selecting another re-pins it server-wide and reloads the
-  // page in its existing File/Changes mode so the diff recomputes.
+  // The server renders comparison state and validates the selected commit.
+  // This adapter only adds the secret transport header and submits on change.
   function bindComparisonControl() {
-    const control = document.querySelector<HTMLElement>(".diff-comparison-control");
+    const control = document.querySelector<HTMLFormElement>(".diff-comparison-control");
     const token = document.querySelector<HTMLMetaElement>('meta[name="code-annotator-comparison-token"]')?.content || "";
     if (!control || !token) return;
-    const selector = requiredElement(control.querySelector<HTMLSelectElement>(".revision-selector"), "revision selector");
-    const status = requiredElement(control.querySelector<HTMLElement>(".diff-comparison-status"), "comparison status");
-
-    selector.addEventListener("change", () => selectBase(selector.value));
-    load();
-
-    async function load(): Promise<void> {
-      try {
-        const response = await fetch("/api/git-comparison", { headers: { Accept: "application/json" } });
-        if (!response.ok) throw new Error();
-        render(await response.json() as ComparisonState);
-      } catch (_) {
-        setStatus("Revision list unavailable.", true);
-      }
-    }
-
-    // render rebuilds the selector from server state. An active commit that is
-    // no longer among the options, such as a pinned commit dropped from the
-    // bounded list, is preserved as a leading selected entry.
-    function render(state: ComparisonState): void {
-      const options = Array.isArray(state.options) ? state.options : [];
-      selector.replaceChildren();
-      if (!options.some((option) => option.commit === state.activeCommit)) {
-        selector.append(buildOption({ commit: state.activeCommit, ...(state.activeShort ? { commitShort: state.activeShort } : {}) }, state.activeCommit));
-      }
-      options.forEach((option) => selector.append(buildOption(option, state.activeCommit)));
-      selector.disabled = false;
-      setStatus("");
-    }
-
-    function buildOption(option: ComparisonOption, activeCommit: string): HTMLOptionElement {
-      const element = document.createElement("option");
-      element.value = option.commit;
-      element.textContent = optionLabel(option);
-      element.title = option.subject ? `${option.commit} ${option.subject}` : option.commit;
-      element.selected = option.commit === activeCommit;
-      return element;
-    }
-
-    function optionLabel(option: ComparisonOption): string {
-      const subject = option.subject ? ` ${truncate(option.subject, 72)}` : "";
-      return `${option.commitShort || ""}${subject}`;
-    }
-
-    async function selectBase(commit: string): Promise<void> {
-      selector.disabled = true;
-      setStatus("Updating comparison base…");
-      try {
-        const response = await fetch("/api/git-comparison", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Code-Annotator-Comparison-Token": token,
-          },
-          body: JSON.stringify({ commit }),
-        });
-        if (!response.ok) throw new Error();
-        // The server re-pinned the base; reload keeps the current mode and URL
-        // so diffs, highlights, and the changed-only filter recompute together.
-        window.location.reload();
-      } catch (_) {
-        setStatus("The Git comparison could not be updated.", true);
-        selector.disabled = false;
-      }
-    }
-
-    function setStatus(message: string, isError = false): void {
-      status.textContent = message || "";
-      status.classList.toggle("error", Boolean(isError));
-    }
-
-    function truncate(value: string, limit: number): string {
-      return value.length > limit ? `${value.slice(0, limit - 1)}…` : value;
-    }
+    const selector = control.querySelector<HTMLSelectElement>(".revision-selector");
+    const status = control.querySelector<HTMLElement>(".diff-comparison-status");
+    if (!selector || !status) return;
+    selector.addEventListener("change", () => {
+      status.textContent = "Updating comparison base…";
+      status.classList.remove("error");
+      control.requestSubmit();
+    });
+    document.body.addEventListener("htmx:configRequest", (event) => {
+      if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null) return;
+      const source = Reflect.get(event.detail, "elt");
+      if (!(source instanceof Element) || source.closest(".diff-comparison-control") !== control) return;
+      const headers = Reflect.get(event.detail, "headers");
+      if (typeof headers === "object" && headers !== null) Reflect.set(headers, "X-Code-Annotator-Comparison-Token", token);
+    });
+    document.body.addEventListener("htmx:responseError", (event) => {
+      if (!(event instanceof CustomEvent) || typeof event.detail !== "object" || event.detail === null) return;
+      const source = Reflect.get(event.detail, "elt");
+      if (!(source instanceof Element) || source.closest(".diff-comparison-control") !== control) return;
+      status.textContent = "The Git comparison could not be updated.";
+      status.classList.add("error");
+    });
   }
 
   // bindDiffDivider lets the reviewer drag or use the keyboard to resize the

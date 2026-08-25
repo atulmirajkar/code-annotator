@@ -34,12 +34,7 @@
       {{if or .IsCode .DiffAvailable}}<nav class="source-mode-tabs" aria-label="Source view">
         <a href="{{.FileURL}}"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
         {{if .DiffAvailable}}<a href="{{.ChangesURL}}"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
-        {{if and .DiffAvailable .DiffMode}}{{if .ComparisonToken}}<div class="diff-comparison-control" data-active-commit="{{.DiffCommit}}">
-          <select class="revision-selector" aria-label="Comparison base" disabled>
-            <option value="{{.DiffCommit}}" selected>{{.DiffBase}} ({{.DiffCommitShort}})</option>
-          </select>
-          <span class="diff-comparison-status" role="status" aria-live="polite"></span>
-        </div>{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
+        {{if and .DiffAvailable .DiffMode}}{{if .Comparison}}{{template "comparison-control" .Comparison}}{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
       </nav>{{end}}
       <article class="markdown-body">{{.Content}}</article>
       {{end}}

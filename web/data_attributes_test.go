@@ -20,9 +20,7 @@ var camelBoundaryPattern = regexp.MustCompile(`([a-z0-9])([A-Z])`)
 func TestAuthoredDataAttributesAreExplicitBaseline(t *testing.T) {
 	t.Parallel()
 
-	allowed := map[string][]string{
-		"web/templates/page.html": {"active-commit"},
-	}
+	allowed := map[string][]string{}
 
 	repository := repositoryRoot(t)
 	found := make(map[string]map[string]struct{})
