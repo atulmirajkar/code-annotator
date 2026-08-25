@@ -337,7 +337,7 @@ func parseShowInactive(value string) (bool, error) {
 
 func (s *Server) renderAnnotationPanel(response http.ResponseWriter, view annotationPanelView, status int) {
 	var output bytes.Buffer
-	if err := s.page.ExecuteTemplate(&output, "annotation-panel", view); err != nil {
+	if err := s.page.ExecuteTemplate(&output, "annotation-panel-response", view); err != nil {
 		http.Error(response, "could not render annotations", http.StatusInternalServerError)
 		return
 	}

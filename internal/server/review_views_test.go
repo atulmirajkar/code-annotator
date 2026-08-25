@@ -82,7 +82,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 	if err != nil {
 		t.Fatalf("parseViewerTemplates() error = %v", err)
 	}
-	for _, name := range []string{"page.html", "annotation-panel", "annotation-card", "annotation-actions"} {
+	for _, name := range []string{"page.html", "annotation-panel", "annotation-panel-response", "annotation-card", "annotation-actions"} {
 		if templates.Lookup(name) == nil {
 			t.Fatalf("template set does not contain %q", name)
 		}
@@ -110,7 +110,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 	}
 	view := newAnnotationPanelView("README.md", []resolvedAnnotation{item}, false)
 	var output bytes.Buffer
-	if err := templates.ExecuteTemplate(&output, "annotation-panel", view); err != nil {
+	if err := templates.ExecuteTemplate(&output, "annotation-panel-response", view); err != nil {
 		t.Fatalf("ExecuteTemplate() error = %v", err)
 	}
 	html := output.String()
@@ -120,6 +120,7 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		}
 	}
 	for _, want := range []string{
+		`id="annotation-count" class="annotation-count" aria-live="polite" hx-swap-oob="outerHTML">1</span>`,
 		`&lt;script&gt;alert(&#34;comment&#34;)&lt;/script&gt;`,
 		`&lt;img src=x onerror=&#34;role()&#34;&gt;`,
 		`&lt;svg onload=&#34;source()&#34;&gt;`,

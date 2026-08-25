@@ -44,8 +44,8 @@ func TestAnnotationPanelUI(t *testing.T) {
 		wantStatus int
 		contains   []string
 	}{
-		{name: "active only", query: "document=README.md", wantStatus: http.StatusOK, contains: []string{`id="annotation-panel-content"`, "No active annotations."}},
-		{name: "show inactive", query: "document=README.md&show_inactive=true", wantStatus: http.StatusOK, contains: []string{`id="annotation-ann_transition_test"`, `class="annotation-badge">closed`}},
+		{name: "active only", query: "document=README.md", wantStatus: http.StatusOK, contains: []string{`id="annotation-count"`, `hx-swap-oob="outerHTML"`, `id="annotation-panel-content"`, "No active annotations."}},
+		{name: "show inactive", query: "document=README.md&show_inactive=true", wantStatus: http.StatusOK, contains: []string{`id="annotation-count"`, `hx-swap-oob="outerHTML"`, `id="annotation-ann_transition_test"`, `class="annotation-badge">closed`}},
 		{name: "invalid filter", query: "document=README.md&show_inactive=yes", wantStatus: http.StatusBadRequest, contains: []string{"invalid show_inactive"}},
 		{name: "missing document", query: "document=missing.md", wantStatus: http.StatusNotFound, contains: []string{"document not found"}},
 	}

@@ -1696,7 +1696,7 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if hasToken != test.wantToken {
 				t.Fatalf("page contains review token = %t, want %t", hasToken, test.wantToken)
 			}
-			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `class="show-inactive-annotations"`) && strings.Contains(response.Body.String(), `id="annotation-panel-content"`) && strings.Contains(response.Body.String(), `hx-post="/ui/review/annotations"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
+			hasPanel := strings.Contains(response.Body.String(), `class="review-panel"`) && strings.Contains(response.Body.String(), `class="review-heading-title"`) && strings.Contains(response.Body.String(), `id="annotation-count"`) && strings.Contains(response.Body.String(), `class="annotation-form"`) && strings.Contains(response.Body.String(), `class="show-inactive-annotations"`) && strings.Contains(response.Body.String(), `id="annotation-panel-content"`) && strings.Contains(response.Body.String(), `hx-post="/ui/review/annotations"`) && strings.Contains(response.Body.String(), `src="/static/review.js"`)
 			if hasPanel != test.wantPanel {
 				t.Fatalf("page contains review panel = %t, want %t", hasPanel, test.wantPanel)
 			}

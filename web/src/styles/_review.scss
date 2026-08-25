@@ -40,6 +40,11 @@
   gap: 0.5rem;
   align-items: center;
 }
+.review-heading-title {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
 .add-annotation-toggle {
   padding: 0.32rem 0.55rem;
   border: 1px solid var(--accent);
@@ -51,7 +56,11 @@
   font-weight: 700;
   cursor: pointer;
 }
-.annotation-count,
+.annotation-count {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
 .review-message {
   color: var(--muted);
   font-size: 0.8rem;

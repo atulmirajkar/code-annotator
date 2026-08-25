@@ -133,6 +133,7 @@ test.describe("annotation review interactions", () => {
     await openNewAnnotationForm(page);
     await expect(page.locator('.annotation-form select[name="role"] option')).toHaveText(["Reviewer", "Agent"]);
     await createSelectionAnnotation(page, "Clarify this wording.");
+    await expect(page.locator(".review-heading-title > #annotation-count")).toHaveText("1");
 
     const card = page.locator(".annotation-card");
     await card.locator(".annotation-summary").click();
@@ -183,6 +184,7 @@ test.describe("annotation review interactions", () => {
     await expect(card.locator(".annotation-quick-close")).toBeVisible();
     await card.locator(".annotation-quick-close").click();
     await expect(page.locator(".annotation-card")).toHaveCount(0);
+    await expect(page.locator(".review-heading-title > #annotation-count")).toHaveText("0 active · 1 total");
     await page.locator(".show-inactive-annotations").check();
     await expect(page.locator(".annotation-card")).toHaveCount(1);
     await expect(page.locator(".annotation-badge")).toContainText(["change request", "closed"]);

@@ -44,7 +44,10 @@
       <div class="review-panel-resize" role="separator" aria-orientation="vertical" aria-label="Resize annotations panel" tabindex="0"></div>
       <div class="review-panel-scroll">
         <div class="review-heading-row">
-          <h2 id="review-heading">Annotations</h2>
+          <div class="review-heading-title">
+            <h2 id="review-heading">Annotations</h2>
+            <span id="annotation-count" class="annotation-count" aria-live="polite">{{.AnnotationPanel.CountLabel}}</span>
+          </div>
           <div class="review-heading-actions">
             <button type="button" class="add-annotation-toggle" aria-controls="annotation-form" aria-expanded="false">Add comment</button>
           </div>
