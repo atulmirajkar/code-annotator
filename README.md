@@ -32,8 +32,8 @@ CDN or runtime network dependency. In review mode, clicking a rendered diagram
 selects its complete source definition for annotation; its collapsible source
 remains available for line-level comments.
 
-HTMX 2.0.10 is pinned, licensed, embedded, and loaded only on review pages for
-the server-rendered annotation UI. Provenance and checksums are recorded in
+HTMX 2.0.10 is pinned, licensed, embedded, and loaded on viewer pages for
+server-rendered annotation and document-panel fragments. Provenance and checksums are recorded in
 [`web/vendor/htmx/README.md`](web/vendor/htmx/README.md). The initial page and
 every annotation read or mutation render the same escaped panel/card/action Go
 templates under `web/templates/`. Small TypeScript adapters retain only native
@@ -46,16 +46,17 @@ contract. Review pages now activate the versioned `/ui/viewer-state` boundary:
 `web/src/viewer-state.ts` validates unknown wire data before returning strongly
 typed source, diagram, annotation, lifecycle, revision, and digest state.
 Rendered review content carries semantic IDs only; TypeScript joins those IDs
-to typed in-memory maps. The remaining allowlisted attributes belong only to
-the document tree and comparison selector, which have separate review gates.
+to typed in-memory maps. The only remaining allowlisted attribute belongs to
+the comparison selector.
 The same migration rule applies when no custom attribute is involved: rendered
 nodes, classes, text, links, and visibility are presentation rather than an
 application-state store. Remaining document-tree, comparison, and smaller view
 adapter violations are explicitly tracked in the milestone design.
-An inactive `/ui/document-state` foundation now exposes the complete catalog,
+The active `/ui/document-state` boundary exposes the complete catalog,
 selected document, File/Changes mode, changed state, navigation URLs, and open
-comment counts as runtime-validated TypeScript state. Pure DOM-free functions
-build and filter that catalog; commit 8B will activate them in the viewer.
+comment counts as runtime-validated TypeScript state. The server renders the
+recursive tree, paths, counts, and filtered fragments; TypeScript uses the
+validated catalog only for keyboard navigation and tab-local preferences.
 
 ## Usage
 

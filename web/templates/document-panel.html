@@ -1,0 +1,45 @@
+{{define "document-tree-nodes"}}
+  {{range .}}
+    {{if .Directory}}
+    <li id="{{.ElementID}}" class="document-directory">
+      <button type="button" class="document-directory-toggle" aria-expanded="true" aria-controls="{{.ChildrenID}}">{{.Name}}</button>
+      <ul id="{{.ChildrenID}}" class="document-tree-children">{{template "document-tree-nodes" .Children}}</ul>
+    </li>
+    {{else}}{{with .Document}}
+    <li class="document-file">
+      <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
+        {{.Name}}{{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}
+        {{if .OpenCommentCount}}<span class="document-open-count" aria-label="{{.OpenCommentCount}} open comments">{{.OpenCommentCount}}</span>{{end}}
+      </a>
+    </li>
+    {{end}}{{end}}
+  {{end}}
+{{end}}
+
+{{define "document-panel"}}
+<div id="document-panel-content">
+  {{if not .Empty}}
+  <form class="document-filter-form" method="get" action="/ui/review/documents">
+    <input type="hidden" name="document" value="{{.Selected}}">
+    <input type="hidden" name="mode" value="{{.Mode}}">
+    <label class="document-search">
+      <span>Find document</span>
+      <input id="document-search-input" type="search" name="query" value="{{.Query}}" placeholder="Filter by path…" autocomplete="off" spellcheck="false">
+    </label>
+    {{if .ChangedAvailable}}<label class="document-changed-filter">
+      <input type="checkbox" name="scope" value="changed"{{if eq .Scope "changed"}} checked{{end}}>
+      <span>Changed only</span>
+    </label>{{else if .ChangedError}}<p class="document-filter-error">Changed-file lookup unavailable.</p>{{end}}
+    {{if .ReviewAvailable}}<label class="document-open-filter">
+      <input type="checkbox" name="scope" value="open-comments" aria-label="Open comments"{{if eq .Scope "open-comments"}} checked{{end}}>
+      <span>Open comments</span>
+      <span class="document-open-total" aria-live="polite">{{.OpenDocumentCount}} document{{if ne .OpenDocumentCount 1}}s{{end}}</span>
+    </label>{{end}}
+  </form>
+  <p id="document-search-status" class="document-search-status" role="status" aria-live="polite"{{if not .Status}} hidden{{end}}>{{.Status}}</p>
+  <ul class="documents">{{template "document-tree-nodes" .Tree}}</ul>
+  {{else}}
+  <p class="empty-nav">No reviewable documents found.</p>
+  {{end}}
+</div>
+{{end}}

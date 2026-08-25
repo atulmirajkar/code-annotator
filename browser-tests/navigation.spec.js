@@ -50,6 +50,7 @@ test.describe("viewer navigation", () => {
     // it since this test exercises path lookup across the full catalog. Move
     // focus off the checkbox afterward so the "/" shortcut below still fires.
     await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
+    await expect(page.locator(".document-search-status")).toBeHidden();
     await page.locator("#documents-sidebar h2").click();
     const search = page.getByRole("searchbox", { name: "Find document" });
     const initialDocumentCount = await page.locator(".documents .document-file:not([hidden])").count();
@@ -64,6 +65,7 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".documents .document-file:not([hidden])")).toHaveCount(initialDocumentCount);
 
     await search.fill("stale");
+    await expect(page.locator(".document-search-status")).toHaveText("1 matching document.");
     await search.press("ArrowDown");
     await expect(page.locator(".documents li:not([hidden]) a")).toBeFocused();
   });
@@ -122,9 +124,9 @@ test.describe("viewer navigation", () => {
     await expect(page.locator(".document-open-total")).toHaveText(/^\d+ documents?$/);
     await openComments.check();
     await expect(changedOnly).not.toBeChecked();
-    await expect(page.locator('.document-file[data-document-path="nested/reviewed.md"]')).toBeVisible();
-    await expect(page.locator('.document-file[data-document-path="nested/other.md"]')).toBeHidden();
-    await expect(page.locator('.document-file[data-document-path="nested/reviewed.md"] .document-open-count')).toHaveText("1");
+    await expect(page.locator(".document-file", { has: page.getByRole("link", { name: /reviewed\.md/ }) })).toBeVisible();
+    await expect(page.getByRole("link", { name: /other\.md/ })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /reviewed\.md/ }).locator(".document-open-count")).toHaveText("1");
 
     await changedOnly.check();
     await expect(openComments).not.toBeChecked();
@@ -140,7 +142,7 @@ test.describe("viewer navigation", () => {
     // uncheck it since this test browses code documents regardless of status.
     await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
 
-    const nextCode = page.locator('.documents li[data-kind="code"] a', { hasText: "code-annotation.go" });
+    const nextCode = page.locator(".documents .document-file a", { hasText: "code-annotation.go" });
     await expect(nextCode).toHaveAttribute("href", "/view/code-annotation.go?mode=diff");
     await nextCode.click();
     await expect(page).toHaveURL(/\/view\/code-annotation\.go\?mode=diff$/);
@@ -150,7 +152,7 @@ test.describe("viewer navigation", () => {
 
     await page.getByRole("link", { name: "File" }).click();
     await expect(page).toHaveURL(/\/view\/code-annotation\.go$/);
-    const otherCode = page.locator('.documents li[data-kind="code"] a', { hasText: "diff-layout.go" });
+    const otherCode = page.locator(".documents .document-file a", { hasText: "diff-layout.go" });
     await expect(otherCode).toHaveAttribute("href", "/view/diff-layout.go");
     await otherCode.click();
     await expect(page).toHaveURL(/\/view\/diff-layout\.go$/);

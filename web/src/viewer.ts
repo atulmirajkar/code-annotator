@@ -1,4 +1,6 @@
-import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
+import { filterDocuments, hasChangedDocuments } from "./document-catalog.js";
+import { fetchDocumentCatalogState } from "./document-state.js";
+import type { DocumentCatalogState, DocumentMode } from "./document-state.js";
 
 (() => {
   "use strict";
@@ -23,6 +25,19 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
     options: ComparisonOption[];
   }
 
+  interface HtmxConfig {
+    allowEval: boolean;
+    allowNestedOobSwaps: boolean;
+    allowScriptTags: boolean;
+    historyCacheSize: number;
+    selfRequestsOnly: boolean;
+  }
+
+  interface HtmxAPI {
+    config: HtmxConfig;
+    ajax(verb: "GET", path: string, options: { target: string; swap: "outerHTML" }): Promise<void>;
+  }
+
   function requiredElement<T extends Element>(value: T | null, label: string): T {
     if (!value) throw new Error(`Missing ${label} in viewer template`);
     return value;
@@ -30,6 +45,7 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
 
   const changedOnlyStorageKey = "code-annotator.changed-only";
   const documentScopeStorageKey = "code-annotator.document-scope";
+  const documentTreeStorageKey = "code-annotator.document-tree-expanded";
   const sourceModeStorageKey = "code-annotator.source-mode";
   const diffSplitStorageKey = "code-annotator.diff-split";
   const panelStoragePrefix = "code-annotator.panel-collapsed.";
@@ -38,6 +54,8 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
   const diffSplitStep = 2;
   const layout = document.querySelector<HTMLElement>(".layout");
   if (!layout) return;
+
+  configureHTMX();
 
   bindTopbarHeight();
 
@@ -58,6 +76,16 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
   bindDocumentSearch();
   bindComparisonControl();
   bindDiffDivider();
+
+  function configureHTMX(): void {
+    const api = Reflect.get(globalThis, "htmx") as HtmxAPI | undefined;
+    if (!api) return;
+    api.config.allowEval = false;
+    api.config.allowNestedOobSwaps = false;
+    api.config.allowScriptTags = false;
+    api.config.historyCacheSize = 0;
+    api.config.selfRequestsOnly = true;
+  }
 
   function bindTopbarHeight(): void {
     const topbar = document.querySelector<HTMLElement>(".topbar");
@@ -93,10 +121,8 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
     }
   }
 
-  // Source mode is a reviewer preference across document navigation. It
-  // changes only when a File or Changes tab is activated, then rewrites
-  // sidebar links to match, for any document kind, since Changes view is no
-  // longer code-only.
+  // Document links are rendered in the active mode by the server. TypeScript
+  // only remembers an explicit tab choice; it never rewrites the catalog DOM.
   function bindSourceModePreference() {
     const tabs = document.querySelector<HTMLElement>(".source-mode-tabs");
     const activeTab = tabs?.querySelector<HTMLAnchorElement>('a[aria-current="page"]');
@@ -111,99 +137,96 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
       });
     }
 
-    if (readPreference(sourceModeStorageKey) !== "diff") return;
-    document.querySelectorAll<HTMLAnchorElement>('.documents li a').forEach((link) => {
-      const target = new URL(link.href);
-      target.searchParams.set("mode", "diff");
-      link.href = target.pathname + target.search;
-    });
   }
 
   type DocumentScope = "all" | "changed" | "open-comments";
 
-  // bindDocumentSearch builds the real file tree from the stable flat catalog
-  // emitted by the server, then applies path lookup and one mutually exclusive
-  // document scope. Enter opens the first match, while slash focuses lookup.
+  // The server owns tree construction, filtering, counts, and links. This
+  // adapter retains only keyboard behavior and tab-local view preferences,
+  // deriving navigation choices from the validated typed catalog.
   function bindDocumentSearch() {
-    const input = document.querySelector<HTMLInputElement>(".document-search input");
-    const changedOnly = document.querySelector<HTMLInputElement>(".document-changed-filter input");
-    const openComments = document.querySelector<HTMLInputElement>(".document-open-filter input");
-    const openCommentsTotal = document.querySelector<HTMLElement>(".document-open-total");
-    const status = document.querySelector<HTMLElement>(".document-search-status");
-    const list = document.querySelector<HTMLUListElement>(".documents");
-    if (!input || !status || !list) return;
-    const fileItems = Array.from(list.children).filter((item): item is HTMLLIElement => item instanceof HTMLLIElement);
-    if (fileItems.length === 0) return;
-    const tree = buildDocumentTree(list, fileItems, readPreference, writePreference);
-    // refreshAnnotationSummary owns this map: it replaces the counts from the
-    // server's annotation queue. applyDocumentFilters consumes those counts
-    // when the reviewer scopes the tree to documents with open comments.
-    let openCommentCounts = new Map<string, number>();
-    let scope = readDocumentScope();
-    setScope(scope, false);
+    const panel = document.querySelector<HTMLElement>("#document-panel-content");
+    if (!panel) return;
+    let state: DocumentCatalogState | null = null;
+    let scope: DocumentScope = "all";
+    let searchTimer = 0;
+    let documentRequestRunning = false;
+    let queuedDocumentRequest: { query: string; scope: DocumentScope } | null = null;
+    const mode: DocumentMode = new URL(location.href).searchParams.get("mode") === "diff" ? "diff" : "file";
+    const path = decodeURIComponent(location.pathname.startsWith("/view/") ? location.pathname.slice(6) : "");
 
-    const visibleLinks = (): HTMLAnchorElement[] => fileItems
-      .filter((item) => !item.hidden)
-      .map((item) => item.querySelector<HTMLAnchorElement>("a"))
-      .filter((link): link is HTMLAnchorElement => link !== null);
-    // applyDocumentFilters marks each file match, then updateTreeVisibility
-    // propagates those marks up through directory nodes so empty directories
-    // disappear while a search or document scope is active.
-    const applyDocumentFilters = (): void => {
-      const query = input.value.trim().toLocaleLowerCase();
-      let matches = 0;
-      fileItems.forEach((item) => {
-        const path = item.dataset.documentPath || "";
-        const pathMatches = !query || path.toLocaleLowerCase().includes(query);
-        const scopeMatches = scope === "all"
-          || (scope === "changed" && item.dataset.changed === "true")
-          || (scope === "open-comments" && (openCommentCounts.get(path) || 0) > 0);
-        item.dataset.filterMatch = String(pathMatches && scopeMatches);
-        if (pathMatches && scopeMatches) matches++;
+    fetchDocumentCatalogState(path, mode).then((catalog) => {
+      state = catalog;
+      scope = readDocumentScope(catalog);
+      const checkbox = document.querySelector<HTMLInputElement>(`.document-filter-form input[value="${scope}"]`);
+      if (scope !== "all" && checkbox && !checkbox.checked) {
+        checkbox.checked = true;
+        requestDocumentPanel("", scope);
+      }
+    }).catch(() => undefined);
+
+    document.addEventListener("change", (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || input.form?.classList.contains("document-filter-form") !== true || input.name !== "scope") return;
+      scope = input.checked && (input.value === "changed" || input.value === "open-comments") ? input.value : "all";
+      input.form.querySelectorAll<HTMLInputElement>('input[name="scope"]').forEach((candidate) => {
+        if (candidate !== input) candidate.checked = false;
       });
-      updateTreeVisibility(tree, scope !== "all");
-      const descriptor = scope === "changed"
-        ? (query ? "matching changed document" : "changed document")
-        : scope === "open-comments"
-          ? (query ? "matching document with open comments" : "document with open comments")
-          : "matching document";
-      const pluralDescriptor = descriptor.replace("document", "documents");
-      const hasFilter = Boolean(query) || scope !== "all";
-      status.hidden = !hasFilter;
-      status.textContent = matches === 0
-        ? `No ${pluralDescriptor}.`
-        : `${matches} ${matches === 1 ? descriptor : pluralDescriptor}.`;
-    };
+      writePreference(documentScopeStorageKey, scope);
+      requestDocumentPanel(input.form.querySelector<HTMLInputElement>("#document-search-input")?.value || "", scope);
+    }, true);
 
-    input.addEventListener("input", applyDocumentFilters);
-    changedOnly?.addEventListener("change", () => {
-      if (changedOnly.checked) setScope("changed");
-      else setScope("all");
-      applyDocumentFilters();
+    document.addEventListener("input", (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || input.id !== "document-search-input") return;
+      window.clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(() => requestDocumentPanel(input.value, scope), 150);
+    }, true);
+
+    document.addEventListener("search", (event) => {
+      const input = event.target;
+      if (!(input instanceof HTMLInputElement) || input.id !== "document-search-input") return;
+      window.clearTimeout(searchTimer);
+      requestDocumentPanel(input.value, scope);
+    }, true);
+
+    document.addEventListener("click", (event) => {
+      const button = event.target instanceof Element ? event.target.closest<HTMLButtonElement>(".document-directory-toggle") : null;
+      if (!button) return;
+      const item = button.closest<HTMLLIElement>(".document-directory");
+      if (!item) return;
+      const expanded = button.getAttribute("aria-expanded") !== "true";
+      button.setAttribute("aria-expanded", String(expanded));
+      item.classList.toggle("collapsed", !expanded);
+      writeExpandedDirectories();
     });
-    openComments?.addEventListener("change", () => {
-      if (openComments.checked) setScope("open-comments");
-      else setScope("all");
-      applyDocumentFilters();
+
+    document.addEventListener("htmx:afterSwap", () => {
+      restoreExpandedDirectories();
     });
+    restoreExpandedDirectories();
+
     document.addEventListener("code-annotator:annotations-updated", () => {
-      if (!openComments) return;
-      refreshAnnotationSummary().then(applyDocumentFilters).catch(() => undefined);
+      fetchDocumentCatalogState(path, mode).then((catalog) => {
+        state = catalog;
+        document.querySelector<HTMLInputElement>("#document-search-input")?.dispatchEvent(new Event("search", { bubbles: true }));
+      }).catch(() => undefined);
     });
-    if (openComments) refreshAnnotationSummary().then(applyDocumentFilters).catch(() => {
-      openComments.disabled = true;
-      applyDocumentFilters();
-    });
-    applyDocumentFilters();
-    input.addEventListener("keydown", (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        input.value = "";
-        applyDocumentFilters();
-      } else if (event.key === "Enter") {
-        visibleLinks()[0]?.click();
-      } else if (event.key === "ArrowDown") {
+
+    document.addEventListener("keydown", (event: KeyboardEvent) => {
+      const input = document.querySelector<HTMLInputElement>("#document-search-input");
+      if (!input) return;
+      if (event.target === input && event.key === "Escape") {
         event.preventDefault();
-        visibleLinks()[0]?.focus();
+        input.value = "";
+        input.dispatchEvent(new Event("search", { bubbles: true }));
+      } else if (event.target === input && event.key === "Enter") {
+        event.preventDefault();
+        const destination = state ? filterDocuments(state.documents, input.value, scope).documents[0] : undefined;
+        if (destination) location.assign(destination.url);
+      } else if (event.target === input && event.key === "ArrowDown") {
+        event.preventDefault();
+        document.querySelector<HTMLAnchorElement>(".documents .document-file a")?.focus();
       }
     });
     document.addEventListener("keydown", (event: KeyboardEvent) => {
@@ -211,55 +234,67 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
       const editing = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable);
       if (event.key === "/" && !editing && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
-        input.focus();
+        document.querySelector<HTMLInputElement>("#document-search-input")?.focus();
       }
     });
 
-    function setScope(next: DocumentScope, persist = true): void {
-      scope = next;
-      if (changedOnly) changedOnly.checked = next === "changed";
-      if (openComments) openComments.checked = next === "open-comments";
-      if (persist) writePreference(documentScopeStorageKey, next);
+    function restoreExpandedDirectories(): void {
+      const stored = readPreference(documentTreeStorageKey);
+      if (stored === null) return;
+      const expanded = readStringSet(stored);
+      document.querySelectorAll<HTMLLIElement>(".document-directory[id]").forEach((item) => {
+        const isExpanded = expanded.has(item.id);
+        item.classList.toggle("collapsed", !isExpanded);
+        item.querySelector<HTMLButtonElement>(":scope > .document-directory-toggle")?.setAttribute("aria-expanded", String(isExpanded));
+      });
     }
 
-    async function refreshAnnotationSummary(): Promise<void> {
-      if (!openComments) return;
-      const response = await fetch("/api/annotations?status=open,acknowledged,needs_changes,applied", {
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`annotation queue request failed: ${response.status}`);
-      const payload = await response.json() as { documents?: Array<{ document?: string; annotations?: unknown[] }> };
-      openCommentCounts = new Map((payload.documents || []).map((item) => [item.document || "", Array.isArray(item.annotations) ? item.annotations.length : 0]));
-      const matchingDocuments = Array.from(openCommentCounts.values()).filter((count) => count > 0).length;
-      if (openCommentsTotal) {
-        openCommentsTotal.textContent = `${matchingDocuments} document${matchingDocuments === 1 ? "" : "s"}`;
+    function writeExpandedDirectories(): void {
+      const expanded = Array.from(document.querySelectorAll<HTMLLIElement>(".document-directory[id]"))
+        .filter((item) => !item.classList.contains("collapsed"))
+        .map((item) => item.id)
+        .sort();
+      writePreference(documentTreeStorageKey, JSON.stringify(expanded));
+    }
+
+    function requestDocumentPanel(queryValue: string, nextScope: DocumentScope): void {
+      queuedDocumentRequest = { query: queryValue, scope: nextScope };
+      if (documentRequestRunning) return;
+      void sendNextDocumentRequest();
+    }
+
+    async function sendNextDocumentRequest(): Promise<void> {
+      const api = Reflect.get(globalThis, "htmx") as HtmxAPI | undefined;
+      const request = queuedDocumentRequest;
+      if (!api || !request) return;
+      queuedDocumentRequest = null;
+      documentRequestRunning = true;
+      const parameters = new URLSearchParams({ document: path, mode });
+      if (request.query) parameters.set("query", request.query);
+      if (request.scope !== "all") parameters.set("scope", request.scope);
+      try {
+        await api.ajax("GET", `/ui/review/documents?${parameters.toString()}`, { target: "#document-panel-content", swap: "outerHTML" });
+      } finally {
+        documentRequestRunning = false;
+        if (queuedDocumentRequest) void sendNextDocumentRequest();
       }
-      fileItems.forEach((item) => {
-        const path = item.dataset.documentPath || "";
-        const count = openCommentCounts.get(path) || 0;
-        const link = item.querySelector<HTMLAnchorElement>("a");
-        if (!link) return;
-        let badge = link.querySelector<HTMLElement>(".document-open-count");
-        if (count > 0) {
-          if (!badge) {
-            badge = document.createElement("span");
-            badge.className = "document-open-count";
-            link.append(badge);
-          }
-          badge.textContent = String(count);
-          badge.setAttribute("aria-label", `${count} open comment${count === 1 ? "" : "s"}`);
-        } else {
-          badge?.remove();
-        }
-      });
     }
   }
 
-  function readDocumentScope(): DocumentScope {
+  function readDocumentScope(state: DocumentCatalogState): DocumentScope {
     const stored = readPreference(documentScopeStorageKey);
     if (stored === "all" || stored === "changed" || stored === "open-comments") return stored;
     if (readPreference(changedOnlyStorageKey) === "true") return "changed";
-    return hasChangedDocuments() ? "changed" : "all";
+    return hasChangedDocuments(state.documents) ? "changed" : "all";
+  }
+
+  function readStringSet(value: string): Set<string> {
+    try {
+      const parsed: unknown = JSON.parse(value);
+      return new Set(Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []);
+    } catch (_) {
+      return new Set();
+    }
   }
 
   // bindComparisonControl turns the static base label into a bounded revision
@@ -403,28 +438,6 @@ import { buildDocumentTree, updateTreeVisibility } from "./document-tree.js";
 
   function writeDiffSplitPreference(percent: number): void {
     writePreference(diffSplitStorageKey, String(percent));
-  }
-
-  // Session storage keeps an explicit reviewer choice across document
-  // navigation in one tab without turning it into a server-wide preference.
-  // Before any explicit choice, a configured Git base with at least one
-  // changed document defaults the filter on: that is exactly the moment a
-  // reviewer wants the sidebar scoped to changed files, independent of which
-  // document happens to be open first (often a Markdown file with no diff).
-  // A clean worktree with nothing changed leaves the default off, since an
-  // always-on default would otherwise open to an empty filtered list.
-  function readChangedOnlyPreference() {
-    const stored = readPreference(changedOnlyStorageKey);
-    if (stored !== null) return stored === "true";
-    return hasChangedDocuments();
-  }
-
-  function writeChangedOnlyPreference(enabled: boolean): void {
-    writeBooleanPreference(changedOnlyStorageKey, enabled);
-  }
-
-  function hasChangedDocuments() {
-    return document.querySelector('.documents li[data-changed="true"]') !== null;
   }
 
   // readPanelCollapsedPreference falls back to defaultCollapsed only when the

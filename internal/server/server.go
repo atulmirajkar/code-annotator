@@ -62,7 +62,6 @@ type Server struct {
 	reviewSelectJS    []byte
 	documentCatalogJS []byte
 	documentStateJS   []byte
-	documentTreeJS    []byte
 	viewerJS          []byte
 	viewerStateJS     []byte
 	htmxJS            []byte
@@ -116,7 +115,7 @@ func WithReviewSession(store *annotationstore.Store, origin, token string) Optio
 type pageData struct {
 	Root            string
 	Selected        string
-	Documents       []documentView
+	DocumentPanel   documentPanelView
 	Content         template.HTML
 	Empty           bool
 	ReviewToken     string
@@ -126,23 +125,11 @@ type pageData struct {
 	DiffBase        string
 	DiffCommit      string
 	DiffCommitShort string
-	ChangedReady    bool
-	ChangedError    bool
 	DiffMode        bool
 	DiffAvailable   bool
 	FileURL         string
 	ChangesURL      string
 	AnnotationPanel *annotationPanelView
-}
-
-type documentView struct {
-	Path      string
-	Name      string
-	Directory string
-	URL       string
-	Selected  bool
-	Kind      string
-	Changed   bool
 }
 
 // WithIndexOptions configures the reviewable content catalog.
@@ -312,10 +299,6 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer state script: %w", err)
 	}
-	documentTreeJS, err := fs.ReadFile(web.Files, "generated/document-tree.js")
-	if err != nil {
-		return nil, fmt.Errorf("read document tree script: %w", err)
-	}
 	documentCatalogJS, err := fs.ReadFile(web.Files, "generated/document-catalog.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document catalog script: %w", err)
@@ -351,7 +334,6 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		reviewSelectJS:    reviewSelectJS,
 		documentCatalogJS: documentCatalogJS,
 		documentStateJS:   documentStateJS,
-		documentTreeJS:    documentTreeJS,
 		viewerJS:          viewerJS,
 		viewerStateJS:     viewerStateJS,
 		htmxJS:            htmxJS,
@@ -382,13 +364,13 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/viewer-state.js", server.handleViewerStateScript)
 	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
 	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
-	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
 	mux.HandleFunc("GET /static/mermaid.js", server.handleMermaidScript)
 	mux.HandleFunc("GET /static/mermaid.tiny.js", server.handleMermaidLibrary)
 	mux.HandleFunc("GET /ui/viewer-state", server.handleViewerState)
 	mux.HandleFunc("GET /ui/document-state", server.handleDocumentState)
+	mux.HandleFunc("GET /ui/review/documents", server.handleDocumentPanel)
 	if server.annotations != nil {
 		mux.HandleFunc("GET /api/annotations", server.handleAnnotations)
 	}
@@ -476,11 +458,6 @@ func (s *Server) handleDocumentStateScript(response http.ResponseWriter, _ *http
 	_, _ = response.Write(s.documentStateJS)
 }
 
-func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
-	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
-	_, _ = response.Write(s.documentTreeJS)
-}
-
 // handleStyles serves the embedded viewer stylesheet from the same origin so
 // pages do not require CSP permission for inline styles.
 func (s *Server) handleStyles(response http.ResponseWriter, _ *http.Request) {
@@ -488,8 +465,8 @@ func (s *Server) handleStyles(response http.ResponseWriter, _ *http.Request) {
 	_, _ = response.Write(s.styles)
 }
 
-// handleHTMXLibrary serves the pinned HTMX bundle. Pages do not load it until
-// the server-rendered review UI is activated by a later migration gate.
+// handleHTMXLibrary serves the pinned HTMX bundle used by server-rendered UI
+// fragments on both read-only and review-enabled pages.
 func (s *Server) handleHTMXLibrary(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.htmxJS)
@@ -648,21 +625,25 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 			}
 		}
 	}
-	documents := make([]documentView, 0, len(index.Documents))
 	isCode := false
 	for _, document := range index.Documents {
 		if document.Path == selected && document.Kind == content.KindCode {
 			isCode = true
 		}
-		documents = append(documents, documentView{
-			Path:      document.Path,
-			Name:      document.Name,
-			Directory: document.Directory,
-			URL:       routeURL("/view/", document.Path),
-			Selected:  document.Path == selected,
-			Kind:      string(document.Kind),
-			Changed:   containsPath(changed, document.Path),
-		})
+	}
+	openCommentCounts, err := s.documentOpenCommentCounts(index)
+	if err != nil {
+		http.Error(response, "could not read annotations", http.StatusInternalServerError)
+		return
+	}
+	mode := "file"
+	if diffMode {
+		mode = "diff"
+	}
+	catalogState := newDocumentCatalogState(index, selected, mode, changed, changedReady, changedError, s.annotations != nil, openCommentCounts)
+	initialDocumentScope := "all"
+	if changedReady && len(changed) > 0 {
+		initialDocumentScope = "changed"
 	}
 
 	hasMermaid := bytes.Contains(fragment, []byte(`class="mermaid-diagram"`))
@@ -676,13 +657,11 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 	data := pageData{
 		Root:          s.root.Path(),
 		Selected:      selected,
-		Documents:     documents,
+		DocumentPanel: newDocumentPanelView(catalogState, "", initialDocumentScope),
 		Content:       template.HTML(fragment), // goldmark output with safe defaults.
 		Empty:         len(index.Documents) == 0,
 		HasMermaid:    hasMermaid,
 		IsCode:        isCode,
-		ChangedReady:  changedReady,
-		ChangedError:  changedError,
 		DiffMode:      diffMode,
 		DiffAvailable: active != nil,
 		FileURL:       routeURL("/view/", selected),

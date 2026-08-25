@@ -47,25 +47,29 @@ response through `parseViewerState`; type assertions alone are not a wire
 validator. Renderer tests require every typed source-map identity to exist in
 the corresponding review HTML. `go test ./web` also scans production Go
 rendering, templates, TypeScript, and Sass against a shrinking per-file
-`data-*` allowlist. Only document-tree and comparison-selector attributes remain
-approved; new attributes and dataset consumers fail that test.
+`data-*` allowlist. Only the comparison-selector attribute remains approved;
+new attributes and dataset consumers fail that test.
 
 Frontend state modules must remain independently unit testable and DOM-free.
 They accept primitives or validated interfaces and return state or render
 instructions; they do not use `document`, DOM element types, selectors,
 classes, visibility, labels, or datasets as inputs. Entry points and view
-adapters may query elements to bind events and project typed state. Commit 8A
-will add an automated architecture check for this module boundary before the
-document catalog migration is activated.
+adapters may query elements to bind events and project typed state.
+`web/state_modules_test.go` enforces this boundary.
 
 Commit 8A adds that check in `web/state_modules_test.go`; its reviewed module
 list currently contains `web/src/document-catalog.ts`. The catalog parser and
 pure rules have co-located Vitest coverage, while
-`internal/server/document_state_test.go` covers the inactive Go endpoint,
+`internal/server/document_state_test.go` covers the active Go endpoint,
 default selection, validation failures, URL mode, changed input, and active
 annotation counts. `/static/document-state.js` and
-`/static/document-catalog.js` remain embedded even though no page imports them
-until commit 8B.
+`/static/document-catalog.js` are embedded and imported by the viewer.
+
+Document filtering is server-rendered by `GET /ui/review/documents`. Run its
+5,000-path performance guard with
+`go test ./internal/server -run '^$' -bench '^BenchmarkDocumentPanel5000$' -benchmem`.
+The activation measurement on Apple M1 was 4.08 ms/op, below the 50 ms
+server-render threshold used with the 150 ms browser debounce.
 
 ## Run from source
 

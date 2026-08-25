@@ -95,15 +95,18 @@ nested field and enum, rejects duplicate semantic IDs, and returns typed maps.
 Source spans, diagrams, annotation cards, and lifecycle forms expose only
 semantic IDs; selection, highlighting, navigation, Mermaid interaction, HTMX
 revision headers, and lifecycle fields join those IDs to typed state. The
-remaining dataset uses are temporarily allowlisted for the document tree and
-comparison selector. HTML retains presentation, semantic IDs, accessibility
+only remaining dataset use is temporarily allowlisted for the comparison
+selector. HTML retains presentation, semantic IDs, accessibility
 attributes, links, and normal form semantics—not application state encoded in
 custom attributes.
 
 Custom attributes are not the only remaining state concern. The document
-sidebar currently enumerates rendered list items to reconstruct its catalog,
-tree, changed/open-comment filters, visible results, and badges. Review code
-also has smaller cases that infer visible annotations, mutation kind, conflict
+sidebar no longer treats rendered nodes as catalog state: Go builds the
+recursive tree, filters it, renders counts and links, and serves replacement
+fragments. A small adapter reads only interaction values, focus targets,
+semantic directory IDs, and presentation expansion state; Enter uses the
+runtime-validated catalog to choose a destination. Review code still has
+smaller cases that infer visible annotations, mutation kind, conflict
 feedback, or a root-page document from nodes. These are documented migration
 debt, not the target architecture. DOM reads are valid for native selection,
 focus, form input, geometry, events, rendered selection text, and semantic-ID
@@ -112,15 +115,17 @@ explicit interaction values. The ordered remediation is commit 8A typed
 document state, commit 8B document activation, commit 9 comparison state, and
 commit 10 residual view-adapter cleanup.
 
-`GET /ui/document-state?document={optional path}&mode={file|diff}` is now the
-inactive versioned catalog boundary. An omitted path selects the index default,
+`GET /ui/document-state?document={optional path}&mode={file|diff}` is the active
+versioned catalog boundary. An omitted path selects the index default,
 matching `/`; its response contains selected identity, normalized mode,
 changed-lookup availability/failure, review availability, and ordered document
 records with kind, navigation URL, changed membership, and active-comment
 count. `web/src/document-state.ts` runtime-validates the entire unknown payload
 and indexes it by path. `web/src/document-catalog.ts` contains DOM-free tree,
-filter, result-order, status-label, and summary rules. No runtime entrypoint
-imports either module yet, so the existing sidebar remains unchanged until 8B.
+filter, result-order, status-label, and summary rules.
+`GET /ui/review/documents` renders recursive HTML from the same authoritative
+inputs; the viewer replaces filtered fragments through HTMX after a 150 ms
+debounce.
 
 Vitest runs co-located `web/src/**/*.test.ts` files and is deliberately scoped
 away from the CommonJS Playwright suite in `browser-tests/`. The production

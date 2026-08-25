@@ -4,7 +4,7 @@ Last updated: 2026-08-24
 
 ## Current state
 
-**Phase:** Server-rendered review UI commit 8A is implemented. The maintainer
+**Phase:** Server-rendered review UI commits 8A and 8B are implemented. The maintainer
 approved continuing through commits 8B, 9, and 10 before a combined review.
 The approved design and ordered review gates are documented in
 [`docs/designs/server-rendered-review-ui.md`](docs/designs/server-rendered-review-ui.md).
@@ -33,9 +33,12 @@ or dataset consumers; only document-tree/filter and comparison state remains.
 Follow-up C records that DOM structure is not an acceptable replacement state
 channel, inventories remaining violations, and splits typed document state from
 document-tree activation.
-Commit 8A adds inactive `/ui/document-state`, runtime validation, pure DOM-free
-tree/filter/count rules, focused tests, and an architecture guard. No viewer
-entrypoint imports the new modules yet.
+Commit 8A added `/ui/document-state`, runtime validation, pure DOM-free
+tree/filter/count rules, focused tests, and an architecture guard. Commit 8B
+activates those contracts: Go renders recursive document fragments and counts,
+HTMX replaces filtered panels after a 150 ms debounce, and TypeScript no longer
+reconstructs catalog state from list nodes. The 5,000-path benchmark measured
+4.08 ms/op against a 50 ms threshold. Only comparison custom-data state remains.
 Every milestone 17 commit must update
 the affected README, build, architecture, design, and status documentation in
 the same commit, then stop for maintainer approval before the next gate.
@@ -363,7 +366,7 @@ for explicit approval before starting the next item.
   revise the remaining gates, and stop before implementation.
 - [x] Commit 8A: add runtime-validated document catalog state and pure DOM-free
   tree/filter/count logic without activating it.
-- [ ] Commit 8B: server-render the document tree and counts; activate server
+- [x] Commit 8B: server-render the document tree and counts; activate server
   filtering only if the documented 5,000-path benchmark passes.
 - [ ] Commit 9: server-render comparison selection while retaining the JSON
   comparison API.
@@ -417,10 +420,10 @@ activates the versioned viewer-state endpoint and validates its unknown JSON
 payload into strongly typed TypeScript maps, and removes annotation/source/Mermaid/lifecycle
 application state from HTML. Follow-up C is the current documentation review
 gate and broadens the invariant from custom attributes to all DOM-derived
-application state. Commit 8A implements the inactive typed document catalog and
-pure tree/filter/count rules. The maintainer approved continuing directly
-through commit 8B, commit 9, and commit 10 for one combined review. Commit 8B
-is next and activates document-tree rendering and filtering.
+application state. Commits 8A and 8B implement and activate the typed document
+catalog, recursive server-rendered tree, counts, and server filtering. The
+maintainer approved continuing directly through commit 9 and commit 10 for one
+combined review. Commit 9 is next and server-renders comparison selection.
 
 Milestone 15 (cross-document open-comment status) is implemented and verified.
 Milestone 16 (skill-managed agent queue polling) is implemented and verified.

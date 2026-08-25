@@ -414,8 +414,19 @@ func TestChangedCatalogMetadata(t *testing.T) {
 			if got := strings.Contains(body, "Changed-file lookup unavailable."); got != test.wantError {
 				t.Errorf("lookup error present = %t, want %t", got, test.wantError)
 			}
-			if got := strings.Count(body, `data-changed="true"`); got != test.wantChanged {
-				t.Errorf("changed document count = %d, want %d", got, test.wantChanged)
+			stateResponse := getResponse(t, viewer.Handler(), "/ui/document-state")
+			var state documentCatalogState
+			if err := json.NewDecoder(stateResponse.Body).Decode(&state); err != nil {
+				t.Fatalf("decode document state: %v", err)
+			}
+			gotChanged := 0
+			for _, document := range state.Documents {
+				if document.Changed {
+					gotChanged++
+				}
+			}
+			if gotChanged != test.wantChanged {
+				t.Errorf("changed document count = %d, want %d", gotChanged, test.wantChanged)
 			}
 		})
 	}
@@ -1678,8 +1689,8 @@ func TestReviewPageEmbedding(t *testing.T) {
 				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
 			}
 			hasHTMX := strings.Contains(response.Body.String(), `src="/static/htmx.min.js"`)
-			if hasHTMX != test.wantHTMX {
-				t.Fatalf("page loads HTMX = %t, want %t", hasHTMX, test.wantHTMX)
+			if !hasHTMX {
+				t.Fatal("page does not load HTMX for document fragments")
 			}
 			hasToken := strings.Contains(response.Body.String(), `name="code-annotator-review-token" content="`+token+`"`)
 			if hasToken != test.wantToken {
@@ -1726,11 +1737,10 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get review navigation module", path: "/static/review-navigation.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationNavigator", "navigateFromAnnotation", "emphasizeNavigationTarget"}},
 		{name: "get review panel module", path: "/static/review-panel.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createReviewPanelController", "setAnnotationFormVisible", "startReviewPanelResize"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
-		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-tree.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./document-catalog.js", "./document-state.js", "bindPanelToggle", "documents-collapsed", "review-collapsed", "bindDocumentSearch", "open-comments"}},
 		{name: "get viewer state module", path: "/static/viewer-state.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"parseViewerState", "fetchViewerState", "viewer state schemaVersion is unsupported"}},
 		{name: "get document state module", path: "/static/document-state.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"parseDocumentCatalogState", "fetchDocumentCatalogState", "document state schemaVersion is unsupported"}},
 		{name: "get document catalog module", path: "/static/document-catalog.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "filterDocuments", "countDocumentsWithOpenComments", "hasChangedDocuments"}},
-		{name: "get document tree module", path: "/static/document-tree.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"buildDocumentTree", "updateTreeVisibility", "document-tree-expanded"}},
 		{name: "get viewer stylesheet", path: "/static/styles.css", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/css; charset=utf-8", wantContents: []string{".markdown-body", ".mermaid-output", ".review-panel", "font-variant-ligatures: none", "min-width: max-content"}},
 		{name: "get HTMX library", path: "/static/htmx.min.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"htmx", "2.0.10"}},
 		{name: "get Mermaid integration", path: "/static/mermaid.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{`securityLevel: "strict"`, "maxDiagramCharacters", "mermaid.render"}},

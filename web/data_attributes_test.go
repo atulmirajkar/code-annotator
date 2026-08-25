@@ -21,9 +21,7 @@ func TestAuthoredDataAttributesAreExplicitBaseline(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string][]string{
-		"web/src/document-tree.ts": {"document-path", "filter-match"},
-		"web/src/viewer.ts":        {"changed", "document-path", "filter-match"},
-		"web/templates/page.html":  {"active-commit", "changed", "document-path", "kind"},
+		"web/templates/page.html": {"active-commit"},
 	}
 
 	repository := repositoryRoot(t)

@@ -5,7 +5,7 @@
 Implementation in progress. Commit gates 0 through 7, commit 7 review
 follow-ups A and B, the commit 4 review follow-up, and the intervening role-only
 compatibility slice are approved. Commit 7 review follow-up C is approved.
-Commit 8A is implemented; the maintainer approved continuing through commits
+Commits 8A and 8B are implemented; the maintainer approved continuing through commits
 8B, 9, and 10 before the next combined review.
 
 This document defines milestone 17 in
@@ -761,6 +761,10 @@ Implementation notes:
 
 ### Commit 8B: server-render the document tree and benchmark filtering
 
+Status: implemented. A 5,000-path nested-tree filter and template-render
+benchmark measured 4.08 ms/op on Apple M1, below the 50 ms acceptance
+threshold; server filtering is active behind a 150 ms debounce.
+
 Scope:
 
 - add recursive document-tree and summary templates;
@@ -774,6 +778,15 @@ Scope:
 - update generated assets and documentation with the measured decision.
 
 Checks: unit, benchmark, server, `check:web`, Go/race, navigation Playwright.
+
+Implementation notes:
+
+- `GET /ui/review/documents` returns one recursive, escaped panel fragment;
+- server state owns filtering, URLs, open-comment counts, and tree structure;
+- the adapter uses programmatic HTMX swaps, validated catalog state for Enter,
+  and semantic directory IDs for tab-local presentation preferences;
+- flat DOM catalog reconstruction, manual count badges, document datasets,
+  source-mode link rewriting, and `document-tree.ts` are removed.
 
 ### Commit 9: server-render the comparison selector
 

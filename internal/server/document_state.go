@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"atulm/code-annotator/internal/annotation"
@@ -9,6 +11,12 @@ import (
 )
 
 const documentStateSchemaVersion = 1
+
+var (
+	errDocumentStateNotFound        = errors.New("document not found")
+	errDocumentStateMode            = errors.New("unsupported document mode")
+	errDocumentStateDiffUnavailable = errors.New("Changes view is unavailable")
+)
 
 // documentCatalogState is the inactive typed browser boundary for commit 8A.
 // Commit 8B will consume it instead of reconstructing catalog state from HTML.
@@ -34,38 +42,43 @@ type documentCatalogItem struct {
 }
 
 func (s *Server) handleDocumentState(response http.ResponseWriter, request *http.Request) {
-	index, err := s.root.IndexWithOptions(s.indexOptions)
+	state, err := s.readDocumentCatalogState(request.Context(), request.URL.Query().Get("document"), request.URL.Query().Get("mode"))
 	if err != nil {
-		http.Error(response, "could not index documents", http.StatusInternalServerError)
+		s.writeDocumentStateError(response, err)
 		return
 	}
+	response.Header().Set("Content-Type", "application/json; charset=utf-8")
+	response.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(response).Encode(state)
+}
 
-	selected := request.URL.Query().Get("document")
+func (s *Server) readDocumentCatalogState(ctx context.Context, selected, mode string) (documentCatalogState, error) {
+	index, err := s.root.IndexWithOptions(s.indexOptions)
+	if err != nil {
+		return documentCatalogState{}, err
+	}
+
 	if selected == "" {
 		selected = index.DefaultPath
 	} else if _, ok := findDocument(index, selected); !ok {
-		http.Error(response, "document not found", http.StatusNotFound)
-		return
+		return documentCatalogState{}, errDocumentStateNotFound
 	}
-	mode := request.URL.Query().Get("mode")
 	if mode == "" {
 		mode = "file"
 	}
 	if mode != "file" && mode != "diff" {
-		http.Error(response, "unsupported document mode", http.StatusBadRequest)
-		return
+		return documentCatalogState{}, errDocumentStateMode
 	}
 
 	active := s.activeComparison()
 	if mode == "diff" && active == nil {
-		http.Error(response, "Changes view is unavailable", http.StatusNotFound)
-		return
+		return documentCatalogState{}, errDocumentStateDiffUnavailable
 	}
 	changed := make(map[string]struct{})
 	changedAvailable := false
 	changedError := false
 	if active != nil {
-		paths, changedErr := active.ChangedPaths(request.Context())
+		paths, changedErr := active.ChangedPaths(ctx)
 		if changedErr != nil {
 			changedError = true
 		} else {
@@ -78,13 +91,20 @@ func (s *Server) handleDocumentState(response http.ResponseWriter, request *http
 
 	openCommentCounts, err := s.documentOpenCommentCounts(index)
 	if err != nil {
-		http.Error(response, "could not read annotations", http.StatusInternalServerError)
-		return
+		return documentCatalogState{}, err
 	}
-	state := newDocumentCatalogState(index, selected, mode, changed, changedAvailable, changedError, s.annotations != nil, openCommentCounts)
-	response.Header().Set("Content-Type", "application/json; charset=utf-8")
-	response.Header().Set("Cache-Control", "no-store")
-	_ = json.NewEncoder(response).Encode(state)
+	return newDocumentCatalogState(index, selected, mode, changed, changedAvailable, changedError, s.annotations != nil, openCommentCounts), nil
+}
+
+func (s *Server) writeDocumentStateError(response http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errDocumentStateNotFound), errors.Is(err, errDocumentStateDiffUnavailable):
+		http.Error(response, err.Error(), http.StatusNotFound)
+	case errors.Is(err, errDocumentStateMode):
+		http.Error(response, err.Error(), http.StatusBadRequest)
+	default:
+		http.Error(response, "could not load document state", http.StatusInternalServerError)
+	}
 }
 
 func (s *Server) documentOpenCommentCounts(index content.Index) (map[string]int, error) {
