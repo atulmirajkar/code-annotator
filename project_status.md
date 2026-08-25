@@ -294,7 +294,11 @@ Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-synta
   panes now receive independent bounded token ranges; current source IDs and
   annotation offsets remain stable, base rows remain non-selectable, and
   Markdown uses its grammar only in Changes view.
-- [ ] Complete submilestone 12.6: hardening and release.
+- [ ] Complete submilestone 12.6: hardening and release. Go/frontend/race
+  verification and six-platform builds pass, but the browser suite remains
+  environment-blocked (Edge aborts at launch) and the highlighted binaries are
+  currently 16.33–17.89% larger than the pre-highlighting artifacts, requiring
+  maintainer review against the 12.1 size budget.
 
 ### 13. Agent server discovery
 
