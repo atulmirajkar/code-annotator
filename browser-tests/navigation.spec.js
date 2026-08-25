@@ -97,6 +97,8 @@ test.describe("viewer navigation", () => {
     await writeFile(path.join(viewer.contentRoot, "nested", "other.md"), "# Other nested document\n");
     await page.goto(viewerURL);
 
+    await expect(page.locator(".documents > li").first()).toHaveClass(/document-directory/);
+
     const token = await page.locator('meta[name="code-annotator-review-token"]').getAttribute("content");
     const current = await page.request.get(`${viewerURL}api/annotations?document=nested%2Freviewed.md`);
     const currentPayload = await current.json();

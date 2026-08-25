@@ -1,9 +1,11 @@
 package server
 
 import (
+	"cmp"
 	"crypto/sha256"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 )
 
@@ -151,6 +153,9 @@ func buildDocumentTreeView(documents []documentCatalogItem) []documentTreeNodeVi
 }
 
 func freezeDocumentTree(nodes []*mutableDocumentTreeNode) []documentTreeNodeView {
+	// Sort every sibling group independently so directories precede files at
+	// each depth while names remain deterministic for navigation and tests.
+	slices.SortFunc(nodes, compareDocumentTreeNodes)
 	result := make([]documentTreeNodeView, 0, len(nodes))
 	for _, node := range nodes {
 		view := documentTreeNodeView{Key: node.key, Name: node.name, Directory: node.directory, Document: node.document}
@@ -163,6 +168,22 @@ func freezeDocumentTree(nodes []*mutableDocumentTreeNode) []documentTreeNodeView
 		result = append(result, view)
 	}
 	return result
+}
+
+func compareDocumentTreeNodes(left, right *mutableDocumentTreeNode) int {
+	if left.directory != right.directory {
+		if left.directory {
+			return -1
+		}
+		return 1
+	}
+	if order := cmp.Compare(strings.ToLower(left.name), strings.ToLower(right.name)); order != 0 {
+		return order
+	}
+	if order := cmp.Compare(left.name, right.name); order != 0 {
+		return order
+	}
+	return cmp.Compare(left.key, right.key)
 }
 
 func documentElementIdentity(value string) string {

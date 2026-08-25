@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -48,6 +49,35 @@ func TestDocumentTreeUsesStableSemanticIDs(t *testing.T) {
 	if first[0].ElementID != second[0].ElementID || !strings.HasPrefix(first[0].ElementID, "document-directory-") {
 		t.Fatalf("directory ID is not stable: %q, %q", first[0].ElementID, second[0].ElementID)
 	}
+}
+
+func TestDocumentTreeSortsDirectoriesBeforeFilesAtEveryLevel(t *testing.T) {
+	t.Parallel()
+	documents := []documentCatalogItem{
+		{Path: "Z.md", Name: "Z.md"},
+		{Path: "alpha/z.go", Name: "z.go"},
+		{Path: "a.md", Name: "a.md"},
+		{Path: "zeta/file.go", Name: "file.go"},
+		{Path: "alpha/nested/file.go", Name: "file.go"},
+		{Path: "alpha/a.go", Name: "a.go"},
+		{Path: "alpha/Beta/file.go", Name: "file.go"},
+	}
+
+	tree := buildDocumentTreeView(documents)
+	if got, want := documentTreeNodeNames(tree), []string{"alpha", "zeta", "a.md", "Z.md"}; !slices.Equal(got, want) {
+		t.Fatalf("root order = %v, want %v", got, want)
+	}
+	if got, want := documentTreeNodeNames(tree[0].Children), []string{"Beta", "nested", "a.go", "z.go"}; !slices.Equal(got, want) {
+		t.Fatalf("nested order = %v, want %v", got, want)
+	}
+}
+
+func documentTreeNodeNames(nodes []documentTreeNodeView) []string {
+	names := make([]string, 0, len(nodes))
+	for _, node := range nodes {
+		names = append(names, node.Name)
+	}
+	return names
 }
 
 func BenchmarkDocumentPanel5000(b *testing.B) {
