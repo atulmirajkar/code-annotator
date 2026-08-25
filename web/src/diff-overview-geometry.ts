@@ -1,17 +1,29 @@
+// All coordinates in this module are CSS pixels measured along the vertical
+// axis. Keeping that convention here lets the browser controller translate DOM
+// measurements into a small, deterministic model that can be tested without a
+// browser runtime.
 export interface DiffOverviewRange {
+  // Stable hunk identifier shared with the server-rendered navigation target.
   readonly id: string;
+  // Inclusive top and exclusive bottom in the full diff's scrollable content.
   readonly start: number;
   readonly end: number;
 }
 
+// Inputs needed to project diff hunks onto the overview track. The controller
+// supplies CSS-pixel dimensions and the current device-pixel ratio.
 export interface DiffOverviewGeometry {
   readonly contentHeight: number;
   readonly trackHeight: number;
+  // Small hunks remain discoverable even when their proportional size is tiny.
   readonly minimumMarkerHeight: number;
   readonly markerGap: number;
   readonly devicePixelRatio: number;
 }
 
+// A marker normally represents one hunk. In density mode multiple hunks may
+// occupy the same device-pixel slot; densityGroup and densityCount expose that
+// fact without dropping their individual navigation identities.
 export interface DiffOverviewMarkerLayout {
   readonly id: string;
   readonly top: number;
@@ -35,6 +47,7 @@ export interface DiffOverviewViewportLayout {
 
 export interface DiffOverviewLocation {
   readonly id: string;
+  // "current" intersects the viewport; "next" is the first hunk below it.
   readonly state: "current" | "next";
 }
 
@@ -44,6 +57,13 @@ interface MutableMarkerLayout {
   readonly height: number;
 }
 
+/**
+ * Projects ordered, non-overlapping hunk ranges onto the ruler track.
+ *
+ * The normal path preserves a visible minimum marker size and separates close
+ * markers by packing them. When that is mathematically impossible, the density
+ * path reduces markers to device-pixel slots while retaining every hunk ID.
+ */
 export function layoutDiffOverviewMarkers(
   ranges: ReadonlyArray<DiffOverviewRange>,
   geometry: DiffOverviewGeometry,
@@ -53,6 +73,8 @@ export function layoutDiffOverviewMarkers(
   if (ranges.length === 0) return [];
 
   const markers = ranges.map((range) => idealMarkerLayout(range, geometry));
+  // Decide whether every minimum-sized marker plus its gap can fit before
+  // packing. This prevents the packing pass from manufacturing negative tops.
   const requiredHeight = markers.reduce(
     (total, marker) => total + marker.height,
     Math.max(0, ranges.length - 1) * geometry.markerGap,
@@ -69,6 +91,7 @@ export function layoutDiffOverviewMarkers(
   }));
 }
 
+/** Projects the visible portion of the diff onto the overview track. */
 export function layoutDiffOverviewViewport(
   geometry: DiffOverviewViewportGeometry,
 ): DiffOverviewViewportLayout {
@@ -91,6 +114,8 @@ export function layoutDiffOverviewViewport(
   const rawHeight =
     ((visibleEnd - visibleStart) / geometry.contentHeight) *
     geometry.trackHeight;
+  // Grow a very short viewport indicator around its proportional center. Near
+  // either track edge the final clamp moves the whole indicator back in bounds.
   const height = Math.min(
     geometry.trackHeight,
     Math.max(geometry.minimumHeight, rawHeight),
@@ -102,6 +127,11 @@ export function layoutDiffOverviewViewport(
   };
 }
 
+/**
+ * Finds the hunk the ruler should emphasize for the current viewport.
+ * Intersections win over a later hunk, and document order breaks ties when a
+ * tall viewport intersects more than one range.
+ */
 export function selectDiffOverviewLocation(
   ranges: ReadonlyArray<DiffOverviewRange>,
   visibleStart: number,
@@ -130,6 +160,8 @@ function idealMarkerLayout(
   const top = (range.start / geometry.contentHeight) * geometry.trackHeight;
   const proportionalHeight =
     ((range.end - range.start) / geometry.contentHeight) * geometry.trackHeight;
+  // Clamp after applying the minimum so a marker at the end of the document
+  // grows upward rather than extending beyond the track.
   const height = Math.min(
     geometry.trackHeight,
     Math.max(geometry.minimumMarkerHeight, proportionalHeight),
@@ -172,12 +204,17 @@ function layoutDensityMarkers(
   ranges: ReadonlyArray<DiffOverviewRange>,
   geometry: DiffOverviewGeometry,
 ): ReadonlyArray<DiffOverviewMarkerLayout> {
+  // One slot corresponds to one physical device pixel. Higher-density displays
+  // therefore gain more independent slots without introducing sub-pixel gaps
+  // that the browser cannot render distinctly.
   const slotCount = Math.max(
     1,
     Math.floor(geometry.trackHeight * geometry.devicePixelRatio),
   );
   const slotHeight = geometry.trackHeight / slotCount;
   const slots = ranges.map((range) => {
+    // The midpoint best represents a hunk after its height has collapsed to a
+    // single slot; using only the start would bias long hunks toward the top.
     const center = (range.start + range.end) / 2;
     return Math.min(
       slotCount - 1,
@@ -187,6 +224,9 @@ function layoutDensityMarkers(
   const counts = new Map<number, number>();
   for (const slot of slots) counts.set(slot, (counts.get(slot) ?? 0) + 1);
 
+  // Emit one layout per input range even when layouts overlap. The controller
+  // can make a shared slot clickable as a group while retaining the count and
+  // each hunk's stable ID for navigation and accessibility.
   return ranges.map((range, index) => {
     const slot = requireAt(slots, index);
     const densityCount = counts.get(slot) ?? 1;
@@ -222,6 +262,8 @@ function validateRanges(
     identifiers.add(range.id);
     requireFinite(range.start, `${range.id}.start`);
     requireFinite(range.end, `${range.id}.end`);
+    // Requiring document order and non-overlap keeps current/next selection and
+    // both packing passes deterministic; callers must normalize DOM ranges.
     if (
       range.start < previousEnd ||
       range.start < 0 ||
@@ -235,6 +277,8 @@ function validateRanges(
 }
 
 function rangeContentHeight(ranges: ReadonlyArray<DiffOverviewRange>): number {
+  // Selection only compares relative range positions, so the final end is a
+  // sufficient validation boundary. Empty input still needs a positive bound.
   return ranges.length === 0 ? 1 : requireAt(ranges, ranges.length - 1).end;
 }
 
