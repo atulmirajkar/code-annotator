@@ -117,6 +117,30 @@ Annotations created in Changes view appear in File view because both views
 anchor to the same current bytes. Existing annotations also appear in Changes
 view when their current anchor resolves.
 
+### Diff overview ruler
+
+Changes view reserves a narrow ruler column beside the current pane. One marker
+represents each maximal contiguous run of changed aligned rows across the
+complete file. Added and deleted hunks use their corresponding diff colors;
+replacement or mixed hunks use both. Marker positions and lengths are
+proportional to the complete aligned diff, while a separate viewport indicator
+shows which portion is visible. The intersecting hunk is current; otherwise the
+first hunk below the viewport is next.
+
+The ruler is sticky within the diff bounds and follows the existing vertical
+scroll owner: `.document` on desktop and Window in responsive layouts. It does
+not add a vertical scrollbar, cover source text, or move with either pane's
+independent horizontal scroll. Activating an ordinary, accessible marker link
+centers its first current-side cell and retains marker focus. If enhancement
+cannot validate or measure the server targets, the links retain native fragment
+navigation. Extremely dense files group visible marks by device-pixel slot
+without dropping any hunk link.
+
+The detailed geometry, progressive-enhancement, accessibility, failure, and
+verification contract is recorded in
+[`diff-overview-ruler.md`](diff-overview-ruler.md). All six implementation gates
+in that design are complete.
+
 ### Changed-files filter
 
 When `--diff-base` is configured, the document sidebar adds a `Changed only`

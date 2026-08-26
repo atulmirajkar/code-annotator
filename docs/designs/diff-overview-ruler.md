@@ -2,9 +2,9 @@
 
 ## Status
 
-Approved on 2026-08-25. Implementation is complete through review gate 5 and
-stopped for maintainer review. The server derives request-local hunks and
-renders semantic targets and progressive-enhancement overview links. DOM-free
+Approved and implemented on 2026-08-25. All six review gates are complete. The
+server derives request-local hunks and renders semantic targets and
+progressive-enhancement overview links. DOM-free
 TypeScript owns ruler geometry, while a focused browser adapter validates those
 targets, discovers the active scroll owner, coalesces measurement updates,
 projects marker and viewport styles, and intercepts unmodified activation.
@@ -12,8 +12,9 @@ The fourth diff grid column, sticky track, marker kinds, current/next treatment,
 and accessible focus states are active. A dedicated long-file Playwright
 fixture now verifies five separated hunks plus an 800-hunk density stress case,
 navigation, scroll ownership, responsive layout, themes, focus, and horizontal
-pane independence. The remaining gate closes out implemented-behavior
-documentation and repeats the complete verification matrix.
+pane independence. README, code-review, architecture, design, and project-status
+documentation describe the implemented behavior; `docs/build.md` remains
+unchanged because the contributor and release workflow did not change.
 
 ## Problem
 
@@ -348,7 +349,7 @@ a diff-unavailable page retain their current markup and behavior.
 
 ## Browser component
 
-A focused `web/src/diff-overview.ts` module will expose one entrypoint:
+A focused `web/src/diff-overview.ts` module exposes one entrypoint:
 
 ```ts
 export function bindDiffOverview(environment: DiffOverviewEnvironment): void;
@@ -358,7 +359,7 @@ Its environment receives `Document`, `Window`, `ResizeObserver`, and
 `requestAnimationFrame` ports explicitly. `viewer.ts` only passes those
 dependencies and remains a composition root.
 
-The component will:
+The component:
 
 - find the optional ruler and its server-rendered links;
 - validate that every same-page fragment resolves to a unique element inside
@@ -440,7 +441,7 @@ undeclared global.
 
 ### Playwright tests
 
-A long multi-hunk fixture will verify behavior in a real browser:
+A long multi-hunk fixture verifies behavior in a real browser:
 
 - marker count, order, classification, and proportional vertical order;
 - off-screen hunks retain markers inside the visible track, including a hunk
@@ -457,12 +458,12 @@ A long multi-hunk fixture will verify behavior in a real browser:
   page-level horizontal overflow; and
 - markers and focus treatment remain distinguishable in light and dark modes.
 
-The implementation is complete only after `npm run check:web`, the focused
-Playwright diff suite, `go test ./...`, and `go vet ./...` pass.
+The completed implementation passes `npm run check:web`, the focused Playwright
+diff suite, `go test ./...`, and `go vet ./...`.
 
-## Documentation impact when implemented
+## Implemented documentation
 
-The implementation change will update:
+The completed implementation updates:
 
 - `README.md` with the ruler's navigation behavior;
 - `docs/designs/code-review.md` with the implemented Changes-view contract;
@@ -470,8 +471,20 @@ The implementation change will update:
 - `docs/build.md` only if the contributor workflow changes; and
 - `project_status.md` with the completed milestone and verification results.
 
-This document remains explicit about implementation status until the feature
-and its verification are complete.
+This document remains the detailed design and verification contract for the
+implemented feature.
+
+## Final verification
+
+Final verification completed on 2026-08-25 with:
+
+- `npm run check:web`: 12 Vitest files and 55 tests passed; TypeScript,
+  generated JavaScript, and generated CSS rebuilt without a diff;
+- `npm run test:browser`: all 47 Playwright scenarios passed, including the six
+  dedicated ruler scenarios;
+- `go test ./...`: passed;
+- `go vet ./...`: passed; and
+- `go test -race ./...`: passed.
 
 ## Review-gated implementation commits
 

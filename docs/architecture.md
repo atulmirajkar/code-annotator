@@ -448,6 +448,15 @@ resizable divider between them; the chosen split is a tab-scoped preference.
 The File/Changes toolbar and revision selector are sticky beneath the topbar
 so they remain visible while scrolling a long file.
 
+The trailing overview ruler is another grid column rather than an overlay or
+scroll container. `internal/render` supplies ordered semantic hunk links and
+current-side range identities. `diff-overview.ts` resolves those identities,
+measures the active scroll owner, and projects the DOM-free geometry results as
+CSS custom properties. The track remains inside the diff bounds and follows
+`.document` or Window as responsive CSS transfers vertical scrolling. Failed
+validation leaves the server-rendered fragment links usable and does not alter
+the diff panes.
+
 Fenced `mermaid` blocks load the embedded Mermaid Tiny bundle only on pages that
 need it. Mermaid runs with strict security and a bounded input size, and no
 diagram asset is fetched at runtime. The default Content Security Policy allows

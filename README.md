@@ -64,10 +64,10 @@ interaction values, and narrow injected ports. Viewer interfaces and helpers
 remain at module scope; its initializer only wires dependencies, and handlers
 receive any shared mutable state through explicit typed context parameters.
 `web/src/viewer.ts` is a composition root. Layout, document search, document
-tree, comparison, diff-divider, environment, and safe-storage concerns live in
-focused modules. The document-tree module keeps a typed set of explicit
-collapses across server-rendered HTMX swaps, so newly revealed directories
-default to expanded.
+tree, comparison, diff-divider, diff-overview, environment, and safe-storage
+concerns live in focused modules. The document-tree module keeps a typed set of
+explicit collapses across server-rendered HTMX swaps, so newly revealed
+directories default to expanded.
 The review entrypoint follows the same convention: its initializer composes a
 typed context, while event handlers and state transitions remain module-level.
 Review controllers receive document, window, storage, and HTMX ports explicitly.
@@ -232,11 +232,16 @@ if the content root is outside its Git worktree or the revision is unavailable.
 Cataloged source files then offer a **File** and **Changes** toggle. Changes
 renders the base and current text side by side in independently scrollable
 panes with a draggable, keyboard-resizable divider, and the toolbar stays
-visible while scrolling a long file. A revision selector next to the toggle
-re-pins the comparison base to any other locally available commit; selecting
-one reloads the page against the new base. The base is always one explicit
-commit and never moves on its own, so it keeps showing an agent's committed
-change until a reviewer chooses a different base.
+visible while scrolling a long file. A sticky overview ruler beside the current
+pane shows every contiguous change hunk across the complete file, distinguishes
+added, deleted, and modified hunks, indicates the visible range and current or
+next change, and lets pointer or keyboard users jump directly to a hunk. It
+follows the existing desktop or responsive scroll owner without adding another
+scrollbar. A revision selector next to the toggle re-pins the comparison base
+to any other locally available commit; selecting one reloads the page against
+the new base. The base is always one explicit commit and never moves on its own,
+so it keeps showing an agent's committed change until a reviewer chooses a
+different base.
 
 When comparison is configured, the document sidebar also offers **Changed
 only**. It includes supported tracked changes against the active base and
@@ -355,8 +360,10 @@ The suite defaults to the `msedge` Playwright channel. Override it with
 
 These tests start an isolated review server and cover Mermaid rendering,
 diagram selection, annotation mutation workflows, stale-anchor reattachment,
-and optimistic-concurrency conflicts. Node.js and Playwright are development
-dependencies only; released `code-annotator` binaries remain self-contained.
+optimistic-concurrency conflicts, side-by-side diff behavior, and the long-file
+overview ruler across desktop, responsive, light, dark, and high-density cases.
+Node.js and Playwright are development dependencies only; released
+`code-annotator` binaries remain self-contained.
 
 ### Agent skill
 
@@ -424,6 +431,7 @@ The Skills CLI discovers the skill directly from `.agents/skills/`.
 - [MVP design](docs/designs/mvp.md)
 - [Annotation review design](docs/designs/annotations.md)
 - [Code review and Git diff design](docs/designs/code-review.md)
+- [Diff overview ruler design](docs/designs/diff-overview-ruler.md)
 - [Server-rendered review UI and testable TypeScript design](docs/designs/server-rendered-review-ui.md)
 - [Agent server discovery design](docs/designs/server-discovery.md)
 - [Architecture](docs/architecture.md)

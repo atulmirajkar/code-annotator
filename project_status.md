@@ -4,9 +4,9 @@ Last updated: 2026-08-25
 
 ## Current state
 
-**Phase:** Diff overview ruler implementation is complete through review gate 5
-and stopped for maintainer review. The approved design and six review gates are
-documented in
+**Phase:** Diff overview ruler implementation is complete and verified through
+all six review gates, and stopped for maintainer review. The approved design and
+six review gates are documented in
 [`docs/designs/diff-overview-ruler.md`](docs/designs/diff-overview-ruler.md).
 The renderer now derives request-local added, deleted, and modified hunks from
 the complete aligned diff rows, identifies each range through its existing
@@ -30,8 +30,12 @@ added hunks, including a final hunk near EOF. Six focused real-browser scenarios
 cover proportional order and bounds, pointer and keyboard centering, viewport
 movement, desktop and Window scroll owners, horizontal pane independence,
 narrow overflow, light and dark marker treatment, focus, and an 800-link density
-stress case. The complete 47-scenario browser suite passes. Gate 6 remains for
-implemented-behavior documentation and the final complete verification matrix.
+stress case. Gate 6 reconciled README, code-review, architecture, design, and
+project-status documentation; `docs/build.md` did not change because the build
+and contributor workflow stayed the same. Final verification passed
+`npm run check:web` (12 Vitest files, 55 tests, and reproducible generated
+assets), all 47 Playwright scenarios, `go test ./...`, `go vet ./...`, and
+`go test -race ./...`.
 
 Server-rendered review UI milestone 17 is complete through commit 11.
 The approved design and ordered review gates are documented in
