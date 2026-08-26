@@ -4,9 +4,13 @@ interface ComparisonControlContext {
   token: string;
 }
 
+let activeBindings: AbortController | null = null;
+
 // Comparison choices are server-rendered and validated. The browser supplies
 // submission feedback and the loopback-only mutation token.
 export function bindComparisonControl(document: Document): void {
+  activeBindings?.abort();
+  activeBindings = null;
   const control = document.querySelector<HTMLFormElement>(
     ".diff-comparison-control",
   );
@@ -19,13 +23,17 @@ export function bindComparisonControl(document: Document): void {
   const status = control?.querySelector<HTMLElement>(".diff-comparison-status");
   if (!control || !token || !selector || !status) return;
   const context: ComparisonControlContext = { control, status, token };
+  const bindings = new AbortController();
+  activeBindings = bindings;
 
-  selector.addEventListener("change", () => handleComparisonChange(context));
+  selector.addEventListener("change", () => handleComparisonChange(context), {
+    signal: bindings.signal,
+  });
   document.body.addEventListener("htmx:configRequest", (event) =>
-    handleComparisonConfigRequest(context, event),
+    handleComparisonConfigRequest(context, event), { signal: bindings.signal },
   );
   document.body.addEventListener("htmx:responseError", (event) =>
-    handleComparisonResponseError(context, event),
+    handleComparisonResponseError(context, event), { signal: bindings.signal },
   );
 }
 

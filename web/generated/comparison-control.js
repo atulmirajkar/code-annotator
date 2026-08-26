@@ -1,6 +1,9 @@
+let activeBindings = null;
 // Comparison choices are server-rendered and validated. The browser supplies
 // submission feedback and the loopback-only mutation token.
 export function bindComparisonControl(document) {
+    activeBindings?.abort();
+    activeBindings = null;
     const control = document.querySelector(".diff-comparison-control");
     const token = document.querySelector('meta[name="code-annotator-comparison-token"]')?.content ?? "";
     const selector = control?.querySelector(".revision-selector");
@@ -8,9 +11,13 @@ export function bindComparisonControl(document) {
     if (!control || !token || !selector || !status)
         return;
     const context = { control, status, token };
-    selector.addEventListener("change", () => handleComparisonChange(context));
-    document.body.addEventListener("htmx:configRequest", (event) => handleComparisonConfigRequest(context, event));
-    document.body.addEventListener("htmx:responseError", (event) => handleComparisonResponseError(context, event));
+    const bindings = new AbortController();
+    activeBindings = bindings;
+    selector.addEventListener("change", () => handleComparisonChange(context), {
+        signal: bindings.signal,
+    });
+    document.body.addEventListener("htmx:configRequest", (event) => handleComparisonConfigRequest(context, event), { signal: bindings.signal });
+    document.body.addEventListener("htmx:responseError", (event) => handleComparisonResponseError(context, event), { signal: bindings.signal });
 }
 function handleComparisonChange(context) {
     context.status.textContent = "Updating comparison base…";

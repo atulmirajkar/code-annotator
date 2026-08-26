@@ -2,9 +2,12 @@ import { layoutDiffOverviewMarkers, layoutDiffOverviewViewport, selectDiffOvervi
 const minimumMarkerHeight = 3;
 const markerGap = 1;
 const minimumViewportHeight = 4;
+let cleanupActiveOverview = null;
 // The server owns hunk identity and link order. This component validates that
 // contract once, then owns only measurements and browser interaction state.
 export function bindDiffOverview(environment) {
+    cleanupActiveOverview?.();
+    cleanupActiveOverview = null;
     const ruler = environment.document.querySelector(".diff-overview");
     if (!ruler)
         return;
@@ -40,10 +43,18 @@ export function bindDiffOverview(environment) {
     context.scrollHandler = () => scheduleUpdate(context);
     observer.observe(view);
     observer.observe(ruler);
-    environment.window.addEventListener("resize", () => scheduleUpdate(context));
+    const handleResize = () => scheduleUpdate(context);
+    environment.window.addEventListener("resize", handleResize);
     for (const item of items) {
         item.marker.addEventListener("click", (event) => activateMarker(context, item, event));
     }
+    cleanupActiveOverview = () => {
+        observer.disconnect();
+        environment.window.removeEventListener("resize", handleResize);
+        if (context.scrollOwner && context.scrollHandler) {
+            context.scrollOwner.removeEventListener("scroll", context.scrollHandler);
+        }
+    };
     scheduleUpdate(context);
 }
 function resolveOverviewItems(document, ruler, currentPane) {

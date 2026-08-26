@@ -51,6 +51,8 @@ const selectionFieldNames = [
   "selection_end_byte",
   "document_sha256",
 ] as const;
+let activeReviewCleanup: (() => void) | null = null;
+let reviewGeneration = 0;
 
 // initializeReview is a composition root: it resolves required elements,
 // loads typed state, creates focused controllers, and wires module-level event
@@ -58,6 +60,9 @@ const selectionFieldNames = [
 export async function initializeReview(
   environment: ReviewEnvironment = defaultReviewEnvironment(),
 ): Promise<void> {
+  const generation = ++reviewGeneration;
+  activeReviewCleanup?.();
+  activeReviewCleanup = null;
   const panel =
     environment.document.querySelector<HTMLElement>(".review-panel");
   if (!panel) return;
@@ -82,7 +87,7 @@ export async function initializeReview(
     mode,
     panelController,
   );
-  if (!viewerState) return;
+  if (!viewerState || generation !== reviewGeneration || !panel.isConnected) return;
 
   prepareDiagramSelection(environment.document, elements.markdown, viewerState);
 
@@ -138,8 +143,12 @@ export async function initializeReview(
     navigateFromAnnotation: navigator.navigateFromAnnotation,
   };
 
-  bindReviewEvents(context, environment.htmx);
+  const bindings = bindReviewEvents(context, environment.htmx);
   selectionController.start();
+  activeReviewCleanup = () => {
+    bindings.abort();
+    selectionController.stop();
+  };
   initializePanel(context);
 }
 
@@ -278,15 +287,16 @@ function prepareDiagramSelection(
 function bindReviewEvents(
   context: ReviewContext,
   htmx: ReviewHtmxAPI | null,
-): void {
+): AbortController {
+  const bindings = new AbortController();
   context.panel.addEventListener("click", (event) =>
-    handleReviewPanelClick(context, event),
+    handleReviewPanelClick(context, event), { signal: bindings.signal },
   );
   context.panel.addEventListener("change", (event) =>
-    handleReviewPanelChange(context, event),
+    handleReviewPanelChange(context, event), { signal: bindings.signal },
   );
   context.form.addEventListener("submit", () =>
-    context.panelController.setFormStatus("Saving…"),
+    context.panelController.setFormStatus("Saving…"), { signal: bindings.signal },
   );
   configureReviewHTMX({
     document: context.document,
@@ -301,7 +311,9 @@ function bindReviewEvents(
         "Could not update annotations. Refresh to try again.",
         true,
       ),
+    signal: bindings.signal,
   });
+  return bindings;
 }
 
 function handleReviewPanelClick(
@@ -502,4 +514,7 @@ function initializePanel(context: ReviewContext): void {
   context.renderAnnotationHighlights(annotations);
 }
 
+document.addEventListener("code-annotator:viewer-navigated", () => {
+  void initializeReview();
+});
 void initializeReview();

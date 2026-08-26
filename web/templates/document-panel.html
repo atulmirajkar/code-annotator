@@ -7,7 +7,7 @@
     </li>
     {{else}}{{with .Document}}
     <li class="document-file">
-      <a href="{{.URL}}"{{if .Selected}} aria-current="page" class="selected"{{end}}>
+      <a href="{{.URL}}" hx-boost="true" hx-target=".document" hx-select=".document" hx-select-oob="#annotation-sidebar:outerHTML" hx-swap="outerHTML show:none"{{if .Selected}} aria-current="page" class="selected"{{end}}>
         {{.Name}}{{if eq .Kind "code"}}<span class="document-kind">code</span>{{end}}
         {{if .OpenCommentCount}}<span class="document-open-count" aria-label="{{.OpenCommentCount}} open comments">{{.OpenCommentCount}}</span>{{end}}
       </a>

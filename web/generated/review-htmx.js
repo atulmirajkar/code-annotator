@@ -40,7 +40,7 @@ function targetsPanel(event, detailValue) {
         (event.target instanceof HTMLElement &&
             event.target.id === "annotation-panel-content"));
 }
-export function configureReviewHTMX({ document, api, panel, token, getRevision, onPanelChanged, onRequestError, }) {
+export function configureReviewHTMX({ document, api, panel, token, getRevision, onPanelChanged, onRequestError, signal, }) {
     if (!api)
         throw new Error("HTMX is unavailable on a review page");
     api.config.allowEval = false;
@@ -63,7 +63,7 @@ export function configureReviewHTMX({ document, api, panel, token, getRevision, 
             return;
         Reflect.set(value.headers, "X-Code-Annotator-Token", token);
         Reflect.set(value.headers, "If-Match", JSON.stringify(getRevision()));
-    });
+    }, { signal });
     document.body.addEventListener("htmx:beforeSwap", (event) => {
         const value = detail(event);
         if (!value ||
@@ -72,7 +72,7 @@ export function configureReviewHTMX({ document, api, panel, token, getRevision, 
             return;
         value.shouldSwap = true;
         value.isError = false;
-    });
+    }, { signal });
     document.body.addEventListener("htmx:afterSwap", (event) => {
         const value = detail(event);
         if (!value || !targetsPanel(event, value))
@@ -81,10 +81,10 @@ export function configureReviewHTMX({ document, api, panel, token, getRevision, 
         void onPanelChanged(requestMutationKind, requestMethod === "post", responseStatus >= 200 && responseStatus < 300);
         requestMutationKind = null;
         requestMethod = "";
-    });
+    }, { signal });
     document.body.addEventListener("htmx:responseError", (event) => {
         const value = detail(event);
         if (value && targetsPanel(event, value))
             onRequestError();
-    });
+    }, { signal });
 }

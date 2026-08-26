@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles":false}'>
   {{if .ReviewToken}}<meta name="code-annotator-review-token" content="{{.ReviewToken}}">{{end}}
   {{if .DiffCommit}}<meta name="code-annotator-diff-base" content="{{.DiffBase}}">
   <meta name="code-annotator-diff-commit" content="{{.DiffCommit}}">{{end}}
   {{if .ComparisonToken}}<meta name="code-annotator-comparison-token" content="{{.ComparisonToken}}">{{end}}
   <title>{{if .Selected}}{{.Selected}} · {{end}}code-annotator</title>
+  <script src="/static/theme-bootstrap.js"></script>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
@@ -18,8 +20,13 @@
       {{if .ReviewToken}}<button type="button" class="panel-toggle review-toggle" aria-controls="annotation-sidebar" aria-expanded="true">Hide annotations</button>{{end}}
     </div>
     <span class="root" title="{{.Root}}">{{.Root}}</span>
+    <button type="button" class="theme-toggle" aria-label="Switch color theme" title="Switch color theme">
+      <span class="theme-icon theme-icon-sun" aria-hidden="true"></span>
+      <span class="theme-icon theme-icon-moon" aria-hidden="true" hidden></span>
+    </button>
   </header>
   <div class="layout{{if .ReviewToken}} review-layout{{end}}">
+    <script src="/static/layout-bootstrap.js"></script>
     <nav class="sidebar" id="documents-sidebar" aria-label="Reviewable documents">
       <h2>Documents</h2>
       {{template "document-panel" .DocumentPanel}}
@@ -32,8 +39,8 @@
       </section>
       {{else}}
       {{if or .IsCode .DiffAvailable}}<nav class="source-mode-tabs" aria-label="Source view">
-        <a href="{{.FileURL}}"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
-        {{if .DiffAvailable}}<a href="{{.ChangesURL}}"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
+        <a href="{{.FileURL}}" hx-boost="true" hx-target=".document" hx-select=".document" hx-select-oob="#annotation-sidebar:outerHTML" hx-swap="outerHTML show:none"{{if not .DiffMode}} aria-current="page"{{end}}>File</a>
+        {{if .DiffAvailable}}<a href="{{.ChangesURL}}" hx-boost="true" hx-target=".document" hx-select=".document" hx-select-oob="#annotation-sidebar:outerHTML" hx-swap="outerHTML show:none"{{if .DiffMode}} aria-current="page"{{end}}>Changes</a>{{end}}
         {{if and .DiffAvailable .DiffMode}}{{if .Comparison}}{{template "comparison-control" .Comparison}}{{else}}<span class="diff-comparison" title="Frozen Git base {{.DiffCommit}}">Base: {{.DiffBase}} ({{.DiffCommitShort}})</span>{{end}}{{end}}
       </nav>{{end}}
       <article class="markdown-body">{{.Content}}</article>

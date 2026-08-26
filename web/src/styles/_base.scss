@@ -1,8 +1,39 @@
 @use "tokens" as *;
 
+@mixin dark-theme {
+  color-scheme: dark;
+  --background: #101318;
+  --surface: #171b22;
+  --border: #303744;
+  --text: #e8ecf2;
+  --muted: #9da7b5;
+  --accent: #91a7ff;
+  --accent-soft: #242d52;
+  --waiting-bg: #4a3511;
+  --waiting-text: #ffd08a;
+  --code: #252b34;
+  --diff-added: #183b2a;
+  --diff-deleted: #482428;
+  --diff-added-marker: #62d98b;
+  --diff-deleted-marker: #ff8798;
+  --syntax-keyword: #c4b5fd;
+  --syntax-string: #5eead4;
+  --syntax-comment: #9da7b5;
+  --syntax-number: #fbbf24;
+  --syntax-type: #93c5fd;
+  --syntax-function: #7dd3fc;
+  --syntax-property: #f9a8d4;
+  --syntax-constant: #fcd34d;
+  --syntax-operator: #cbd5e1;
+  --syntax-attribute: #fda4af;
+  --syntax-tag: #6ee7b7;
+  --syntax-punctuation: #cbd5e1;
+  --syntax-variable: #e2e8f0;
+}
+
 :root {
   --topbar-height: 3.5rem;
-  color-scheme: light dark;
+  color-scheme: light;
   --background: #f6f7f9;
   --surface: #ffffff;
   --border: #d8dee7;
@@ -33,35 +64,13 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #101318;
-    --surface: #171b22;
-    --border: #303744;
-    --text: #e8ecf2;
-    --muted: #9da7b5;
-    --accent: #91a7ff;
-    --accent-soft: #242d52;
-    --waiting-bg: #4a3511;
-    --waiting-text: #ffd08a;
-    --code: #252b34;
-    --diff-added: #183b2a;
-    --diff-deleted: #482428;
-    --diff-added-marker: #62d98b;
-    --diff-deleted-marker: #ff8798;
-    --syntax-keyword: #c4b5fd;
-    --syntax-string: #5eead4;
-    --syntax-comment: #9da7b5;
-    --syntax-number: #fbbf24;
-    --syntax-type: #93c5fd;
-    --syntax-function: #7dd3fc;
-    --syntax-property: #f9a8d4;
-    --syntax-constant: #fcd34d;
-    --syntax-operator: #cbd5e1;
-    --syntax-attribute: #fda4af;
-    --syntax-tag: #6ee7b7;
-    --syntax-punctuation: #cbd5e1;
-    --syntax-variable: #e2e8f0;
+  :root:not(.theme-light) {
+    @include dark-theme;
   }
+}
+
+:root.theme-dark {
+  @include dark-theme;
 }
 
 * {
@@ -111,7 +120,40 @@ a {
     color: var(--accent);
   }
 }
+.theme-toggle {
+  @include control-surface;
+  display: grid;
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  padding: 0.35rem;
+  place-items: center;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .theme-icon {
+    display: block;
+    width: 1rem;
+    height: 1rem;
+    background: currentColor;
+    mask-position: center;
+    mask-repeat: no-repeat;
+    mask-size: contain;
+  }
+  .theme-icon-sun {
+    mask-image: url("/static/assets/theme-sun.svg");
+  }
+  .theme-icon-moon {
+    mask-image: url("/static/assets/theme-moon.svg");
+  }
+  .theme-icon[hidden] {
+    display: none;
+  }
+}
 .root {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--muted);

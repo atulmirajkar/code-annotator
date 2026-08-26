@@ -31,6 +31,7 @@ describe("review HTMX adapter", () => {
       getRevision: () => "revision-1",
       onPanelChanged: vi.fn(),
       onRequestError: vi.fn(),
+      signal: new AbortController().signal,
     });
     form.dispatchEvent(
       new CustomEvent("htmx:configRequest", {

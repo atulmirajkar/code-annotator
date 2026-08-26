@@ -34,6 +34,39 @@ export function bindDocumentSearch(environment) {
     environment.document.addEventListener("code-annotator:annotations-updated", () => handleAnnotationsUpdated(context));
     environment.document.addEventListener("keydown", (event) => handleDocumentSearchKeydown(context, event));
     environment.document.addEventListener("keydown", (event) => handleDocumentShortcutKeydown(context, event));
+    environment.document.addEventListener("code-annotator:viewer-navigated", () => handleViewerNavigation(context));
+}
+function handleViewerNavigation(context) {
+    context.path = decodeURIComponent(context.location.pathname.startsWith("/view/")
+        ? context.location.pathname.slice(6)
+        : "");
+    context.mode = new URL(context.location.href).searchParams.get("mode") === "diff"
+        ? "diff"
+        : "file";
+    synchronizeDocumentLinks(context);
+    void refreshDocumentCatalog(context, false);
+}
+// The document sidebar survives an HTMX document swap, so its existing links
+// still describe the prior page's mode and selection. Rewrite every href to
+// retain the active File/Changes mode, move aria-current to the new document,
+// and reprocess the changed anchor so HTMX refreshes its boosted-link metadata.
+function synchronizeDocumentLinks(context) {
+    for (const link of context.document.querySelectorAll(".documents .document-file a")) {
+        const url = new URL(link.href);
+        if (context.mode === "diff")
+            url.searchParams.set("mode", "diff");
+        else
+            url.searchParams.delete("mode");
+        const href = `${url.pathname}${url.search}`;
+        const selected = decodeURIComponent(url.pathname.slice("/view/".length)) === context.path;
+        link.href = href;
+        link.classList.toggle("selected", selected);
+        if (selected)
+            link.setAttribute("aria-current", "page");
+        else
+            link.removeAttribute("aria-current");
+        context.htmx?.process?.(link);
+    }
 }
 // Runtime validation in document-state.ts keeps unknown server payloads out of
 // the context. The rendered catalog remains usable if this fetch fails.
@@ -44,14 +77,29 @@ async function refreshDocumentCatalog(context, restoreScope) {
         if (!restoreScope)
             return;
         context.scope = resolveDocumentScope(readPreference(context.storage, documentScopeStorageKey), readPreference(context.storage, changedOnlyStorageKey), catalog.documents);
-        const checkbox = context.document.querySelector(`.document-filter-form input[value="${context.scope}"]`);
-        if (context.scope !== "all" && checkbox && !checkbox.checked) {
-            checkbox.checked = true;
-            requestDocumentPanel(context, "", context.scope);
+        const inputs = context.document.querySelectorAll('.document-filter-form input[name="scope"]');
+        const renderedScope = Array.from(inputs).find((input) => input.checked)
+            ?.value ?? "all";
+        if (context.scope !== renderedScope) {
+            // HTMX preserves this sidebar across document navigation, so its radio
+            // state can intentionally differ from the freshly fetched server default
+            // (normally Changed only). Reapply the tab's saved scope and refresh the
+            // panel only when those states differ; otherwise every navigation would
+            // visibly reset the filter before restoring it.
+            for (const input of inputs)
+                input.checked = input.value === context.scope;
+            await requestDocumentPanel(context, "", context.scope);
         }
     }
     catch (_) {
         // Server-rendered links and filters still work without typed state.
+    }
+    finally {
+        if (restoreScope) {
+            context.document
+                .querySelector(".layout")
+                ?.classList.remove("document-scope-restoring");
+        }
     }
 }
 // Checkboxes allow an active scope to be toggled back to "all", while this
@@ -156,7 +204,8 @@ function handleDocumentShortcutKeydown(context, event) {
 function requestDocumentPanel(context, query, scope) {
     context.queuedRequest = { query, scope };
     if (!context.requestRunning)
-        sendNextDocumentRequest(context);
+        return sendNextDocumentRequest(context);
+    return Promise.resolve();
 }
 async function sendNextDocumentRequest(context) {
     const request = context.queuedRequest;

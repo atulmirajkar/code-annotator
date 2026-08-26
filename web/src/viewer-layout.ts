@@ -90,11 +90,18 @@ function bindPanelToggle(options: PanelToggleOptions): void {
       options.defaultCollapsed ?? false,
     ),
   );
-  options.button.addEventListener("click", () => handlePanelToggle(context));
+  options.button.addEventListener("click", () => {
+    const panelID = context.button.getAttribute("aria-controls");
+    const currentPanel = panelID
+      ? context.button.ownerDocument.getElementById(panelID)
+      : null;
+    if (currentPanel) context.panel = currentPanel;
+    handlePanelToggle(context);
+  });
 }
 
 function handlePanelToggle(context: PanelToggleContext): void {
-  const collapsed = !context.panel.hidden;
+  const collapsed = !context.layout.classList.contains(context.collapsedClass);
   setPanelCollapsed(context, collapsed);
   writePreference(
     context.storage,
@@ -120,11 +127,12 @@ function bindSourceModePreference(document: Document, storage: Storage): void {
   const activeTab = tabs?.querySelector<HTMLAnchorElement>(
     'a[aria-current="page"]',
   );
-  if (!tabs || !activeTab) return;
-  persistSourceMode(storage, activeTab);
-  for (const tab of tabs.querySelectorAll<HTMLAnchorElement>("a")) {
-    tab.addEventListener("click", () => persistSourceMode(storage, tab));
-  }
+  if (activeTab) persistSourceMode(storage, activeTab);
+  document.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target : null;
+    const tab = target?.closest<HTMLAnchorElement>(".source-mode-tabs a");
+    if (tab) persistSourceMode(storage, tab);
+  });
 }
 
 function persistSourceMode(storage: Storage, tab: HTMLAnchorElement): void {

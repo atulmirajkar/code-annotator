@@ -1,3 +1,6 @@
+import { effectiveTheme, themeChangeEvent } from "./theme-toggle.js";
+let activeRender = null;
+let mermaidGeneration = 0;
 export async function initializeMermaid(environment) {
     const { document } = environment;
     function requiredElement(value, label) {
@@ -43,6 +46,8 @@ export async function initializeMermaid(environment) {
 export async function initializeMermaidPage() {
     if (typeof mermaid === "undefined")
         return;
+    const generation = ++mermaidGeneration;
+    activeRender = null;
     const prefix = "/view/";
     const mode = new URLSearchParams(window.location.search).get("mode") === "diff" ? "diff" : "file";
     const documentPath = window.location.pathname.startsWith(prefix)
@@ -51,13 +56,28 @@ export async function initializeMermaidPage() {
     if (!documentPath)
         return;
     const state = await fetchViewerState(documentPath, mode);
-    await initializeMermaid({
+    if (generation !== mermaidGeneration)
+        return;
+    // Mermaid bakes theme colors into its generated SVG. Keep the fetched
+    // definitions so a theme change can re-render locally without another
+    // viewer-state request.
+    const definitions = new Map(Array.from(state.document.diagrams.values()).map((position) => [
+        position.elementId,
+        position.text,
+    ]));
+    const render = () => initializeMermaid({
         document,
         api: mermaid,
-        prefersDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
-        definitions: new Map(Array.from(state.document.diagrams.values()).map((position) => [position.elementId, position.text])),
+        prefersDark: effectiveTheme(document, window) === "dark",
+        definitions,
     });
+    activeRender = render;
+    await render();
 }
+window.addEventListener(themeChangeEvent, () => void activeRender?.());
+document.addEventListener("code-annotator:viewer-navigated", () => {
+    void initializeMermaidPage();
+});
 if (typeof mermaid !== "undefined")
     void initializeMermaidPage();
 import { fetchDocumentCatalogState } from "./document-state.js";

@@ -266,7 +266,8 @@ func TestCodeDiffRoute(t *testing.T) {
 			contains: []string{
 				`class="source-mode-tabs"`,
 				`href="/view/main.go"`,
-				`href="/view/main.go?mode=diff" aria-current="page"`,
+				`href="/view/main.go?mode=diff" hx-boost="true"`,
+				`aria-current="page">Changes</a>`,
 				`class="diff-view"`,
 				`class="diff-comparison"`,
 				`<code><span class="syntax-keyword">package</span> main</code>`,
@@ -316,7 +317,8 @@ func TestCodeDiffRoute(t *testing.T) {
 			wantStatus:  http.StatusOK,
 			contains: []string{
 				`class="source-mode-tabs"`,
-				`href="/view/README.md?mode=diff" aria-current="page"`,
+				`href="/view/README.md?mode=diff" hx-boost="true"`,
+				`aria-current="page">Changes</a>`,
 				`class="diff-view"`,
 				`<code><span class="syntax-punctuation">#</span> Home</code>`,
 			},
@@ -1685,8 +1687,20 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if body := response.Body.String(); !strings.Contains(body, `<link rel="stylesheet" href="/static/styles.css">`) || strings.Contains(body, "<style>") {
 				t.Fatalf("page does not use only the external viewer stylesheet:\n%s", body)
 			}
-			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `class="document-search"`) || !strings.Contains(body, `src="/static/viewer.js"`) {
+			if body := response.Body.String(); !strings.Contains(body, `class="panel-toggle documents-toggle"`) || !strings.Contains(body, `class="document-search"`) || !strings.Contains(body, `src="/static/viewer.js"`) || !strings.Contains(body, `hx-boost="true" hx-target=".document"`) {
 				t.Fatalf("page does not contain shared document-panel controls:\n%s", body)
+			}
+			body := response.Body.String()
+			bootstrapIndex := strings.Index(body, `src="/static/theme-bootstrap.js"`)
+			stylesheetIndex := strings.Index(body, `href="/static/styles.css"`)
+			if bootstrapIndex < 0 || stylesheetIndex < 0 || bootstrapIndex > stylesheetIndex {
+				t.Fatalf("page does not restore the theme before loading styles:\n%s", body)
+			}
+			layoutIndex := strings.Index(body, `class="layout`)
+			layoutBootstrapIndex := strings.Index(body, `src="/static/layout-bootstrap.js"`)
+			documentsIndex := strings.Index(body, `id="documents-sidebar"`)
+			if layoutIndex < 0 || layoutBootstrapIndex < layoutIndex || documentsIndex < layoutBootstrapIndex {
+				t.Fatalf("page does not restore layout preferences before rendering panels:\n%s", body)
 			}
 			hasHTMX := strings.Contains(response.Body.String(), `src="/static/htmx.min.js"`)
 			if !hasHTMX {
@@ -1737,7 +1751,12 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get review navigation module", path: "/static/review-navigation.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationNavigator", "navigateFromAnnotation", "emphasizeNavigationTarget"}},
 		{name: "get review panel module", path: "/static/review-panel.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createReviewPanelController", "setAnnotationFormVisible", "startReviewPanelResize"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
-		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./comparison-control.js", "./diff-divider.js", "./diff-overview.js", "./document-search.js", "./document-tree.js", "./viewer-layout.js", "initializeViewer"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./comparison-control.js", "./diff-divider.js", "./diff-overview.js", "./document-search.js", "./document-tree.js", "./theme-toggle.js", "./viewer-layout.js", "initializeViewer"}},
+		{name: "get theme bootstrap script", path: "/static/theme-bootstrap.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"sessionStorage", "code-annotator.theme", "theme-light", "theme-dark"}},
+		{name: "get layout bootstrap script", path: "/static/layout-bootstrap.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"currentScript", "code-annotator.panel-collapsed.annotations", "review-collapsed", "code-annotator.document-scope", "document-scope-restoring"}},
+		{name: "get theme toggle module", path: "/static/theme-toggle.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./browser-storage.js", "bindThemeToggle", "code-annotator:theme-change"}},
+		{name: "get light theme icon", path: "/static/assets/theme-sun.svg", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "image/svg+xml", wantContents: []string{"<svg", "<circle", "<path"}},
+		{name: "get dark theme icon", path: "/static/assets/theme-moon.svg", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "image/svg+xml", wantContents: []string{"<svg", "<path"}},
 		{name: "get browser storage module", path: "/static/browser-storage.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"readPreference", "writePreference"}},
 		{name: "get comparison control module", path: "/static/comparison-control.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindComparisonControl", "X-Code-Annotator-Comparison-Token"}},
 		{name: "get diff divider module", path: "/static/diff-divider.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"bindDiffDivider", "pointermove", "--diff-split"}},
@@ -1789,11 +1808,16 @@ func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
 	tests := []struct {
 		name                  string
 		source                string
+		htmx                  bool
+		mermaidReady          bool
 		wantAssets            bool
 		wantInlineStylePolicy bool
+		wantRedirect          string
 	}{
 		{name: "ordinary Markdown omits Mermaid assets", source: "# Home\n"},
 		{name: "Mermaid fence loads Mermaid assets and permits generated styles", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", wantAssets: true, wantInlineStylePolicy: true},
+		{name: "HTMX navigation redirects when Mermaid runtime is absent", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", htmx: true, wantAssets: true, wantInlineStylePolicy: true, wantRedirect: "/"},
+		{name: "HTMX navigation swaps when Mermaid runtime is ready", source: "```mermaid\nsequenceDiagram\n  A->>B: Hello\n```\n", htmx: true, mermaidReady: true, wantAssets: true, wantInlineStylePolicy: true},
 	}
 
 	for _, test := range tests {
@@ -1809,7 +1833,15 @@ func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
 			if err != nil {
 				t.Fatalf("New() error = %v", err)
 			}
-			response := getResponse(t, viewer.Handler(), "/")
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			if test.htmx {
+				request.Header.Set("HX-Request", "true")
+			}
+			if test.mermaidReady {
+				request.Header.Set("X-Code-Annotator-Mermaid", "true")
+			}
+			response := httptest.NewRecorder()
+			viewer.Handler().ServeHTTP(response, request)
 			body := response.Body.String()
 			hasAssets := strings.Contains(body, `src="/static/mermaid.tiny.js"`) && strings.Contains(body, `src="/static/mermaid.js"`)
 			if hasAssets != test.wantAssets {
@@ -1818,6 +1850,9 @@ func TestMermaidAssetsAreLoadedOnlyForDiagramPages(t *testing.T) {
 			hasInlineStylePolicy := strings.Contains(response.Header().Get("Content-Security-Policy"), "style-src 'self' 'unsafe-inline'")
 			if hasInlineStylePolicy != test.wantInlineStylePolicy {
 				t.Fatalf("page permits generated inline styles = %t, want %t; policy: %q", hasInlineStylePolicy, test.wantInlineStylePolicy, response.Header().Get("Content-Security-Policy"))
+			}
+			if got := response.Header().Get("HX-Redirect"); got != test.wantRedirect {
+				t.Fatalf("HX-Redirect = %q, want %q", got, test.wantRedirect)
 			}
 		})
 	}

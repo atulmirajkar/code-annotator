@@ -3,11 +3,13 @@ export interface HtmxConfig {
   allowNestedOobSwaps: boolean;
   allowScriptTags: boolean;
   historyCacheSize: number;
+  includeIndicatorStyles: boolean;
   selfRequestsOnly: boolean;
 }
 
 export interface HtmxAPI {
   config: HtmxConfig;
+  process?(element: Element): void;
   ajax(
     verb: "GET",
     path: string,

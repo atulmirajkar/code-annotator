@@ -22,6 +22,21 @@ async function openNewAnnotationForm(page) {
 }
 
 test.describe("Mermaid rendering", () => {
+  test("renders after HTMX navigation from a document without diagrams", async ({ page, viewerURL }) => {
+    const signals = captureBrowserSignals(page);
+    await page.goto(`${viewerURL}view/lifecycle.md`);
+    await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
+    await expect(page.locator(".mermaid-output")).toHaveCount(0);
+
+    await page.getByRole("link", { name: "valid.md" }).click();
+    await expect(page).toHaveURL(/\/view\/valid\.md$/);
+    await expect(page.locator(".mermaid-output svg")).toBeVisible();
+    expect(signals.consoleErrors.filter((message) => message.includes("Content Security Policy"))).toEqual([]);
+
+    await page.getByRole("link", { name: "lifecycle.md" }).click();
+    await expect(page.locator(".mermaid-output")).toHaveCount(0);
+  });
+
   for (const colorScheme of ["light", "dark"]) {
     test(`renders a sequence diagram in ${colorScheme} mode without CSP or network errors`, async ({ page, viewerURL }) => {
       const signals = captureBrowserSignals(page);

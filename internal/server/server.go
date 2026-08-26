@@ -77,6 +77,11 @@ type Server struct {
 	viewerLayoutJS      []byte
 	viewerPreferencesJS []byte
 	viewerStateJS       []byte
+	themeBootstrapJS    []byte
+	layoutBootstrapJS   []byte
+	themeToggleJS       []byte
+	themeSunSVG         []byte
+	themeMoonSVG        []byte
 	htmxJS              []byte
 	mermaidJS           []byte
 	mermaidTiny         []byte
@@ -309,6 +314,26 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read viewer script: %w", err)
 	}
+	themeToggleJS, err := fs.ReadFile(web.Files, "generated/theme-toggle.js")
+	if err != nil {
+		return nil, fmt.Errorf("read theme toggle script: %w", err)
+	}
+	themeBootstrapJS, err := fs.ReadFile(web.Files, "generated/theme-bootstrap.js")
+	if err != nil {
+		return nil, fmt.Errorf("read theme bootstrap script: %w", err)
+	}
+	layoutBootstrapJS, err := fs.ReadFile(web.Files, "generated/layout-bootstrap.js")
+	if err != nil {
+		return nil, fmt.Errorf("read layout bootstrap script: %w", err)
+	}
+	themeSunSVG, err := fs.ReadFile(web.Files, "assets/theme-sun.svg")
+	if err != nil {
+		return nil, fmt.Errorf("read light theme icon: %w", err)
+	}
+	themeMoonSVG, err := fs.ReadFile(web.Files, "assets/theme-moon.svg")
+	if err != nil {
+		return nil, fmt.Errorf("read dark theme icon: %w", err)
+	}
 	browserStorageJS, err := fs.ReadFile(web.Files, "generated/browser-storage.js")
 	if err != nil {
 		return nil, fmt.Errorf("read browser storage script: %w", err)
@@ -406,6 +431,11 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		viewerLayoutJS:      viewerLayoutJS,
 		viewerPreferencesJS: viewerPreferencesJS,
 		viewerStateJS:       viewerStateJS,
+		themeBootstrapJS:    themeBootstrapJS,
+		layoutBootstrapJS:   layoutBootstrapJS,
+		themeToggleJS:       themeToggleJS,
+		themeSunSVG:         themeSunSVG,
+		themeMoonSVG:        themeMoonSVG,
 		htmxJS:              htmxJS,
 		mermaidJS:           mermaidJS,
 		mermaidTiny:         mermaidTiny,
@@ -431,6 +461,11 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/review-panel.js", server.handleReviewPanelScript)
 	mux.HandleFunc("GET /static/review-selection.js", server.handleReviewSelectionScript)
 	mux.HandleFunc("GET /static/viewer.js", server.handleViewerScript)
+	mux.HandleFunc("GET /static/theme-bootstrap.js", server.handleThemeBootstrapScript)
+	mux.HandleFunc("GET /static/layout-bootstrap.js", server.handleLayoutBootstrapScript)
+	mux.HandleFunc("GET /static/theme-toggle.js", server.handleThemeToggleScript)
+	mux.HandleFunc("GET /static/assets/theme-sun.svg", server.handleThemeSunIcon)
+	mux.HandleFunc("GET /static/assets/theme-moon.svg", server.handleThemeMoonIcon)
 	mux.HandleFunc("GET /static/browser-storage.js", server.handleBrowserStorageScript)
 	mux.HandleFunc("GET /static/comparison-control.js", server.handleComparisonControlScript)
 	mux.HandleFunc("GET /static/diff-divider.js", server.handleDiffDividerScript)
@@ -523,6 +558,31 @@ func (s *Server) handleReviewSelectionScript(response http.ResponseWriter, _ *ht
 func (s *Server) handleViewerScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.viewerJS)
+}
+
+func (s *Server) handleThemeToggleScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.themeToggleJS)
+}
+
+func (s *Server) handleThemeBootstrapScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.themeBootstrapJS)
+}
+
+func (s *Server) handleLayoutBootstrapScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.layoutBootstrapJS)
+}
+
+func (s *Server) handleThemeSunIcon(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "image/svg+xml")
+	_, _ = response.Write(s.themeSunSVG)
+}
+
+func (s *Server) handleThemeMoonIcon(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "image/svg+xml")
+	_, _ = response.Write(s.themeMoonSVG)
 }
 
 func (s *Server) handleBrowserStorageScript(response http.ResponseWriter, _ *http.Request) {
@@ -646,11 +706,11 @@ func (s *Server) handleIndex(response http.ResponseWriter, request *http.Request
 		return
 	}
 	if index.DefaultPath == "" {
-		s.renderPage(request.Context(), response, index, "", nil, false, s.activeComparison())
+		s.renderPage(request.Context(), response, request, index, "", nil, false, s.activeComparison())
 		return
 	}
 
-	s.renderDocument(request.Context(), response, index, index.DefaultPath, false)
+	s.renderDocument(request.Context(), response, request, index, index.DefaultPath, false)
 }
 
 func (s *Server) handleDocument(response http.ResponseWriter, request *http.Request) {
@@ -670,7 +730,7 @@ func (s *Server) handleDocument(response http.ResponseWriter, request *http.Requ
 		http.Error(response, "unsupported document mode", http.StatusBadRequest)
 		return
 	}
-	s.renderDocument(request.Context(), response, index, documentPath, mode == "diff")
+	s.renderDocument(request.Context(), response, request, index, documentPath, mode == "diff")
 }
 
 func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request) {
@@ -701,7 +761,7 @@ func (s *Server) handleAsset(response http.ResponseWriter, request *http.Request
 	http.ServeContent(response, request, filepath.Base(resolved), info.ModTime(), file)
 }
 
-func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, index content.Index, documentPath string, diffMode bool) {
+func (s *Server) renderDocument(ctx context.Context, response http.ResponseWriter, request *http.Request, index content.Index, documentPath string, diffMode bool) {
 	active := s.activeComparison()
 	document, ok := findDocument(index, documentPath)
 	if !ok {
@@ -761,10 +821,10 @@ func (s *Server) renderDocument(ctx context.Context, response http.ResponseWrite
 		http.Error(response, "could not render document", http.StatusInternalServerError)
 		return
 	}
-	s.renderPage(ctx, response, index, documentPath, fragment, diffMode, active)
+	s.renderPage(ctx, response, request, index, documentPath, fragment, diffMode, active)
 }
 
-func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, index content.Index, selected string, fragment []byte, diffMode bool, active *gitdiff.Config) {
+func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, request *http.Request, index content.Index, selected string, fragment []byte, diffMode bool, active *gitdiff.Config) {
 	changed := make(map[string]struct{})
 	changedReady := false
 	changedError := false
@@ -806,6 +866,13 @@ func (s *Server) renderPage(ctx context.Context, response http.ResponseWriter, i
 		// inline CSS only for pages that render diagrams; script execution remains
 		// restricted to application-owned, same-origin assets.
 		response.Header().Set("Content-Security-Policy", mermaidContentSecurityPolicy)
+		// An HTMX swap cannot broaden the CSP of the already loaded shell or load
+		// the conditionally included Mermaid runtime. Force one full navigation
+		// when entering a diagram page unless the browser reports that the current
+		// shell already has Mermaid available.
+		if request.Header.Get("HX-Request") == "true" && request.Header.Get("X-Code-Annotator-Mermaid") != "true" {
+			response.Header().Set("HX-Redirect", request.URL.RequestURI())
+		}
 	}
 	response.Header().Set("Content-Type", "text/html; charset=utf-8")
 	data := pageData{

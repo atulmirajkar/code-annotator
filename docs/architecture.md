@@ -96,6 +96,25 @@ builder, DOM helper, and thread presentation modules have been removed. The
 invariants, route plan, test strategy, documentation contract, and remaining
 one-commit-at-a-time review gates are defined in
 [`docs/designs/server-rendered-review-ui.md`](designs/server-rendered-review-ui.md).
+
+Document and File/Changes navigation preserves the viewer shell: the top bar
+and theme control, document sidebar and its tab-local filters, and layout state
+remain mounted. HTMX extracts and replaces `.document` as the direct target and
+`#annotation-sidebar` as a second, ID-addressed target from the same complete
+page response. Direct URLs and ordinary browser navigation therefore retain
+the server's complete-page contract while in-page navigation avoids rebuilding
+session-owned controls.
+
+Code that owns a dynamic target must also own its teardown. Before rebinding to
+replacement markup, it removes or aborts listeners that reference the prior
+target, disconnects observers and other controller resources, and prevents
+older asynchronous initialization from publishing into the new generation.
+Grouped DOM listeners use `AbortController`; resources outside that signal use
+explicit disposers or `stop()` methods; generation checks guard work that can
+finish after a later navigation. See
+[`docs/designs/htmx-shell-navigation.md`](designs/htmx-shell-navigation.md) for
+the swap boundary and lifecycle sequence.
+
 This architecture document must be updated in each implementation commit so it
 continues to describe the code that exists rather than the future target.
 

@@ -1,3 +1,5 @@
+import { effectiveTheme, themeChangeEvent } from "./theme-toggle.js";
+
 interface MermaidRenderResult {
   svg: string;
   bindFunctions?: (element: HTMLElement) => void;
@@ -9,6 +11,8 @@ interface MermaidApi {
 }
 
 declare const mermaid: MermaidApi;
+let activeRender: (() => Promise<void>) | null = null;
+let mermaidGeneration = 0;
 
 export interface MermaidEnvironment {
   document: Document;
@@ -63,6 +67,8 @@ export async function initializeMermaid(environment: MermaidEnvironment): Promis
 
 export async function initializeMermaidPage(): Promise<void> {
   if (typeof mermaid === "undefined") return;
+  const generation = ++mermaidGeneration;
+  activeRender = null;
   const prefix = "/view/";
   const mode = new URLSearchParams(window.location.search).get("mode") === "diff" ? "diff" : "file";
   const documentPath = window.location.pathname.startsWith(prefix)
@@ -70,14 +76,31 @@ export async function initializeMermaidPage(): Promise<void> {
     : (await fetchDocumentCatalogState()).selectedPath;
   if (!documentPath) return;
   const state = await fetchViewerState(documentPath, mode);
-  await initializeMermaid({
-    document,
-    api: mermaid,
-    prefersDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
-    definitions: new Map(Array.from(state.document.diagrams.values()).map((position) => [position.elementId, position.text])),
-  });
+  if (generation !== mermaidGeneration) return;
+  // Mermaid bakes theme colors into its generated SVG. Keep the fetched
+  // definitions so a theme change can re-render locally without another
+  // viewer-state request.
+  const definitions = new Map(
+    Array.from(state.document.diagrams.values()).map((position) => [
+      position.elementId,
+      position.text,
+    ]),
+  );
+  const render = (): Promise<void> =>
+    initializeMermaid({
+      document,
+      api: mermaid,
+      prefersDark: effectiveTheme(document, window) === "dark",
+      definitions,
+    });
+  activeRender = render;
+  await render();
 }
 
+window.addEventListener(themeChangeEvent, () => void activeRender?.());
+document.addEventListener("code-annotator:viewer-navigated", () => {
+  void initializeMermaidPage();
+});
 if (typeof mermaid !== "undefined") void initializeMermaidPage();
 import { fetchDocumentCatalogState } from "./document-state.js";
 import { fetchViewerState } from "./viewer-state.js";

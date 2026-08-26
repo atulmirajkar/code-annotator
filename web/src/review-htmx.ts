@@ -22,6 +22,7 @@ interface ReviewHTMXOptions {
     successful: boolean,
   ) => void | Promise<void>;
   onRequestError: () => void;
+  signal: AbortSignal;
 }
 
 export type ReviewMutationKind = "create" | "reattach" | "other" | null;
@@ -95,6 +96,7 @@ export function configureReviewHTMX({
   getRevision,
   onPanelChanged,
   onRequestError,
+  signal,
 }: ReviewHTMXOptions): void {
   if (!api) throw new Error("HTMX is unavailable on a review page");
   api.config.allowEval = false;
@@ -119,7 +121,7 @@ export function configureReviewHTMX({
       return;
     Reflect.set(value.headers, "X-Code-Annotator-Token", token);
     Reflect.set(value.headers, "If-Match", JSON.stringify(getRevision()));
-  });
+  }, { signal });
 
   document.body.addEventListener("htmx:beforeSwap", (event) => {
     const value = detail(event);
@@ -131,7 +133,7 @@ export function configureReviewHTMX({
       return;
     value.shouldSwap = true;
     value.isError = false;
-  });
+  }, { signal });
 
   document.body.addEventListener("htmx:afterSwap", (event) => {
     const value = detail(event);
@@ -144,10 +146,10 @@ export function configureReviewHTMX({
     );
     requestMutationKind = null;
     requestMethod = "";
-  });
+  }, { signal });
 
   document.body.addEventListener("htmx:responseError", (event) => {
     const value = detail(event);
     if (value && targetsPanel(event, value)) onRequestError();
-  });
+  }, { signal });
 }

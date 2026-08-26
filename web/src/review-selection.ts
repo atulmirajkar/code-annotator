@@ -57,6 +57,16 @@ class SelectionController {
     this.updateSelectionPreview();
   }
 
+  stop(): void {
+    const { document, markdown, panel } = this.options;
+    panel.removeEventListener("pointerdown", this.handlePanelPointerDown);
+    document.removeEventListener("pointerup", this.handleDocumentPointerUp);
+    document.removeEventListener("selectionchange", this.handleSelectionChange);
+    markdown.removeEventListener("pointerdown", this.handleMarkdownPointerDown);
+    markdown.removeEventListener("click", this.handleDiagramClick);
+    markdown.removeEventListener("keydown", this.handleDiagramKeydown);
+  }
+
   readonly currentSelection = (): SelectionPayload | null => {
     // The review form reads this typed payload; it never reads DOM IDs or
     // `data-*` attributes to reconstruct source bytes.

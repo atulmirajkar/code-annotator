@@ -29,6 +29,7 @@ describe("explicit browser initializers", () => {
       allowNestedOobSwaps: true,
       allowScriptTags: true,
       historyCacheSize: 10,
+      includeIndicatorStyles: true,
       selfRequestsOnly: false,
     };
 
@@ -47,6 +48,7 @@ describe("explicit browser initializers", () => {
       allowNestedOobSwaps: false,
       allowScriptTags: false,
       historyCacheSize: 0,
+      includeIndicatorStyles: false,
       selfRequestsOnly: true,
     });
   });

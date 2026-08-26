@@ -3,6 +3,116 @@ const path = require("node:path");
 const { test, expect } = require("./viewer");
 
 test.describe("viewer navigation", () => {
+  test("keeps annotations collapsed before viewer JavaScript loads", async ({ page, viewerURL }) => {
+    let releaseViewer;
+    const viewerBlocked = new Promise((resolve) => { releaseViewer = resolve; });
+    await page.route("**/static/viewer.js", async (route) => {
+      await viewerBlocked;
+      await route.continue();
+    });
+
+    const navigation = page.goto(`${viewerURL}view/valid.md`);
+    await page.locator("#annotation-sidebar").waitFor({ state: "attached" });
+    await expect(page.locator(".layout")).toHaveClass(/review-collapsed/);
+    await expect(page.locator("#annotation-sidebar")).toBeHidden();
+
+    releaseViewer();
+    await navigation;
+    await expect(page.getByRole("button", { name: "Show annotations" })).toBeVisible();
+  });
+
+  test("hides the server document scope until the saved scope is restored", async ({ page, viewerURL }) => {
+    await page.addInitScript(() => {
+      sessionStorage.setItem("code-annotator.document-scope", "open-comments");
+    });
+    let releaseScope;
+    let markRequestStarted;
+    const scopeBlocked = new Promise((resolve) => { releaseScope = resolve; });
+    const requestStarted = new Promise((resolve) => { markRequestStarted = resolve; });
+    await page.route("**/ui/review/documents?*", async (route) => {
+      markRequestStarted();
+      await scopeBlocked;
+      await route.continue();
+    });
+
+    await page.goto(`${viewerURL}view/valid.md`);
+    await requestStarted;
+    const panel = page.locator("#document-panel-content");
+    await expect(page.locator(".layout")).toHaveClass(/document-scope-restoring/);
+    await expect(panel).toHaveCSS("visibility", "hidden");
+
+    releaseScope();
+    await expect(page.getByRole("checkbox", { name: "Open comments" })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: "Changed only" })).not.toBeChecked();
+    await expect(page.locator(".layout")).not.toHaveClass(/document-scope-restoring/);
+    await expect(panel).toHaveCSS("visibility", "visible");
+  });
+
+  test("switches and preserves the color theme", async ({ page, viewerURL }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.goto(`${viewerURL}view/valid.md`);
+
+    const toggle = page.getByRole("button", { name: "Switch to dark theme" });
+    await expect(toggle).toBeVisible();
+    await expect(toggle.locator(".theme-icon-sun")).toBeVisible();
+    await expect(toggle.locator(".theme-icon-sun")).toHaveCSS("mask-image", /theme-sun\.svg/);
+    await expect(toggle.locator(".theme-icon-moon")).toBeHidden();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(246, 247, 249)");
+
+    await toggle.click();
+    await expect(page.locator("html")).toHaveClass(/theme-dark/);
+    await expect(page.getByRole("button", { name: "Switch to light theme" })).toBeVisible();
+    await expect(page.locator(".theme-icon-moon")).toBeVisible();
+    await expect(page.locator(".theme-icon-moon")).toHaveCSS("mask-image", /theme-moon\.svg/);
+    await expect(page.locator(".theme-icon-sun")).toBeHidden();
+    await expect(page.locator("body")).toHaveCSS("background-color", "rgb(16, 19, 24)");
+
+    await page.goto(`${viewerURL}view/lifecycle.md`);
+    await expect(page.locator("html")).toHaveClass(/theme-dark/);
+    await expect(page.getByRole("button", { name: "Switch to light theme" })).toBeVisible();
+    await expect(page.locator(".theme-icon-moon")).toBeVisible();
+    await expect(page.locator(".theme-icon-sun")).toBeHidden();
+  });
+
+  test("keeps the viewer shell mounted during document navigation", async ({ page, viewerURL }) => {
+    await page.goto(`${viewerURL}view/valid.md`);
+    await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
+
+    const topbar = await page.locator(".topbar").elementHandle();
+    const documents = await page.locator("#documents-sidebar").elementHandle();
+    const themeToggle = await page.locator(".theme-toggle").elementHandle();
+    const oldDocument = await page.locator("main.document").elementHandle();
+    const oldReviewPanel = await page.locator("#annotation-sidebar").elementHandle();
+    if (!topbar || !documents || !themeToggle || !oldDocument || !oldReviewPanel) {
+      throw new Error("missing viewer shell fixture");
+    }
+
+    let htmxRequest = false;
+    page.on("request", (request) => {
+      if (
+        new URL(request.url()).pathname === "/view/lifecycle.md" &&
+        request.headers()["hx-request"] === "true"
+      ) {
+        htmxRequest = true;
+      }
+    });
+    await page.getByRole("link", { name: "lifecycle.md" }).click();
+
+    await expect(page).toHaveURL(/\/view\/lifecycle\.md$/);
+    await expect(page).toHaveTitle(/lifecycle\.md/);
+    expect(htmxRequest).toBe(true);
+    expect(await topbar.evaluate((element) => element === document.querySelector(".topbar"))).toBe(true);
+    expect(await documents.evaluate((element) => element === document.querySelector("#documents-sidebar"))).toBe(true);
+    expect(await themeToggle.evaluate((element) => element === document.querySelector(".theme-toggle"))).toBe(true);
+    expect(await oldDocument.evaluate((element) => element.isConnected)).toBe(false);
+    expect(await oldReviewPanel.evaluate((element) => element.isConnected)).toBe(false);
+
+    await page.getByRole("button", { name: "Show annotations" }).click();
+    await page.getByRole("button", { name: "Add comment" }).click();
+    await expect(page.locator(".annotation-form")).toBeVisible();
+    await expect(page.locator('.annotation-form input[name="document"]')).toHaveValue("lifecycle.md");
+  });
+
   test("collapses both sidebars and gives their space to the document", async ({ page, viewerURL }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${viewerURL}view/valid.md`);
@@ -174,6 +284,7 @@ test.describe("viewer navigation", () => {
     await expect(page.getByRole("link", { name: "Changes" })).toHaveAttribute("aria-current", "page");
     // Annotations start collapsed by default.
     await expect(page.locator("#annotation-sidebar")).toBeHidden();
+    await expect(page.locator(".layout")).toHaveClass(/review-collapsed/);
     // Changes view with a configured base defaults the sidebar to changed-only;
     // uncheck it since this test browses code documents regardless of status.
     await page.getByRole("checkbox", { name: "Changed only" }).uncheck();
@@ -184,6 +295,7 @@ test.describe("viewer navigation", () => {
     await expect(page).toHaveURL(/\/view\/code-annotation\.go\?mode=diff$/);
     await expect(page.getByRole("link", { name: "Changes" })).toHaveAttribute("aria-current", "page");
     await expect(page.locator("#annotation-sidebar")).toBeHidden();
+    await expect(page.locator(".layout")).toHaveClass(/review-collapsed/);
     await expect(page.getByRole("button", { name: "Show annotations" })).toHaveAttribute("aria-expanded", "false");
 
     await page.getByRole("link", { name: "File" }).click();
