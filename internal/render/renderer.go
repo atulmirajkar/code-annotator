@@ -543,7 +543,7 @@ func writeDiffOverview(output *strings.Builder, items []diffOverviewItem) {
 	if len(items) == 0 {
 		return
 	}
-	output.WriteString(`<nav class="diff-overview" aria-label="Changes in this file" hidden><span class="diff-overview-viewport" aria-hidden="true"></span>`)
+	output.WriteString(`<nav class="diff-overview" aria-label="Changes in this file"><span class="diff-overview-viewport" aria-hidden="true"></span>`)
 	for _, item := range items {
 		fmt.Fprintf(output, `<span class="diff-overview-item"><a class="diff-overview-marker diff-overview-%s" href="#%s" aria-label="%s"></a><a class="diff-overview-end" href="#%s" tabindex="-1" aria-hidden="true"></a></span>`, item.Hunk.Kind, item.TargetID, html.EscapeString(item.Label), item.EndTargetID)
 	}

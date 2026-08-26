@@ -2,13 +2,15 @@
 
 ## Status
 
-Approved on 2026-08-25. Implementation is complete through review gate 3 and
+Approved on 2026-08-25. Implementation is complete through review gate 4 and
 stopped for maintainer review. The server derives request-local hunks and
-renders hidden semantic targets and overview links. DOM-free TypeScript now
-owns proportional marker sizing, collision packing, density grouping, viewport
-projection, and current/next selection. The ruler remains invisible until the
-browser activation gate. The review gates at the end of this document define
-the remaining commits.
+renders semantic targets and progressive-enhancement overview links. DOM-free
+TypeScript owns ruler geometry, while a focused browser adapter validates those
+targets, discovers the active scroll owner, coalesces measurement updates,
+projects marker and viewport styles, and intercepts unmodified activation.
+The fourth diff grid column, sticky track, marker kinds, current/next treatment,
+and accessible focus states are active. The remaining gates add the dedicated
+long-file Playwright fixture and closeout documentation and verification.
 
 ## Problem
 

@@ -69,6 +69,8 @@ type Server struct {
 	documentStateJS     []byte
 	documentTreeJS      []byte
 	diffDividerJS       []byte
+	diffOverviewJS      []byte
+	diffGeometryJS      []byte
 	comparisonStateJS   []byte
 	viewerJS            []byte
 	viewerEnvironmentJS []byte
@@ -319,6 +321,14 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read diff divider script: %w", err)
 	}
+	diffOverviewJS, err := fs.ReadFile(web.Files, "generated/diff-overview.js")
+	if err != nil {
+		return nil, fmt.Errorf("read diff overview script: %w", err)
+	}
+	diffGeometryJS, err := fs.ReadFile(web.Files, "generated/diff-overview-geometry.js")
+	if err != nil {
+		return nil, fmt.Errorf("read diff overview geometry script: %w", err)
+	}
 	documentSearchJS, err := fs.ReadFile(web.Files, "generated/document-search.js")
 	if err != nil {
 		return nil, fmt.Errorf("read document search script: %w", err)
@@ -388,6 +398,8 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		documentStateJS:     documentStateJS,
 		documentTreeJS:      documentTreeJS,
 		diffDividerJS:       diffDividerJS,
+		diffOverviewJS:      diffOverviewJS,
+		diffGeometryJS:      diffGeometryJS,
 		comparisonStateJS:   comparisonStateJS,
 		viewerJS:            viewerJS,
 		viewerEnvironmentJS: viewerEnvironmentJS,
@@ -422,6 +434,8 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/browser-storage.js", server.handleBrowserStorageScript)
 	mux.HandleFunc("GET /static/comparison-control.js", server.handleComparisonControlScript)
 	mux.HandleFunc("GET /static/diff-divider.js", server.handleDiffDividerScript)
+	mux.HandleFunc("GET /static/diff-overview.js", server.handleDiffOverviewScript)
+	mux.HandleFunc("GET /static/diff-overview-geometry.js", server.handleDiffOverviewGeometryScript)
 	mux.HandleFunc("GET /static/document-search.js", server.handleDocumentSearchScript)
 	mux.HandleFunc("GET /static/viewer-environment.js", server.handleViewerEnvironmentScript)
 	mux.HandleFunc("GET /static/viewer-layout.js", server.handleViewerLayoutScript)
@@ -524,6 +538,16 @@ func (s *Server) handleComparisonControlScript(response http.ResponseWriter, _ *
 func (s *Server) handleDiffDividerScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.diffDividerJS)
+}
+
+func (s *Server) handleDiffOverviewScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.diffOverviewJS)
+}
+
+func (s *Server) handleDiffOverviewGeometryScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.diffGeometryJS)
 }
 
 func (s *Server) handleDocumentSearchScript(response http.ResponseWriter, _ *http.Request) {

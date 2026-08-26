@@ -112,7 +112,7 @@ func TestRenderDiff(t *testing.T) {
 				`id="source-17-29" class="source-text">added &amp; more</span>`,
 				`<div id="diff-change-1" class="diff-cell diff-current diff-modified">`,
 				`<div id="diff-change-1-end" class="diff-cell diff-current diff-added">`,
-				`<nav class="diff-overview" aria-label="Changes in this file" hidden>`,
+				`<nav class="diff-overview" aria-label="Changes in this file">`,
 				`class="diff-overview-marker diff-overview-modified" href="#diff-change-1" aria-label="Change 1 of 1, modified near current line 2"`,
 				`class="diff-overview-end" href="#diff-change-1-end" tabindex="-1" aria-hidden="true"`,
 			},

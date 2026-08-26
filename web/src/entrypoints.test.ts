@@ -16,6 +16,7 @@ describe("explicit browser initializers", () => {
         location: window.location,
         storage: window.sessionStorage,
         resizeObserver: window.ResizeObserver,
+        requestAnimationFrame: window.requestAnimationFrame,
         htmx: null,
       }),
     ).not.toThrow();
@@ -37,6 +38,7 @@ describe("explicit browser initializers", () => {
       location: window.location,
       storage: window.sessionStorage,
       resizeObserver: window.ResizeObserver,
+      requestAnimationFrame: window.requestAnimationFrame,
       htmx: { config, ajax: vi.fn() },
     });
 

@@ -5,6 +5,9 @@
 }
 
 @media (max-width: 720px) {
+  .diff-view {
+    --diff-overview-width: 1.45rem;
+  }
   .topbar {
     flex-wrap: wrap;
   }

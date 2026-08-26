@@ -1,5 +1,6 @@
 import { bindComparisonControl } from "./comparison-control.js";
 import { bindDiffDivider } from "./diff-divider.js";
+import { bindDiffOverview } from "./diff-overview.js";
 import { bindDocumentSearch } from "./document-search.js";
 import { bindDocumentTree } from "./document-tree.js";
 import {
@@ -30,6 +31,7 @@ export function initializeViewer(
   bindDocumentSearch(environment);
   bindComparisonControl(environment.document);
   bindDiffDivider(environment.document, environment.storage);
+  bindDiffOverview(environment);
 }
 
 // Harden HTMX before any component can issue a request.

@@ -8,6 +8,7 @@ export function defaultViewerEnvironment() {
         location,
         storage: sessionStorage,
         resizeObserver: ResizeObserver,
+        requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
         htmx: browserHTMX(),
     };
 }

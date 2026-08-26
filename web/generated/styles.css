@@ -14,6 +14,8 @@
   --code: #eef1f5;
   --diff-added: #e8f5e9;
   --diff-deleted: #fdebec;
+  --diff-added-marker: #16803c;
+  --diff-deleted-marker: #c9364f;
   --syntax-keyword: #7c3aed;
   --syntax-string: #0f766e;
   --syntax-comment: #667085;
@@ -43,6 +45,8 @@
     --code: #252b34;
     --diff-added: #183b2a;
     --diff-deleted: #482428;
+    --diff-added-marker: #62d98b;
+    --diff-deleted-marker: #ff8798;
     --syntax-keyword: #c4b5fd;
     --syntax-string: #5eead4;
     --syntax-comment: #9da7b5;
@@ -590,6 +594,7 @@ a {
 
 .diff-view {
   --diff-split: 50%;
+  --diff-overview-width: 1.7rem;
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 0.55rem;
@@ -599,12 +604,12 @@ a {
 .diff-column-headings,
 .diff-panes {
   display: grid;
-  grid-template-columns: minmax(0, var(--diff-split, 50%)) 6px minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--diff-split, 50%)) 6px minmax(0, 1fr) var(--diff-overview-width);
 }
 
 .diff-column-headings {
   position: sticky;
-  top: 0;
+  top: var(--diff-heading-sticky-top, 0);
   z-index: 1;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
@@ -620,6 +625,10 @@ a {
 }
 .diff-column-headings span:last-child {
   border-left: 1px solid var(--border);
+}
+.diff-column-headings::after {
+  border-left: 1px solid var(--border);
+  content: "";
 }
 
 .diff-current-pane {
@@ -666,6 +675,10 @@ a {
   white-space: pre;
 }
 
+.diff-current[id^=diff-change-] {
+  scroll-margin-block: 6rem;
+}
+
 .diff-marker,
 .diff-line-number {
   color: var(--muted);
@@ -689,6 +702,103 @@ a {
 .diff-base.diff-deleted,
 .diff-base.diff-modified {
   background: var(--diff-deleted);
+}
+
+.diff-overview {
+  position: sticky;
+  top: var(--diff-overview-sticky-top, 0);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  height: var(--diff-overview-track-height, 12rem);
+  min-height: 4rem;
+  overflow: visible;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  isolation: isolate;
+}
+
+.diff-overview-viewport {
+  display: none;
+}
+
+.diff-overview-item {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-height: 3px;
+}
+
+.diff-overview-marker {
+  position: absolute;
+  inset: 50% 0 auto;
+  display: block;
+  height: max(0.8rem, 100%);
+  color: inherit;
+  transform: translateY(-50%);
+}
+.diff-overview-marker::before {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.28rem;
+  height: max(3px, var(--diff-overview-marker-height, 3px));
+  border-radius: 999px;
+  background: var(--muted);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+.diff-overview-marker.diff-overview-added::before {
+  background: var(--diff-added-marker);
+}
+.diff-overview-marker.diff-overview-deleted::before {
+  background: var(--diff-deleted-marker);
+}
+.diff-overview-marker.diff-overview-modified::before {
+  background: linear-gradient(90deg, var(--diff-deleted-marker) 0 50%, var(--diff-added-marker) 50% 100%);
+}
+.diff-overview-marker.diff-overview-current::before, .diff-overview-marker.diff-overview-next::before {
+  width: 0.48rem;
+  box-shadow: 0 0 0 1px var(--surface), 0 0 0 2px var(--accent);
+}
+.diff-overview-marker:focus-visible {
+  border-radius: 0.2rem;
+  outline: 0.15rem solid var(--accent);
+  outline-offset: -0.1rem;
+}
+
+.diff-overview-end {
+  display: none;
+}
+
+.diff-overview-enhanced {
+  display: block;
+}
+.diff-overview-enhanced .diff-overview-viewport {
+  position: absolute;
+  z-index: 0;
+  top: var(--diff-overview-viewport-top, 0);
+  right: 0.18rem;
+  left: 0.18rem;
+  display: block;
+  height: var(--diff-overview-viewport-height, 0);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 0.2rem;
+  background: color-mix(in srgb, var(--accent-soft) 65%, transparent);
+  pointer-events: none;
+}
+.diff-overview-enhanced .diff-overview-item {
+  position: absolute;
+  top: var(--diff-overview-marker-top, 0);
+  right: 0;
+  left: 0;
+  height: var(--diff-overview-marker-height, 3px);
+  min-height: 0;
+}
+.diff-overview-enhanced .diff-overview-density:focus-within,
+.diff-overview-enhanced .diff-overview-density:hover {
+  z-index: 2;
+  transform: scaleX(1.2);
 }
 
 .diff-unavailable {
@@ -1345,6 +1455,9 @@ a {
   }
 }
 @media (max-width: 720px) {
+  .diff-view {
+    --diff-overview-width: 1.45rem;
+  }
   .topbar {
     flex-wrap: wrap;
   }

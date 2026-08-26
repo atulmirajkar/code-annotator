@@ -155,15 +155,20 @@ restore a server default over the tab-local preference. Unknown directories
 default to expanded. This adapter lives independently in `document-tree.ts`.
 `viewer.ts` composes it
 with focused document-search, layout, comparison-control, diff-divider,
-environment, and browser-storage modules; it owns no feature implementation.
+diff-overview, environment, and browser-storage modules; it owns no feature
+implementation.
 
-`diff-overview-geometry.ts` is the DOM-free rule layer for the pending diff
-overview ruler. It accepts ordered numeric hunk ranges and measured content and
-track bounds. It returns proportional marker sizes, collision-packed positions,
+`diff-overview-geometry.ts` is the DOM-free rule layer for the diff overview
+ruler. It accepts ordered numeric hunk ranges and measured content and track
+bounds. It returns proportional marker sizes, collision-packed positions,
 device-pixel density groups, a viewport projection, and the current or next
 hunk identity. It performs no browser lookup or event binding and is included
-in the pure-state architecture guard. The hidden server-rendered overview is
-not activated until a later browser-controller gate.
+in the pure-state architecture guard. `diff-overview.ts` is the focused DOM
+adapter: it validates server fragment identities, measures their current-pane
+ranges, discovers and tracks the computed vertical scroll owner, coalesces
+scroll and resize work through an injected animation-frame port, and projects
+the pure results into CSS. Invalid contracts retain ordinary fragment-link
+navigation instead of partially activating the ruler.
 
 `review.ts` uses a module-scoped `ReviewContext` rather than initializer-local
 helpers. Its panel, selection, highlight, navigation, and HTMX controllers
@@ -249,8 +254,10 @@ deleted, or modified hunk. The current pane identifies the range through its
 existing first and last cells, and the renderer emits an ordered, accessible
 link plus a non-focusable end reference for every hunk. This adds no persisted
 diff state, JSON field, custom `data-*` channel, or row wrapper. The overview
-navigation remains hidden until its browser geometry and styles are implemented
-in the next review gates, so existing diff layout and selection are unchanged.
+navigation is a progressive-enhancement fallback. The browser adapter activates
+sticky proportional positioning only after validating every semantic target;
+the fourth grid column leaves both diff panes' independent horizontal scrolling
+and the shared vertical scroll policy unchanged.
 
 ## HTTP routes
 

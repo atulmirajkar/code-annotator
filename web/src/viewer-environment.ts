@@ -21,6 +21,7 @@ export interface ViewerEnvironment {
   location: Location;
   storage: Storage;
   resizeObserver: typeof ResizeObserver;
+  requestAnimationFrame: (callback: FrameRequestCallback) => number;
   htmx: HtmxAPI | null;
 }
 
@@ -35,6 +36,7 @@ export function defaultViewerEnvironment(): ViewerEnvironment {
     location,
     storage: sessionStorage,
     resizeObserver: ResizeObserver,
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
     htmx: browserHTMX(),
   };
 }
