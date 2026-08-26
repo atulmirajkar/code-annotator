@@ -123,9 +123,17 @@ function handleLeaderKey(context, event) {
         cancelLeader(context);
         return;
     }
-    if (event.isComposing ||
+    if (
+    // Mid-IME composition: the key is part of composing a character, not a
+    // real command keystroke.
+    event.isComposing ||
+        // A dead key (e.g. an accent key awaiting its base letter) has no
+        // meaningful .key value to match against E/R/C.
         event.key === "Dead" ||
+        // Any modifier turns this into a different, unrelated keyboard command.
         hasAnyModifier(event) ||
+        // Focus moved into an editable or interactive control between the
+        // leader key and this one.
         isSuppressedTarget(context, event.target)) {
         cancelLeader(context);
         return;

@@ -36,8 +36,6 @@ const interactiveTargetSelector = [
 type ShortcutCommand = "documents" | "annotations" | "add-comment";
 
 // Mutable state shared by the keydown, dialog, and preference handlers below.
-// leaderTimer doubles as the armed/idle flag: non-null means a Space leader
-// is waiting for its second key.
 interface KeyboardShortcutsContext {
   document: Document;
   window: Window;
@@ -46,7 +44,14 @@ interface KeyboardShortcutsContext {
   status: HTMLElement;
   reviewAvailable: boolean;
   enabled: boolean;
+  // Handle from window.setTimeout for the pending leader timeout, or null
+  // when idle. Doubles as the armed/idle flag: non-null means a Space leader
+  // is waiting for its second key, and cancelLeader clears it back to null.
   leaderTimer: number | null;
+  // The element focused just before the shortcuts dialog was opened (by `?`
+  // or the top-bar button). Captured in openShortcutsDialog and consumed on
+  // the dialog's close event to return focus there instead of leaving it on
+  // <body>, then reset to null.
   invoker: HTMLElement | null;
 }
 
@@ -178,9 +183,16 @@ function handleLeaderKey(
     return;
   }
   if (
+    // Mid-IME composition: the key is part of composing a character, not a
+    // real command keystroke.
     event.isComposing ||
+    // A dead key (e.g. an accent key awaiting its base letter) has no
+    // meaningful .key value to match against E/R/C.
     event.key === "Dead" ||
+    // Any modifier turns this into a different, unrelated keyboard command.
     hasAnyModifier(event) ||
+    // Focus moved into an editable or interactive control between the
+    // leader key and this one.
     isSuppressedTarget(context, event.target)
   ) {
     cancelLeader(context);
