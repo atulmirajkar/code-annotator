@@ -1533,6 +1533,115 @@ a {
   color: #b42318;
 }
 
+.shortcuts-open {
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  flex: 0 0 auto;
+  padding: 0.35rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.shortcuts-open:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.shortcut-status {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+.shortcut-status:empty {
+  display: none;
+}
+
+.shortcuts-dialog {
+  max-width: min(32rem, 100vw - 2rem);
+  margin: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+}
+.shortcuts-dialog::backdrop {
+  background: color-mix(in srgb, #000 45%, transparent);
+}
+.shortcuts-dialog:focus-visible {
+  outline: none;
+}
+.shortcuts-dialog h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+}
+
+.shortcuts-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.shortcuts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: baseline;
+}
+.shortcuts-row dt {
+  flex: 0 0 auto;
+  min-width: 9rem;
+  font-weight: 700;
+}
+.shortcuts-row dd {
+  flex: 1 1 12rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  background: var(--background);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.shortcuts-note {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.shortcuts-enabled {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+}
+
+.shortcuts-dialog-close {
+  border: 1px solid var(--border);
+  border-radius: 0.4rem;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  padding: 0.35rem 0.55rem;
+  cursor: pointer;
+}
+.shortcuts-dialog-close:hover, .shortcuts-dialog-close:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .markdown-body .annotation-navigation-target {
     animation: none;
@@ -1547,6 +1656,10 @@ a {
   }
   .root {
     order: 2;
+    width: 100%;
+  }
+  .shortcut-status {
+    order: 3;
     width: 100%;
   }
   .layout,

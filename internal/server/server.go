@@ -69,6 +69,7 @@ type Server struct {
 	documentSearchJS    []byte
 	documentStateJS     []byte
 	documentTreeJS      []byte
+	keyboardShortcutsJS []byte
 	diffDividerJS       []byte
 	diffOverviewJS      []byte
 	diffGeometryJS      []byte
@@ -391,6 +392,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read document tree script: %w", err)
 	}
+	keyboardShortcutsJS, err := fs.ReadFile(web.Files, "generated/keyboard-shortcuts.js")
+	if err != nil {
+		return nil, fmt.Errorf("read keyboard shortcuts script: %w", err)
+	}
 	comparisonStateJS, err := fs.ReadFile(web.Files, "generated/comparison-state.js")
 	if err != nil {
 		return nil, fmt.Errorf("read comparison state script: %w", err)
@@ -428,6 +433,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		documentSearchJS:    documentSearchJS,
 		documentStateJS:     documentStateJS,
 		documentTreeJS:      documentTreeJS,
+		keyboardShortcutsJS: keyboardShortcutsJS,
 		diffDividerJS:       diffDividerJS,
 		diffOverviewJS:      diffOverviewJS,
 		diffGeometryJS:      diffGeometryJS,
@@ -486,6 +492,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /static/document-catalog.js", server.handleDocumentCatalogScript)
 	mux.HandleFunc("GET /static/document-state.js", server.handleDocumentStateScript)
 	mux.HandleFunc("GET /static/document-tree.js", server.handleDocumentTreeScript)
+	mux.HandleFunc("GET /static/keyboard-shortcuts.js", server.handleKeyboardShortcutsScript)
 	mux.HandleFunc("GET /static/comparison-state.js", server.handleComparisonStateScript)
 	mux.HandleFunc("GET /static/styles.css", server.handleStyles)
 	mux.HandleFunc("GET /static/htmx.min.js", server.handleHTMXLibrary)
@@ -660,6 +667,11 @@ func (s *Server) handleDocumentStateScript(response http.ResponseWriter, _ *http
 func (s *Server) handleDocumentTreeScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.documentTreeJS)
+}
+
+func (s *Server) handleKeyboardShortcutsScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.keyboardShortcutsJS)
 }
 
 func (s *Server) handleComparisonStateScript(response http.ResponseWriter, _ *http.Request) {

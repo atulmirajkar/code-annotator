@@ -3,6 +3,7 @@ import { bindDiffDivider } from "./diff-divider.js";
 import { bindDiffOverview } from "./diff-overview.js";
 import { bindDocumentSearch } from "./document-search.js";
 import { bindDocumentTree } from "./document-tree.js";
+import { bindKeyboardShortcuts } from "./keyboard-shortcuts.js";
 import { bindThemeToggle } from "./theme-toggle.js";
 import { defaultViewerEnvironment, } from "./viewer-environment.js";
 import { bindViewerLayout } from "./viewer-layout.js";
@@ -21,6 +22,7 @@ export function initializeViewer(environment = defaultViewerEnvironment()) {
     bindDiffDivider(environment.document, environment.storage);
     bindDiffOverview(environment);
     bindDocumentNavigationLifecycle(environment);
+    bindKeyboardShortcuts(environment.document, environment.window, environment.window.localStorage);
 }
 function bindDocumentNavigationLifecycle(environment) {
     environment.document.addEventListener("htmx:afterSettle", (event) => {

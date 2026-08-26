@@ -309,6 +309,11 @@ function bindReviewEvents(
   context.form.addEventListener("submit", () =>
     context.panelController.setFormStatus("Saving…"), { signal: bindings.signal },
   );
+  context.document.addEventListener(
+    "code-annotator:add-comment",
+    () => handleAddCommentShortcut(context),
+    { signal: bindings.signal },
+  );
   configureReviewHTMX({
     document: context.document,
     api: htmx,
@@ -324,6 +329,21 @@ function bindReviewEvents(
       ),
     signal: bindings.signal,
   });
+}
+
+// Handles the keyboard shortcut's code-annotator:add-comment event: reveals
+// the review sidebar through its existing toggle button if it is currently
+// hidden, then opens the new-comment form through the same controller path
+// the visible Add comment button uses, so behavior never diverges between
+// pointer and keyboard activation.
+function handleAddCommentShortcut(context: ReviewContext): void {
+  if (context.panel.hidden) {
+    context.document
+      .querySelector<HTMLButtonElement>(".review-toggle")
+      ?.click();
+  }
+  context.panelController.setAnnotationFormVisible(true);
+  context.panelController.setFormStatus("");
 }
 
 function handleReviewPanelClick(

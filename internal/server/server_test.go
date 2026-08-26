@@ -1722,6 +1722,18 @@ func TestReviewPageEmbedding(t *testing.T) {
 			if hasOpenCommentsFilter != test.wantPanel {
 				t.Fatalf("page contains open-comments filter = %t, want %t", hasOpenCommentsFilter, test.wantPanel)
 			}
+			hasShortcutsButton := strings.Contains(response.Body.String(), `class="shortcuts-open"`) && strings.Contains(response.Body.String(), `class="shortcuts-dialog"`) && strings.Contains(response.Body.String(), `class="shortcuts-enabled-toggle"`) && strings.Contains(response.Body.String(), `class="shortcut-status"`)
+			if !hasShortcutsButton {
+				t.Fatalf("page does not contain the keyboard shortcuts reference:\n%s", response.Body.String())
+			}
+			hasDocumentsRow := strings.Contains(response.Body.String(), `<kbd>Space</kbd> then <kbd>E</kbd>`)
+			if !hasDocumentsRow {
+				t.Fatalf("page does not list the documents-sidebar shortcut:\n%s", response.Body.String())
+			}
+			hasReviewOnlyRows := strings.Contains(response.Body.String(), `<kbd>Space</kbd> then <kbd>R</kbd>`) && strings.Contains(response.Body.String(), `<kbd>Space</kbd> then <kbd>C</kbd>`)
+			if hasReviewOnlyRows != test.wantPanel {
+				t.Fatalf("page lists review-only shortcut rows = %t, want %t", hasReviewOnlyRows, test.wantPanel)
+			}
 			hasSource := strings.Contains(response.Body.String(), `class="source-text"`) || strings.Contains(response.Body.String(), `class="source-text source-code-text"`)
 			if hasSource != test.wantSource {
 				t.Fatalf("page contains source metadata = %t, want %t", hasSource, test.wantSource)
@@ -1752,7 +1764,8 @@ func TestStaticAssets(t *testing.T) {
 		{name: "get review navigation module", path: "/static/review-navigation.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createAnnotationNavigator", "navigateFromAnnotation", "emphasizeNavigationTarget"}},
 		{name: "get review panel module", path: "/static/review-panel.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createReviewPanelController", "setAnnotationFormVisible", "startReviewPanelResize"}},
 		{name: "get review selection module", path: "/static/review-selection.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"createSelectionController", "captureDiagramSelection", "diagramSelectionActive", "currentSelection"}},
-		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./comparison-control.js", "./diff-divider.js", "./diff-overview.js", "./document-search.js", "./document-tree.js", "./theme-toggle.js", "./viewer-layout.js", "initializeViewer"}},
+		{name: "get viewer script", path: "/static/viewer.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./comparison-control.js", "./diff-divider.js", "./diff-overview.js", "./document-search.js", "./document-tree.js", "./keyboard-shortcuts.js", "./theme-toggle.js", "./viewer-layout.js", "initializeViewer"}},
+		{name: "get keyboard shortcuts module", path: "/static/keyboard-shortcuts.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./browser-storage.js", "bindKeyboardShortcuts", "code-annotator.global-shortcuts-enabled", "code-annotator:add-comment"}},
 		{name: "get theme bootstrap script", path: "/static/theme-bootstrap.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"sessionStorage", "code-annotator.theme", "theme-light", "theme-dark"}},
 		{name: "get layout bootstrap script", path: "/static/layout-bootstrap.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"currentScript", "code-annotator.panel-collapsed.annotations", "review-collapsed", "code-annotator.document-scope", "document-scope-restoring"}},
 		{name: "get theme toggle module", path: "/static/theme-toggle.js", method: http.MethodGet, wantStatus: http.StatusOK, wantType: "text/javascript; charset=utf-8", wantContents: []string{"./browser-storage.js", "bindThemeToggle", "code-annotator:theme-change"}},

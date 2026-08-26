@@ -20,11 +20,46 @@
       {{if .ReviewToken}}<button type="button" class="panel-toggle review-toggle" aria-controls="annotation-sidebar" aria-expanded="true">Hide annotations</button>{{end}}
     </div>
     <span class="root" title="{{.Root}}">{{.Root}}</span>
+    <p class="shortcut-status" role="status" aria-live="polite"></p>
+    <button type="button" class="shortcuts-open" aria-haspopup="dialog">Keyboard shortcuts</button>
     <button type="button" class="theme-toggle" aria-label="Switch color theme" title="Switch color theme">
       <span class="theme-icon theme-icon-sun" aria-hidden="true"></span>
       <span class="theme-icon theme-icon-moon" aria-hidden="true" hidden></span>
     </button>
   </header>
+  <dialog class="shortcuts-dialog" aria-labelledby="shortcuts-dialog-heading">
+    <h2 id="shortcuts-dialog-heading">Keyboard shortcuts</h2>
+    <dl class="shortcuts-list">
+      <div class="shortcuts-row">
+        <dt><kbd>?</kbd></dt>
+        <dd>Open keyboard shortcuts — viewer and review modes</dd>
+      </div>
+      <div class="shortcuts-row">
+        <dt><kbd>Space</kbd> then <kbd>E</kbd></dt>
+        <dd>Toggle documents sidebar — viewer and review modes</dd>
+      </div>
+      {{if .ReviewToken}}
+      <div class="shortcuts-row">
+        <dt><kbd>Space</kbd> then <kbd>R</kbd></dt>
+        <dd>Toggle review sidebar — review mode only</dd>
+      </div>
+      <div class="shortcuts-row">
+        <dt><kbd>Space</kbd> then <kbd>C</kbd></dt>
+        <dd>Add a new comment — review mode only</dd>
+      </div>
+      {{end}}
+      <div class="shortcuts-row">
+        <dt><kbd>Escape</kbd></dt>
+        <dd>Close keyboard shortcuts — while this dialog is open</dd>
+      </div>
+    </dl>
+    <p class="shortcuts-note">Space starts a shortcut and does not scroll the page while global shortcuts are enabled.</p>
+    <label class="shortcuts-enabled">
+      <input type="checkbox" class="shortcuts-enabled-toggle">
+      Enable global shortcuts
+    </label>
+    <button type="button" class="shortcuts-dialog-close">Close</button>
+  </dialog>
   <div class="layout{{if .ReviewToken}} review-layout{{end}}">
     <script src="/static/layout-bootstrap.js"></script>
     <nav class="sidebar" id="documents-sidebar" aria-label="Reviewable documents">

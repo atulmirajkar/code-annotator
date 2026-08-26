@@ -184,6 +184,7 @@ function bindReviewEvents(context, htmx, bindings) {
     context.panel.addEventListener("click", (event) => handleReviewPanelClick(context, event), { signal: bindings.signal });
     context.panel.addEventListener("change", (event) => handleReviewPanelChange(context, event), { signal: bindings.signal });
     context.form.addEventListener("submit", () => context.panelController.setFormStatus("Saving…"), { signal: bindings.signal });
+    context.document.addEventListener("code-annotator:add-comment", () => handleAddCommentShortcut(context), { signal: bindings.signal });
     configureReviewHTMX({
         document: context.document,
         api: htmx,
@@ -194,6 +195,20 @@ function bindReviewEvents(context, htmx, bindings) {
         onRequestError: () => context.panelController.setFormStatus("Could not update annotations. Refresh to try again.", true),
         signal: bindings.signal,
     });
+}
+// Handles the keyboard shortcut's code-annotator:add-comment event: reveals
+// the review sidebar through its existing toggle button if it is currently
+// hidden, then opens the new-comment form through the same controller path
+// the visible Add comment button uses, so behavior never diverges between
+// pointer and keyboard activation.
+function handleAddCommentShortcut(context) {
+    if (context.panel.hidden) {
+        context.document
+            .querySelector(".review-toggle")
+            ?.click();
+    }
+    context.panelController.setAnnotationFormVisible(true);
+    context.panelController.setFormStatus("");
 }
 function handleReviewPanelClick(context, event) {
     const target = event.target instanceof Element ? event.target : null;

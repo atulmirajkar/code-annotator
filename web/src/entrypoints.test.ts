@@ -23,7 +23,13 @@ describe("explicit browser initializers", () => {
   });
 
   it("configures an explicitly injected HTMX API", () => {
-    document.body.innerHTML = `<main class="layout"></main>`;
+    document.body.innerHTML = `<main class="layout"></main>
+      <p class="shortcut-status" role="status"></p>
+      <button type="button" class="shortcuts-open">Keyboard shortcuts</button>
+      <dialog class="shortcuts-dialog">
+        <button type="button" class="shortcuts-dialog-close">Close</button>
+        <input type="checkbox" class="shortcuts-enabled-toggle">
+      </dialog>`;
     const config = {
       allowEval: true,
       allowNestedOobSwaps: true,

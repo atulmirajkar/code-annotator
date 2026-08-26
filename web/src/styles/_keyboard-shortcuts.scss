@@ -1,0 +1,108 @@
+@use "tokens" as *;
+
+.shortcuts-open {
+  @include control-surface;
+  flex: 0 0 auto;
+  padding: $control-padding-y $control-padding-x;
+  font-size: 0.75rem;
+  cursor: pointer;
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+.shortcut-status {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  &:empty {
+    display: none;
+  }
+}
+
+.shortcuts-dialog {
+  max-width: min(32rem, calc(100vw - 2rem));
+  margin: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  color: var(--text);
+
+  &::backdrop {
+    background: color-mix(in srgb, #000 45%, transparent);
+  }
+
+  &:focus-visible {
+    outline: none;
+  }
+
+  h2 {
+    margin: 0 0 0.9rem;
+    font-size: 1.05rem;
+  }
+}
+
+.shortcuts-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0 0 1rem;
+}
+
+.shortcuts-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  align-items: baseline;
+
+  dt {
+    flex: 0 0 auto;
+    min-width: 9rem;
+    font-weight: 700;
+  }
+
+  dd {
+    flex: 1 1 12rem;
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+}
+
+kbd {
+  display: inline-block;
+  padding: 0.1rem 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 0.3rem;
+  background: var(--background);
+  color: var(--text);
+  font-family: $font-mono;
+  font-size: 0.78rem;
+}
+
+.shortcuts-note {
+  margin: 0 0 1rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.shortcuts-enabled {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0 0 1.1rem;
+  font-size: 0.88rem;
+}
+
+.shortcuts-dialog-close {
+  @include control-surface;
+  padding: $control-padding-y $control-padding-x;
+  cursor: pointer;
+  &:hover,
+  &:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
