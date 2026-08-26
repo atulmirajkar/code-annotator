@@ -1,3 +1,5 @@
+import { bindAnnotationCardDisclosures } from "./annotation-card-disclosures.js";
+import type { AnnotationOperationFocus } from "./annotation-card-disclosures.js";
 import { fetchDocumentCatalogState } from "./document-state.js";
 import { configureLifecycleForm } from "./review-fragments.js";
 import { createAnnotationHighlighter } from "./review-highlights.js";
@@ -32,6 +34,7 @@ interface ReviewContext extends ReviewElements {
   viewerState: ViewerState;
   panelController: ReturnType<typeof createReviewPanelController>;
   selectionController: ReturnType<typeof createSelectionController>;
+  cardOperationFocus: AnnotationOperationFocus;
   renderAnnotationHighlights: ReturnType<
     typeof createAnnotationHighlighter
   >["renderAnnotationHighlights"];
@@ -94,6 +97,13 @@ export async function initializeReview(
   // Selection events can fire only after start(), which runs after context is
   // assigned. The nullable relay breaks the controller construction cycle.
   let context: ReviewContext | null = null;
+  const bindings = new AbortController();
+  // Bound ahead of context construction so its returned handle can be stored
+  // on ReviewContext; the panel it delegates on outlives every fragment swap.
+  const cardOperationFocus = bindAnnotationCardDisclosures(
+    panel,
+    bindings.signal,
+  );
   const selectionController = createSelectionController({
     document: environment.document,
     window: environment.window,
@@ -139,11 +149,12 @@ export async function initializeReview(
     viewerState,
     panelController,
     selectionController,
+    cardOperationFocus,
     renderAnnotationHighlights: highlighter.renderAnnotationHighlights,
     navigateFromAnnotation: navigator.navigateFromAnnotation,
   };
 
-  const bindings = bindReviewEvents(context, environment.htmx);
+  bindReviewEvents(context, environment.htmx, bindings);
   selectionController.start();
   activeReviewCleanup = () => {
     bindings.abort();
@@ -287,8 +298,8 @@ function prepareDiagramSelection(
 function bindReviewEvents(
   context: ReviewContext,
   htmx: ReviewHtmxAPI | null,
-): AbortController {
-  const bindings = new AbortController();
+  bindings: AbortController,
+): void {
   context.panel.addEventListener("click", (event) =>
     handleReviewPanelClick(context, event), { signal: bindings.signal },
   );
@@ -313,7 +324,6 @@ function bindReviewEvents(
       ),
     signal: bindings.signal,
   });
-  return bindings;
 }
 
 function handleReviewPanelClick(
@@ -365,6 +375,7 @@ async function handlePanelChanged(
   }
   initializePanel(context);
   if (!mutation) return;
+  context.cardOperationFocus.restoreAfterSwap(successful);
   if (!successful) {
     context.panelController.setFormStatus(
       "Annotations changed elsewhere. Review the refreshed panel and retry.",

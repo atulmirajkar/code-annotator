@@ -409,29 +409,37 @@
   }
 }
 .annotation-action-bar {
-  position: relative;
   margin-top: 0.8rem;
   padding: 0.65rem 0.65rem;
   border-top: 1px solid var(--border);
 }
-.annotation-actions {
-  width: 100%;
-  min-width: 0;
-  > summary {
-    padding-right: 5rem;
-    color: var(--muted);
-    cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+.annotation-action-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+.annotation-disclosure-toggle {
+  @include control-surface;
+  padding: 0.32rem 0.58rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 700;
+  &:hover,
+  &[aria-expanded="true"] {
+    border-color: var(--accent);
+    color: var(--accent);
   }
+}
+.annotation-reply-panel,
+.annotation-actions-panel {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--border);
 }
 .annotation-quick-close {
   @include primary-action;
-  position: absolute;
-  top: 0.65rem;
-  right: 0.65rem;
   padding: 0.32rem 0.58rem;
   border: 1px solid var(--accent);
   font-size: 0.75rem;
@@ -445,9 +453,6 @@
 .annotation-lifecycle {
   display: grid;
   gap: 0.55rem;
-  margin-top: 0.65rem;
-  padding-top: 0.65rem;
-  border-top: 1px solid var(--border);
 }
 .annotation-reply label,
 .annotation-lifecycle label {

@@ -62,6 +62,12 @@ func TestAnnotationActionAvailabilityUsesLifecycleRules(t *testing.T) {
 			t.Parallel()
 			item := resolvedAnnotation{Annotation: annotation.Annotation{ID: "ann_actions", Status: test.status}}
 			view := newAnnotationActionsView("README.md", item, false)
+			if got, want := view.ReplyPanelID, "annotation-reply-panel-ann_actions"; got != want {
+				t.Fatalf("ReplyPanelID = %q, want %q", got, want)
+			}
+			if got, want := view.ActionsPanelID, "annotation-actions-panel-ann_actions"; got != want {
+				t.Fatalf("ActionsPanelID = %q, want %q", got, want)
+			}
 			if got := transitionStatuses(view.Transitions); !slices.Equal(got, test.wantStatuses) {
 				t.Fatalf("transition statuses = %v, want %v", got, test.wantStatuses)
 			}
@@ -127,6 +133,8 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 		`&lt;b onclick=&#34;reply()&#34;&gt;reply&lt;/b&gt;`,
 		`Lines 4–6`,
 		`class="annotation-badge stale"`,
+		`class="annotation-disclosure-toggle annotation-reply-toggle" aria-expanded="false" aria-controls="annotation-reply-panel-ann_fragment"`,
+		`class="annotation-disclosure-toggle annotation-actions-toggle" aria-expanded="false" aria-controls="annotation-actions-panel-ann_fragment"`,
 		`class="annotation-reattach"`,
 		`open → acknowledged`,
 	} {
@@ -136,6 +144,13 @@ func TestAnnotationFragmentTemplatesRenderEscapedAuthoritativeState(t *testing.T
 	}
 	if strings.Contains(html, "Acknowledgement") {
 		t.Errorf("rendered fragment exposes redundant acknowledgement entry:\n%s", html)
+	}
+	replyPanel := strings.Index(html, `id="annotation-reply-panel-ann_fragment"`)
+	replyForm := strings.Index(html, `class="annotation-reply"`)
+	actionsPanel := strings.Index(html, `id="annotation-actions-panel-ann_fragment"`)
+	reattachForm := strings.Index(html, `class="annotation-reattach"`)
+	if replyPanel < 0 || replyForm < replyPanel || actionsPanel < replyForm || reattachForm < actionsPanel {
+		t.Errorf("rendered fragment does not separate reply and action regions:\n%s", html)
 	}
 }
 

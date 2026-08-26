@@ -55,6 +55,7 @@ type Server struct {
 	comparison          *comparisonController
 	page                *template.Template
 	styles              []byte
+	annotationCardJS    []byte
 	reviewJS            []byte
 	reviewFragmentsJS   []byte
 	reviewHTMXJS        []byte
@@ -286,6 +287,10 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	if err != nil {
 		return nil, fmt.Errorf("read review script: %w", err)
 	}
+	annotationCardJS, err := fs.ReadFile(web.Files, "generated/annotation-card-disclosures.js")
+	if err != nil {
+		return nil, fmt.Errorf("read annotation card disclosures script: %w", err)
+	}
 	reviewFragmentsJS, err := fs.ReadFile(web.Files, "generated/review-fragments.js")
 	if err != nil {
 		return nil, fmt.Errorf("read review fragments script: %w", err)
@@ -409,6 +414,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 		highlighter:         highlight.NewRuntime(),
 		page:                page,
 		styles:              styles,
+		annotationCardJS:    annotationCardJS,
 		reviewJS:            reviewJS,
 		reviewFragmentsJS:   reviewFragmentsJS,
 		reviewHTMXJS:        reviewHTMXJS,
@@ -453,6 +459,7 @@ func New(root *content.Root, renderer *mdrender.Renderer, options ...Option) (*S
 	mux.HandleFunc("GET /view/{path...}", server.handleDocument)
 	mux.HandleFunc("GET /asset/{path...}", server.handleAsset)
 	mux.HandleFunc("GET /healthz", server.handleHealth)
+	mux.HandleFunc("GET /static/annotation-card-disclosures.js", server.handleAnnotationCardDisclosuresScript)
 	mux.HandleFunc("GET /static/review.js", server.handleReviewScript)
 	mux.HandleFunc("GET /static/review-fragments.js", server.handleReviewFragmentsScript)
 	mux.HandleFunc("GET /static/review-htmx.js", server.handleReviewHTMXScript)
@@ -522,6 +529,11 @@ func parseViewerTemplates() (*template.Template, error) {
 func (s *Server) handleReviewScript(response http.ResponseWriter, _ *http.Request) {
 	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	_, _ = response.Write(s.reviewJS)
+}
+
+func (s *Server) handleAnnotationCardDisclosuresScript(response http.ResponseWriter, _ *http.Request) {
+	response.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	_, _ = response.Write(s.annotationCardJS)
 }
 
 func (s *Server) handleReviewFragmentsScript(response http.ResponseWriter, _ *http.Request) {

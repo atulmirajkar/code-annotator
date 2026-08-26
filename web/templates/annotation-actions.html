@@ -1,18 +1,18 @@
 {{define "annotation-actions"}}
 <div class="annotation-action-bar">
-  <details class="annotation-actions">
-    <summary>Actions</summary>
-    {{if .CanReattach}}
-    <form class="annotation-reattach" method="post" action="{{.ReattachURL}}" hx-post="{{.ReattachURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+  <div class="annotation-action-controls">
+    <button type="button" class="annotation-disclosure-toggle annotation-reply-toggle" aria-expanded="false" aria-controls="{{.ReplyPanelID}}">Reply</button>
+    <button type="button" class="annotation-disclosure-toggle annotation-actions-toggle" aria-expanded="false" aria-controls="{{.ActionsPanelID}}">Actions</button>
+    {{if .CanQuickClose}}
+    <form class="annotation-quick-close-form" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
-      <input type="hidden" name="selection_start_byte" value="{{.ReattachStartByte}}">
-      <input type="hidden" name="selection_end_byte" value="{{.ReattachEndByte}}">
-      <input type="hidden" name="document_sha256" value="{{.ReattachDigest}}">
-      <p class="reattach-help">Select replacement text in the document to enable reattachment.</p>
-      <p class="reattach-status" role="status"></p>
-      <button type="submit" disabled>Reattach selection</button>
+      <input type="hidden" name="status" value="closed">
+      <input type="hidden" name="role" value="reviewer">
+      <button type="submit" class="annotation-quick-close" aria-label="Close annotation {{.AnnotationID}}">Close</button>
     </form>
     {{end}}
+  </div>
+  <div id="{{.ReplyPanelID}}" class="annotation-reply-panel" hidden>
     <form class="annotation-reply" method="post" action="{{.ReplyURL}}" hx-post="{{.ReplyURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
       <label>Reply as
@@ -25,6 +25,19 @@
       <p class="reply-status" role="status"></p>
       <button type="submit">Add reply</button>
     </form>
+  </div>
+  <div id="{{.ActionsPanelID}}" class="annotation-actions-panel" hidden>
+    {{if .CanReattach}}
+    <form class="annotation-reattach" method="post" action="{{.ReattachURL}}" hx-post="{{.ReattachURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
+      <input type="hidden" name="document" value="{{.Document}}">
+      <input type="hidden" name="selection_start_byte" value="{{.ReattachStartByte}}">
+      <input type="hidden" name="selection_end_byte" value="{{.ReattachEndByte}}">
+      <input type="hidden" name="document_sha256" value="{{.ReattachDigest}}">
+      <p class="reattach-help">Select replacement text in the document to enable reattachment.</p>
+      <p class="reattach-status" role="status"></p>
+      <button type="submit" disabled>Reattach selection</button>
+    </form>
+    {{end}}
     {{if .Transitions}}
     <form id="{{.LifecycleFormID}}" class="annotation-lifecycle" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
       <input type="hidden" name="document" value="{{.Document}}">
@@ -45,14 +58,6 @@
       <button type="submit">Update status</button>
     </form>
     {{end}}
-  </details>
-  {{if .CanQuickClose}}
-  <form class="annotation-quick-close-form" method="post" action="{{.TransitionURL}}" hx-post="{{.TransitionURL}}" hx-target="#annotation-panel-content" hx-swap="outerHTML">
-    <input type="hidden" name="document" value="{{.Document}}">
-    <input type="hidden" name="status" value="closed">
-    <input type="hidden" name="role" value="reviewer">
-    <button type="submit" class="annotation-quick-close" aria-label="Close annotation {{.AnnotationID}}">Close</button>
-  </form>
-  {{end}}
+  </div>
 </div>
 {{end}}

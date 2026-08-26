@@ -151,9 +151,12 @@ test.describe("annotation review interactions", () => {
     await card.locator(".annotation-summary").click();
     await expect(card.locator(".annotation-source")).toContainText("selected phrase");
     await card.locator(".annotation-summary").click();
-    await expect(card.locator(".annotation-actions")).toBeHidden();
+    await expect(card.locator(".annotation-actions-panel")).toBeHidden();
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-reply-toggle").click();
+    await expect(card.locator(".annotation-reply-panel")).toBeVisible();
+    await expect(card.locator(".annotation-actions-panel")).toBeHidden();
+    await expect(card.locator('.annotation-reply textarea[name="message"]')).toBeFocused();
 
     await card.locator('.annotation-reply select[name="role"]').selectOption("agent");
     await card.locator('.annotation-reply textarea[name="message"]').fill("I will update it.");
@@ -165,7 +168,7 @@ test.describe("annotation review interactions", () => {
     await expect(page.locator(".review-panel-resize")).toBeVisible();
 
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-reply-toggle").click();
     await expect(card.locator('.annotation-reply select[name="role"] option')).toHaveText(["Reviewer", "Agent"]);
     await card.locator('.annotation-reply select[name="role"]').selectOption("reviewer");
     await card.locator('.annotation-reply textarea[name="message"]').fill("I have a follow-up question.");
@@ -174,7 +177,7 @@ test.describe("annotation review interactions", () => {
     await expect(card.locator(".annotation-meta")).toContainText("waiting for agent");
 
     await card.locator(".annotation-summary").click();
-    await card.locator('.annotation-actions > summary').click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-lifecycle select[name="status"]').selectOption("acknowledged");
     await expect(card.locator('.annotation-lifecycle select[name="role"] option')).toHaveText(["Agent"]);
     await card.locator('.annotation-lifecycle button[type="submit"]').click();
@@ -182,14 +185,14 @@ test.describe("annotation review interactions", () => {
     await expect(card.locator(".annotation-thread-entry.acknowledgement")).toHaveCount(0);
 
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-lifecycle select[name="status"]').selectOption("applied");
     await card.locator('.annotation-lifecycle textarea[name="activity"]').fill("Updated the wording.");
     await card.locator('.annotation-lifecycle button[type="submit"]').click();
     await expect(card.locator(".annotation-badge")).toContainText(["change request", "applied"]);
 
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await expect(card.locator('.annotation-lifecycle option[value="closed"]')).toHaveCount(0);
     await expect(card.locator('.annotation-lifecycle option[value="needs_changes"]')).toHaveCount(1);
     await expect(card.locator('.annotation-lifecycle select[name="role"] option')).toHaveText(["Reviewer"]);
@@ -216,7 +219,7 @@ test.describe("annotation review interactions", () => {
 
     await selectText(page, "Replacement anchor");
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-reattach button[type="submit"]').click();
     await expect(card.locator(".annotation-badge.stale")).toHaveCount(0);
     await expect(card.locator(".annotation-source")).toContainText("Replacement anchor");
@@ -244,7 +247,7 @@ test.describe("annotation review interactions", () => {
     await page.reload();
     await selectText(page, "Replacement anchor");
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-reattach button[type="submit"]').click();
     await expect(card.locator(".annotation-badge.stale")).toHaveCount(0);
     await expect(card.locator(".annotation-source")).toContainText("Replacement anchor");
@@ -276,7 +279,7 @@ test.describe("annotation review interactions", () => {
 
     const firstCard = page.locator(".annotation-card").first();
     await firstCard.locator(".annotation-summary").click();
-    await firstCard.locator(".annotation-actions > summary").click();
+    await firstCard.locator(".annotation-reply-toggle").click();
     await firstCard.locator('.annotation-reply textarea[name="message"]').fill("Unsaved reply");
     await firstCard.locator('.annotation-reply button[type="submit"]').click();
 
@@ -294,12 +297,12 @@ test.describe("annotation review interactions", () => {
 
     const card = page.locator(".annotation-card", { hasText: "Quick close conflict." });
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-lifecycle select[name="status"]').selectOption("acknowledged");
     await card.locator('.annotation-lifecycle button[type="submit"]').click();
 
     await card.locator(".annotation-summary").click();
-    await card.locator(".annotation-actions > summary").click();
+    await card.locator(".annotation-actions-toggle").click();
     await card.locator('.annotation-lifecycle select[name="status"]').selectOption("applied");
     await card.locator('.annotation-lifecycle textarea[name="activity"]').fill("Applied for conflict coverage.");
     await card.locator('.annotation-lifecycle button[type="submit"]').click();

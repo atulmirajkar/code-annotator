@@ -84,6 +84,8 @@ type annotationActionsView struct {
 	ReplyURL        string
 	ReattachURL     string
 	TransitionURL   string
+	ReplyPanelID    string
+	ActionsPanelID  string
 	LifecycleFormID string
 	// CanReattach requires both a source selector and a currently stale anchor.
 	CanReattach bool
@@ -205,6 +207,14 @@ func lifecycleFormElementID(annotationID string) string {
 	return "annotation-lifecycle-" + annotationID
 }
 
+func replyPanelElementID(annotationID string) string {
+	return "annotation-reply-panel-" + annotationID
+}
+
+func actionsPanelElementID(annotationID string) string {
+	return "annotation-actions-panel-" + annotationID
+}
+
 func humanizeAnnotationValue(value string) string {
 	return strings.ReplaceAll(value, "_", " ")
 }
@@ -221,6 +231,8 @@ func newAnnotationActionsView(document string, item resolvedAnnotation, anchorSt
 		ReplyURL:        baseURL + "/replies",
 		ReattachURL:     baseURL + "/reattach",
 		TransitionURL:   baseURL + "/transition",
+		ReplyPanelID:    replyPanelElementID(item.ID),
+		ActionsPanelID:  actionsPanelElementID(item.ID),
 		LifecycleFormID: lifecycleFormElementID(item.ID),
 		CanReattach:     (item.Source != nil || item.NeedsReattachment) && anchorStale,
 		CanQuickClose:   item.Status == annotation.StatusApplied,

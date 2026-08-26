@@ -1,6 +1,6 @@
 {{define "annotation-panel"}}
 <div id="annotation-panel-content">
-  {{if .Feedback}}<p class="annotation-panel-feedback {{.FeedbackKind}}" role="status">{{.Feedback}}</p>{{end}}
+  {{if .Feedback}}<p class="annotation-panel-feedback {{.FeedbackKind}}" role="status" tabindex="-1">{{.Feedback}}</p>{{end}}
   {{if .Cards}}
   <div class="annotation-list" aria-live="polite">
     {{range .Cards}}{{template "annotation-card" .}}{{end}}

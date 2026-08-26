@@ -132,6 +132,15 @@ Comments should explain information the code cannot express by itself:
 Do not add comments that merely restate a function name or individual
 statement. Update comments when the invariant changes.
 
+Give every function a short header comment: one line describing what it does
+and one line per non-obvious parameter. This is required for every exported
+function, and expected for module-scope helpers once a file's control flow is
+dense enough that a reader benefits from a summary before the body — a
+single-expression helper with a self-describing name and no parameters does
+not need one. Add a body comment inside dense logic (branchy conditionals,
+multi-step DOM traversal, non-obvious ordering) to mark what each step is
+doing, not to restate the line beside it.
+
 ## Test at the right boundary
 
 - Put DOM-free rules in focused modules with Vitest unit tests.
@@ -182,5 +191,7 @@ Before considering a TypeScript change complete, verify:
 - each module has one coherent responsibility;
 - async errors and request races are handled;
 - non-obvious invariants have useful comments;
+- exported functions have a header comment describing what they do and their
+  non-obvious parameters;
 - tests cover the changed behavior;
 - generated assets and source-of-truth docs are current.

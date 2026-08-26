@@ -1,3 +1,4 @@
+import { bindAnnotationCardDisclosures } from "./annotation-card-disclosures.js";
 import { fetchDocumentCatalogState } from "./document-state.js";
 import { configureLifecycleForm } from "./review-fragments.js";
 import { createAnnotationHighlighter } from "./review-highlights.js";
@@ -44,6 +45,10 @@ export async function initializeReview(environment = defaultReviewEnvironment())
     // Selection events can fire only after start(), which runs after context is
     // assigned. The nullable relay breaks the controller construction cycle.
     let context = null;
+    const bindings = new AbortController();
+    // Bound ahead of context construction so its returned handle can be stored
+    // on ReviewContext; the panel it delegates on outlives every fragment swap.
+    const cardOperationFocus = bindAnnotationCardDisclosures(panel, bindings.signal);
     const selectionController = createSelectionController({
         document: environment.document,
         window: environment.window,
@@ -89,10 +94,11 @@ export async function initializeReview(environment = defaultReviewEnvironment())
         viewerState,
         panelController,
         selectionController,
+        cardOperationFocus,
         renderAnnotationHighlights: highlighter.renderAnnotationHighlights,
         navigateFromAnnotation: navigator.navigateFromAnnotation,
     };
-    const bindings = bindReviewEvents(context, environment.htmx);
+    bindReviewEvents(context, environment.htmx, bindings);
     selectionController.start();
     activeReviewCleanup = () => {
         bindings.abort();
@@ -174,8 +180,7 @@ function prepareDiagramSelection(document, markdown, viewerState) {
         output.setAttribute("aria-label", "Rendered Mermaid diagram. Select the complete diagram for annotation.");
     }
 }
-function bindReviewEvents(context, htmx) {
-    const bindings = new AbortController();
+function bindReviewEvents(context, htmx, bindings) {
     context.panel.addEventListener("click", (event) => handleReviewPanelClick(context, event), { signal: bindings.signal });
     context.panel.addEventListener("change", (event) => handleReviewPanelChange(context, event), { signal: bindings.signal });
     context.form.addEventListener("submit", () => context.panelController.setFormStatus("Saving…"), { signal: bindings.signal });
@@ -189,7 +194,6 @@ function bindReviewEvents(context, htmx) {
         onRequestError: () => context.panelController.setFormStatus("Could not update annotations. Refresh to try again.", true),
         signal: bindings.signal,
     });
-    return bindings;
 }
 function handleReviewPanelClick(context, event) {
     const target = event.target instanceof Element ? event.target : null;
@@ -228,6 +232,7 @@ async function handlePanelChanged(context, mutationKind, mutation, successful) {
     initializePanel(context);
     if (!mutation)
         return;
+    context.cardOperationFocus.restoreAfterSwap(successful);
     if (!successful) {
         context.panelController.setFormStatus("Annotations changed elsewhere. Review the refreshed panel and retry.", true);
         return;
