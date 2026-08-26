@@ -2,15 +2,18 @@
 
 ## Status
 
-Approved on 2026-08-25. Implementation is complete through review gate 4 and
+Approved on 2026-08-25. Implementation is complete through review gate 5 and
 stopped for maintainer review. The server derives request-local hunks and
 renders semantic targets and progressive-enhancement overview links. DOM-free
 TypeScript owns ruler geometry, while a focused browser adapter validates those
 targets, discovers the active scroll owner, coalesces measurement updates,
 projects marker and viewport styles, and intercepts unmodified activation.
 The fourth diff grid column, sticky track, marker kinds, current/next treatment,
-and accessible focus states are active. The remaining gates add the dedicated
-long-file Playwright fixture and closeout documentation and verification.
+and accessible focus states are active. A dedicated long-file Playwright
+fixture now verifies five separated hunks plus an 800-hunk density stress case,
+navigation, scroll ownership, responsive layout, themes, focus, and horizontal
+pane independence. The remaining gate closes out implemented-behavior
+documentation and repeats the complete verification matrix.
 
 ## Problem
 

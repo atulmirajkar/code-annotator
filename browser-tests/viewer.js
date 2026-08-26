@@ -53,6 +53,10 @@ const test = base.extend({
 // second non-catalog commit gives the revision selector more than one bounded
 // option without altering any reviewable file's committed content.
 async function initializeGitFixture(contentRoot) {
+  await writeFile(
+    path.join(contentRoot, "diff-overview.go"),
+    diffOverviewFixture(false),
+  );
   await runFile("git", ["-C", contentRoot, "init", "-b", "main"]);
   await runFile("git", ["-C", contentRoot, "add", "."]);
   await runFile("git", ["-C", contentRoot, "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-m", "fixtures"]);
@@ -70,6 +74,35 @@ var afterSelection = true
 
 This paragraph describes the current line after edits were applied.
 `);
+  await writeFile(
+    path.join(contentRoot, "diff-overview.go"),
+    diffOverviewFixture(true),
+  );
+}
+
+// Five separated edits across a 210-row source file give the overview ruler a
+// stable long document, every marker kind, and a final hunk close to EOF.
+function diffOverviewFixture(changed) {
+  const rows = [];
+  for (let row = 1; row <= 210; row += 1) {
+    if (changed && row === 80) continue;
+    if (changed && row === 120) {
+      rows.push('    "overview row 119 added",');
+    }
+    const suffix =
+      changed && (row === 40 || row === 160 || row === 205)
+        ? " changed"
+        : "";
+    rows.push(
+      `    "overview row ${String(row).padStart(3, "0")}${suffix} keeps a deliberately long stable value for independent horizontal diff scrolling",`,
+    );
+  }
+  return `package fixture
+
+var overviewRows = []string{
+${rows.join("\n")}
+}
+`;
 }
 
 // waitForViewerURL resolves startup output while retaining stderr for useful
