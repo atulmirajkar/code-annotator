@@ -214,17 +214,17 @@ verification is reviewed.
 
 - [x] Pin Mermaid Tiny and retain its license in the embedded web assets.
 - [x] Bundle Mermaid at build time with no runtime Node.js, Chromium, CDN, or
-  network dependency.
+      network dependency.
 - [x] Recognize fenced `mermaid` blocks and render them as client-side SVG.
 - [x] Use strict Mermaid security, bounded diagram input, and self-only scripts;
-  permit generated inline SVG styles only on pages containing Mermaid.
+      permit generated inline SVG styles only on pages containing Mermaid.
 - [x] Preserve the source code block and show a useful message when diagram
-  parsing or rendering fails.
+      parsing or rendering fails.
 - [x] Add responsive diagram styling and viewer-theme integration.
 - [x] Treat a rendered diagram as one source-backed annotation region rather
-  than mapping individual SVG labels to Markdown offsets.
+      than mapping individual SVG labels to Markdown offsets.
 - [x] Add sequence-diagram, malformed-input, CSP, offline-asset, and annotation
-  integration tests.
+      integration tests.
 
 ### 8. Viewer navigation polish
 
@@ -236,13 +236,13 @@ verification is reviewed.
 
 - [x] Scroll exact and moved annotation cards to their resolved highlights.
 - [x] Scroll stale annotations to the nearest source-backed position around
-  their original byte offset and identify the result as approximate.
+      their original byte offset and identify the result as approximate.
 - [x] Scroll document-level annotations to the document heading or top.
 - [x] Add keyboard activation, focus handling, and temporary target emphasis.
 - [x] Keep nested card controls and text selection from triggering navigation.
 - [x] Add a reviewer Quick Close button beside Actions for applied annotations.
 - [x] Add browser coverage for resolved, stale, collapsed-panel, and
-  reduced-motion behavior, plus Quick Close success and conflict handling.
+      reduced-motion behavior, plus Quick Close success and conflict handling.
 
 ### 10. Code review and Git diff
 
@@ -252,36 +252,36 @@ verification is reviewed.
 - [x] Approve immutable startup Git base semantics and annotation context.
 - [x] Implement safe code rendering and reuse annotation workflows.
 - [x] Implement bounded Git comparison, strict unified-patch alignment, and
-  side-by-side current-file diff presentation.
+      side-by-side current-file diff presentation.
 - [x] Add a changed-only document filter backed by the configured Git base.
 - [x] Extend agent handoff and browser coverage to code review.
 - [x] Keep base and current code in independent horizontal scroll panes so long
-  lines cannot cross the divider or obscure change highlighting.
+      lines cannot cross the divider or obscure change highlighting.
 - [x] Cover current-side diff annotation creation, restored highlights, and
-  annotation-to-source navigation in the browser.
+      annotation-to-source navigation in the browser.
 - [x] Cover current-side multi-line selection and reject base-side and
-  cross-pane selections in the browser.
+      cross-pane selections in the browser.
 - [x] Exclude line-number gutters and diff markers from multi-line selection
-  previews while preserving source blank lines.
+      previews while preserving source blank lines.
 - [x] Support selection endpoints on empty current-file lines using zero-length
-  source anchors in File and Changes views.
+      source anchors in File and Changes views.
 - [x] Preserve the reviewer-selected File/Changes mode across code-document
-  navigation without applying diff mode to Markdown documents.
+      navigation without applying diff mode to Markdown documents.
 - [x] Preserve collapsed document and annotation sidebars across navigation in
-  the current browser tab.
+      the current browser tab.
 - [x] Display the requested Git base and frozen abbreviated commit beside the
-  File/Changes controls, with the full commit available as hover text.
+      File/Changes controls, with the full commit available as hover text.
 - [x] Complete diff-specific browser coverage for narrow layouts and light/dark
-  themes.
+      themes.
 - [x] Design a bounded revision selector that re-pins an always-explicit
-  server-wide comparison base validated against a live commit listing.
+      server-wide comparison base validated against a live commit listing.
 - [x] Implement bounded recent-commit discovery.
 - [x] Implement the authenticated comparison state and select API routes.
 - [x] Add the revision selector with abbreviated commit and truncated subject.
 - [x] Add unit, handler, concurrency, and browser coverage for selection,
-  rejection, cross-tab base changes, and failure behavior.
+      rejection, cross-tab base changes, and failure behavior.
 - [x] Update user-facing build/run documentation and refresh distributions
-  after the code-review milestone receives maintainer approval.
+      after the code-review milestone receives maintainer approval.
 
 ### 11. Live reload
 
@@ -298,40 +298,40 @@ verification is reviewed.
 Design: [`docs/designs/source-syntax-highlighting.md`](docs/designs/source-syntax-highlighting.md).
 
 - [x] Select an offline, embedded highlighter with Go, C#, JavaScript, and
-  TypeScript support.
+      TypeScript support.
 - [ ] Preserve source-backed outer spans and exact annotation byte ranges.
 - [ ] Support nested token elements in selection and annotation highlights.
 - [ ] Add light/dark themes without runtime network dependencies.
 - [ ] Add rendering, selection, CSP, and browser regression coverage.
 - [x] Complete submilestone 12.1: runtime and grammar integration. The pinned
-  pure-Go runtime loads all 11 approved grammars from the selective offline
-  build, applies a 128 KiB admission cap plus 500 ms parse deadline, passes the
-  full Go/vet/race matrix, and cross-builds all six CGO-disabled targets within
-  the approved binary-size budget. Awaiting maintainer review before 12.2.
+      pure-Go runtime loads all 11 approved grammars from the selective offline
+      build, applies a 128 KiB admission cap plus 500 ms parse deadline, passes the
+      full Go/vet/race matrix, and cross-builds all six CGO-disabled targets within
+      the approved binary-size budget. Awaiting maintainer review before 12.2.
 - [x] Complete submilestone 12.2: nested source-range support. Restored
-  annotation ranges now map through descendant text nodes, fallback marks split
-  safely inside token elements, and the focused plus full frontend unit suites
-  pass. The Playwright browser matrix remains environment-blocked because
-  Microsoft Edge aborts during launch in this workspace; no assertion failures
-  were observed.
+      annotation ranges now map through descendant text nodes, fallback marks split
+      safely inside token elements, and the focused plus full frontend unit suites
+      pass. The Playwright browser matrix remains environment-blocked because
+      Microsoft Edge aborts during launch in this workspace; no assertion failures
+      were observed.
 - [x] Complete submilestone 12.3: core language highlighting in File view.
-  File view now highlights Go, C#, JavaScript/JSX, and TypeScript/TSX through
-  bounded Tree-sitter ranges, fixed semantic classes, escaped token output,
-  and plain-render fallback. Existing source IDs and line-ending gaps remain
-  stable; Changes view and the remaining catalog are deferred to later gates.
+      File view now highlights Go, C#, JavaScript/JSX, and TypeScript/TSX through
+      bounded Tree-sitter ranges, fixed semantic classes, escaped token output,
+      and plain-render fallback. Existing source IDs and line-ending gaps remain
+      stable; Changes view and the remaining catalog are deferred to later gates.
 - [x] Complete submilestone 12.4: remaining default source catalog. File-view
-  highlighting now admits JSON, HTML, CSS, SCSS, and XML-backed `.csproj`
-  documents; JavaScript aliases remain explicitly covered, while Markdown and
-  unsupported custom extensions retain their existing plain/Goldmark paths.
+      highlighting now admits JSON, HTML, CSS, SCSS, and XML-backed `.csproj`
+      documents; JavaScript aliases remain explicitly covered, while Markdown and
+      unsupported custom extensions retain their existing plain/Goldmark paths.
 - [x] Complete submilestone 12.5: Changes-view highlighting. Base and current
-  panes now receive independent bounded token ranges; current source IDs and
-  annotation offsets remain stable, base rows remain non-selectable, and
-  Markdown uses its grammar only in Changes view.
+      panes now receive independent bounded token ranges; current source IDs and
+      annotation offsets remain stable, base rows remain non-selectable, and
+      Markdown uses its grammar only in Changes view.
 - [ ] Complete submilestone 12.6: hardening and release. Go/frontend/race
-  verification, the full 41-scenario browser suite, and six-platform builds
-  pass. The highlighted binaries are currently 16.33–17.89% larger than the
-  pre-highlighting artifacts, requiring maintainer review against the 12.1
-  size budget.
+      verification, the full 41-scenario browser suite, and six-platform builds
+      pass. The highlighted binaries are currently 16.33–17.89% larger than the
+      pre-highlighting artifacts, requiring maintainer review against the 12.1
+      size budget.
 
 ### 13. Agent server discovery
 
@@ -339,11 +339,11 @@ See [`docs/designs/server-discovery.md`](docs/designs/server-discovery.md).
 
 - [x] Define the discovery registry format, location, and security boundary.
 - [x] Implement the discovery package (register, list, remove, state-dir
-  resolution, `CODE_ANNOTATOR_STATE_DIR` override).
+      resolution, `CODE_ANNOTATOR_STATE_DIR` override).
 - [x] Register review-mode servers on startup and deregister on clean
-  shutdown.
+      shutdown.
 - [x] Add the `agent discover` CLI subcommand with `/healthz` liveness
-  verification and `--root` disambiguation.
+      verification and `--root` disambiguation.
 - [x] Self-heal stale registry entries left behind by an unclean exit.
 - [x] Update the agent skill to try discovery before asking a human for a URL.
 - [x] Add discovery, command, and end-to-end lifecycle tests.
@@ -357,14 +357,14 @@ Design: [`docs/designs/typescript-migration.md`](docs/designs/typescript-migrati
 - [x] Add Sass source partials, compile, and watch commands for the stylesheet.
 - [x] Add a TypeScript watch command for save-time frontend development.
 - [x] Add the `web/src` authored-source and `web/generated` generated-asset
-  layout.
+      layout.
 - [x] Define shared browser API and annotation types.
 - [x] Convert review leaf modules and the API boundary.
 - [x] Convert review controllers, rendering, selection, and navigation.
 - [x] Convert standalone viewer and Mermaid integration scripts.
 - [x] Embed generated assets while preserving existing `/static/*.js` routes.
 - [x] Keep generated assets reproducible and verify them locally with a clean
-  generated-output check.
+      generated-output check.
 - [ ] Add a CI workflow check for generated-asset reproducibility.
 - [x] Run typecheck, Go tests, vet, and race checks.
 - [x] Run browser regression tests with a working Edge process.
@@ -375,51 +375,51 @@ Design: [`docs/designs/typescript-migration.md`](docs/designs/typescript-migrati
 Design: [`docs/designs/cross-document-comment-status.md`](docs/designs/cross-document-comment-status.md).
 
 - [x] Replace the flat document list with an expandable file tree containing
-  explicit directory rows, preserving existing catalog ordering and
-  navigation.
+      explicit directory rows, preserving existing catalog ordering and
+      navigation.
 - [x] Define the document-level active-comment summary from the existing
-  annotation queue response.
+      annotation queue response.
 - [x] Add mutually exclusive `Changed only` and `Open comments` scope toggles
-  to the file tree.
+      to the file tree.
 - [x] Display accessible per-document active-comment counts and a matching
-  document total.
+      document total.
 - [x] Preserve document hierarchy, navigation, lookup, collapsed-sidebar
-  state, and File/Changes mode while filtering.
+      state, and File/Changes mode while filtering.
 - [x] Refresh counts after annotation creation, replies, lifecycle changes,
-  reattachment, and revision-conflict reloads.
+      reattachment, and revision-conflict reloads.
 - [x] Add unit and browser coverage for filtering, counts, empty results,
-  keyboard access, and narrow layouts.
+      keyboard access, and narrow layouts.
 - [x] Update user-facing documentation and verify the complete milestone.
 
 Cheap queue polling follow-up, see
 [`docs/designs/queue-etag.md`](docs/designs/queue-etag.md):
 
 - [x] Add `ETag`/`If-None-Match` support to `GET /api/annotations`, splitting
-  the handler into a cheap candidate-collection phase and an expensive
-  anchor-resolution phase so a matching poll skips the latter entirely.
+      the handler into a cheap candidate-collection phase and an expensive
+      anchor-resolution phase so a matching poll skips the latter entirely.
 - [x] Add `--etag` to `agent queue`, with output unchanged when omitted and a
-  small `{"etag","modified","queue"}` envelope when passed.
+      small `{"etag","modified","queue"}` envelope when passed.
 - [x] Add server-side ETag/304 tests and CLI `--etag` tests.
 - [x] Update the agent skill and `server-discovery.md` to explain that
-  establishing a polling loop is the caller's own runtime/orchestration
-  concern (a scheduled wakeup, `/loop`, a cron job); this project only makes
-  each individual poll cheap.
+      establishing a polling loop is the caller's own runtime/orchestration
+      concern (a scheduled wakeup, `/loop`, a cron job); this project only makes
+      each individual poll cheap.
 
 ### 16. Skill-managed agent queue polling
 
 Design: [`docs/designs/agent-queue-polling.md`](docs/designs/agent-queue-polling.md).
 
 - [x] Add a skill-bundled polling helper with URL discovery and configurable
-  interval/status options.
+      interval/status options.
 - [x] Carry the queue ETag between polls and emit only changed queue payloads
-  on stdout.
+      on stdout.
 - [x] Keep processing and annotation mutations in the existing live workflow;
-  make the helper read-only and signal-safe.
+      make the helper read-only and signal-safe.
 - [x] Add fake-CLI shell tests for discovery, retries, ETag carry-forward,
-  unchanged polls, and `--once`.
+      unchanged polls, and `--once`.
 - [x] Document the helper in the skill and user-facing agent handoff docs.
 - [x] Run the complete Go, vet, race, and browser checks and close the
-  milestone. The full matrix passed on 2026-08-24.
+      milestone. The full matrix passed on 2026-08-24.
 
 ### 17. Server-rendered review UI and testable TypeScript
 
@@ -431,71 +431,76 @@ complete and commit only one item, report its checks and commit hash, and wait
 for explicit approval before starting the next item.
 
 - [x] Commit 0: approve the architecture, documentation authority, milestones,
-  acceptance criteria, and one-commit-at-a-time review protocol.
+      acceptance criteria, and one-commit-at-a-time review protocol.
 - [x] Commit 1: add Vitest/`happy-dom`, `test:unit`, and the first surviving
-  pure TypeScript extraction without changing runtime behavior.
+      pure TypeScript extraction without changing runtime behavior.
 - [x] Commit 2: vendor, license, embed, and serve HTMX 2.0.10 without loading it
-  in the page.
+      in the page.
 - [x] Commit 3: add inactive annotation fragment templates, presentation view
-  models, and escaping/action-availability tests.
+      models, and escaping/action-availability tests.
 - [x] Role-only compatibility commit: remove free-text authorship, use one role
-  across storage/API/CLI/browser contracts, and migrate schema v1 sidecars on
-  their next successful save.
+      across storage/API/CLI/browser contracts, and migrate schema v1 sidecars on
+      their next successful save.
 - [x] Commit 4: share annotation read/create application operations and add
-  compatible HTML handlers while preserving JSON behavior.
+      compatible HTML handlers while preserving JSON behavior.
 - [x] Commit 4 review follow-up: preserve comments when a captured selection's
-  document digest is stale, expose the result as requiring reattachment, and
-  use anchor terminology consistently across shared operations.
+      document digest is stale, expose the result as requiring reattachment, and
+      use anchor terminology consistently across shared operations.
 - [x] Commit 5: share reply/transition operations and add 422/409 HTML
-  responses while preserving JSON behavior.
+      responses while preserving JSON behavior.
 - [x] Commit 6: share reattach operations and complete the inactive HTML
-  mutation surface.
+      mutation surface.
 - [x] Commit 7: activate the HTMX annotation panel, retain browser-only
-  selection/highlight/navigation adapters, and remove superseded DOM renderers.
+      selection/highlight/navigation adapters, and remove superseded DOM renderers.
 - [x] Commit 7 review follow-up A: establish the inactive versioned viewer-state
-  endpoint, runtime-validated TypeScript contract, and shrinking `data-*`
-  enforcement baseline.
+      endpoint, runtime-validated TypeScript contract, and shrinking `data-*`
+      enforcement baseline.
 - [x] Commit 7 review follow-up B: migrate annotation, source, Mermaid,
-  lifecycle, revision, digest, selection, and navigation state from custom
-  attributes to semantic IDs and typed in-memory state.
+      lifecycle, revision, digest, selection, and navigation state from custom
+      attributes to semantic IDs and typed in-memory state.
 - [x] Commit 7 review follow-up C: define and inventory the DOM/state boundary,
-  revise the remaining gates, and stop before implementation.
+      revise the remaining gates, and stop before implementation.
 - [x] Commit 8A: add runtime-validated document catalog state and pure DOM-free
-  tree/filter/count logic without activating it.
+      tree/filter/count logic without activating it.
 - [x] Commit 8B: server-render the document tree and counts; activate server
-  filtering only if the documented 5,000-path benchmark passes.
+      filtering only if the documented 5,000-path benchmark passes.
 - [x] Commit 9: server-render comparison selection while retaining the JSON
-  comparison API.
+      comparison API.
 - [x] Commit 10: replace remaining import-time IIFEs with explicit,
-  dependency-injected initializers and finish TypeScript unit/lint coverage.
+      dependency-injected initializers and finish TypeScript unit/lint coverage.
 - [x] Commit 11: run the complete verification matrix, reconcile all docs,
-  remove dead assets/tests, and refresh distributions after source approval.
+      remove dead assets/tests, and refresh distributions after source approval.
+
+### 18. Keyboard accessibility and annotation card actions
+
+- [x]   - ? showing keyboard shortcuts
+- [x]   - keyboard shortcut implementation
 
 ## Decisions
 
-| Decision | Status |
-| --- | --- |
-| Local HTTP server with embedded frontend assets | Approved |
-| Loopback-only binding with OS-selected port by default | Approved |
-| `github.com/yuin/goldmark` with GFM and raw HTML disabled | Approved |
-| `github.com/pkg/browser` for default-browser launch | Approved |
-| Browser-launch failure is non-fatal | Approved |
-| Annotations stored separately from Markdown in versioned JSON sidecars | Approved |
-| Annotation review scheduled before live reload | Approved |
-| Mermaid rendered client-side from an embedded pinned bundle | Approved |
-| Mermaid uses strict security and no runtime CDN or browser automation | Approved |
-| Live reload deferred until after annotation and diagram milestones | Approved |
-| Editing and network sharing deferred | Approved |
-| Agent discovery registers via a cooperative per-user registry file, never a port scan | Approved |
-| Discovery registry never stores the review mutation token | Approved |
-| TypeScript source compiles to checked-in generated browser assets | Approved |
-| Existing browser module boundaries and `/static/*.js` URLs remain stable | Approved |
-| Go templates own authoritative review HTML; TypeScript owns browser-only interaction | Approved |
-| Existing `/api/*` JSON contracts remain stable; browser fragments use separate `/ui/*` routes | Approved |
-| HTMX 2.0.10 is pinned, vendored, licensed, embedded, and loaded only from the viewer origin | Approved |
-| Milestone 17 advances one reviewed commit at a time and stops after every commit | Approved |
-| Repository documentation is updated with each slice and is the cross-session handoff contract | Approved |
-| Annotation role is both attribution and permission; free-text authorship is not stored | Approved |
+| Decision                                                                                                   | Status   |
+| ---------------------------------------------------------------------------------------------------------- | -------- |
+| Local HTTP server with embedded frontend assets                                                            | Approved |
+| Loopback-only binding with OS-selected port by default                                                     | Approved |
+| `github.com/yuin/goldmark` with GFM and raw HTML disabled                                                  | Approved |
+| `github.com/pkg/browser` for default-browser launch                                                        | Approved |
+| Browser-launch failure is non-fatal                                                                        | Approved |
+| Annotations stored separately from Markdown in versioned JSON sidecars                                     | Approved |
+| Annotation review scheduled before live reload                                                             | Approved |
+| Mermaid rendered client-side from an embedded pinned bundle                                                | Approved |
+| Mermaid uses strict security and no runtime CDN or browser automation                                      | Approved |
+| Live reload deferred until after annotation and diagram milestones                                         | Approved |
+| Editing and network sharing deferred                                                                       | Approved |
+| Agent discovery registers via a cooperative per-user registry file, never a port scan                      | Approved |
+| Discovery registry never stores the review mutation token                                                  | Approved |
+| TypeScript source compiles to checked-in generated browser assets                                          | Approved |
+| Existing browser module boundaries and `/static/*.js` URLs remain stable                                   | Approved |
+| Go templates own authoritative review HTML; TypeScript owns browser-only interaction                       | Approved |
+| Existing `/api/*` JSON contracts remain stable; browser fragments use separate `/ui/*` routes              | Approved |
+| HTMX 2.0.10 is pinned, vendored, licensed, embedded, and loaded only from the viewer origin                | Approved |
+| Milestone 17 advances one reviewed commit at a time and stops after every commit                           | Approved |
+| Repository documentation is updated with each slice and is the cross-session handoff contract              | Approved |
+| Annotation role is both attribution and permission; free-text authorship is not stored                     | Approved |
 | DOM may provide interaction and layout input but never document, annotation, comparison, or workflow state | Approved |
 
 ## Known risks
